@@ -123,5 +123,117 @@ export const StorageService = {
   async importFullData(data: FitTrackerData): Promise<void> {
     await this.saveData(data);
   },
+
+  /**
+   * Supprime une séance complète de l'historique par ID.
+   */
+  async deleteWorkoutSession(sessionId: string): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedHistory = currentData.history.filter((s) => s.id !== sessionId);
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      history: updatedHistory,
+      profile: {
+        ...currentData.profile,
+        totalWorkouts: Math.max(0, currentData.profile.totalWorkouts - 1),
+      },
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Supprime un exercice spécifique d'une séance dans l'historique.
+   */
+  async deleteExerciseFromSession(sessionId: string, exerciseId: string): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedHistory = currentData.history.map((session) => {
+      if (session.id !== sessionId) return session;
+
+      const updatedExercises = session.exercises.filter((ex) => ex.id !== exerciseId);
+
+      let volume = 0;
+      let completedCount = 0;
+      let totalCount = 0;
+
+      updatedExercises.forEach((ex) => {
+        ex.sets.forEach((s) => {
+          totalCount++;
+          if (s.completed) {
+            completedCount++;
+            if (s.type !== 'warmup' && s.weightKg && s.reps) {
+              volume += s.weightKg * s.reps;
+            }
+          }
+        });
+      });
+
+      return {
+        ...session,
+        exercises: updatedExercises,
+        totalVolumeKg: volume,
+        completedSetsCount: completedCount,
+        totalSetsCount: totalCount,
+      };
+    });
+
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      history: updatedHistory,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Supprime une série spécifique d'un exercice d'une séance dans l'historique.
+   */
+  async deleteSetFromSession(sessionId: string, exerciseId: string, setId: string): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedHistory = currentData.history.map((session) => {
+      if (session.id !== sessionId) return session;
+
+      const updatedExercises = session.exercises.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+
+        const updatedSets = ex.sets
+          .filter((s) => s.id !== setId)
+          .map((s, idx) => ({ ...s, setNumber: idx + 1 }));
+
+        return { ...ex, sets: updatedSets };
+      });
+
+      let volume = 0;
+      let completedCount = 0;
+      let totalCount = 0;
+
+      updatedExercises.forEach((ex) => {
+        ex.sets.forEach((s) => {
+          totalCount++;
+          if (s.completed) {
+            completedCount++;
+            if (s.type !== 'warmup' && s.weightKg && s.reps) {
+              volume += s.weightKg * s.reps;
+            }
+          }
+        });
+      });
+
+      return {
+        ...session,
+        exercises: updatedExercises,
+        totalVolumeKg: volume,
+        completedSetsCount: completedCount,
+        totalSetsCount: totalCount,
+      };
+    });
+
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      history: updatedHistory,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
 };
 

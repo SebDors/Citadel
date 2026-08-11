@@ -29,6 +29,9 @@ interface WorkoutContextType {
   renameFolder: (folderId: string, newName: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   toggleFolderCollapse: (folderId: string) => Promise<void>;
+  deleteWorkoutSession: (sessionId: string) => Promise<void>;
+  deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
+  deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
   // Rest Timer State
   restTimer: {
@@ -572,6 +575,21 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const deleteWorkoutSession = async (sessionId: string) => {
+    const updated = await StorageService.deleteWorkoutSession(sessionId);
+    setData(updated);
+  };
+
+  const deleteExerciseFromSession = async (sessionId: string, exerciseId: string) => {
+    const updated = await StorageService.deleteExerciseFromSession(sessionId, exerciseId);
+    setData(updated);
+  };
+
+  const deleteSetFromSession = async (sessionId: string, exerciseId: string, setId: string) => {
+    const updated = await StorageService.deleteSetFromSession(sessionId, exerciseId, setId);
+    setData(updated);
+  };
+
   const dismissRestTimer = () => {
     setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
   };
@@ -616,6 +634,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         renameFolder,
         deleteFolder,
         toggleFolderCollapse,
+        deleteWorkoutSession,
+        deleteExerciseFromSession,
+        deleteSetFromSession,
         reloadAllData,
         restTimer,
         dismissRestTimer,
