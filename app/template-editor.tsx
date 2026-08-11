@@ -34,6 +34,7 @@ import {
   Check,
   Timer,
   RotateCcw,
+  Layers,
 } from 'lucide-react-native';
 
 
@@ -54,6 +55,20 @@ export default function TemplateEditorScreen() {
 
   // Target set for type picker modal: { exIdx, setIdx }
   const [activeSetTarget, setActiveSetTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
+
+  // Target exercise for superset modal
+  const [supersetModalExIdx, setSupersetModalExIdx] = useState<number | null>(null);
+
+  // Set or remove superset group for exercise
+  const handleSetSupersetGroup = (exIdx: number, supersetGroup?: string) => {
+    const updated = [...selectedExercises];
+    updated[exIdx] = {
+      ...updated[exIdx],
+      supersetGroup: supersetGroup || undefined,
+    };
+    setSelectedExercises(updated);
+    setSupersetModalExIdx(null);
+  };
 
   // Load existing template if editing
   useEffect(() => {
@@ -262,16 +277,44 @@ export default function TemplateEditorScreen() {
         {selectedExercises.map((ex, exIdx) => {
           const exRest = ex.restSeconds ?? defaultRestSeconds;
           return (
-            <View key={ex.id} style={[styles.exCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <View
+              key={ex.id}
+              style={[
+                styles.exCard,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+                ex.supersetGroup ? { borderColor: theme.supersetTag, borderWidth: 2 } : undefined,
+              ]}
+            >
+              {/* Badge Groupe Superset */}
+              {ex.supersetGroup && (
+                <View style={[styles.supersetHeader, { backgroundColor: theme.supersetTag }]}>
+                  <Layers size={14} color="#FFFFFF" />
+                  <Text style={styles.supersetText}>{ex.supersetGroup}</Text>
+                </View>
+              )}
+
               {/* En-tête de l'exercice */}
               <View style={styles.exHeader}>
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={[styles.exName, { color: theme.text }]}>{ex.exerciseName}</Text>
                   <Text style={[styles.exMuscle, { color: theme.textMuted }]}>{ex.primaryMuscle}</Text>
                 </View>
-                <TouchableOpacity onPress={() => handleRemoveExercise(exIdx)}>
-                  <Trash2 size={18} color={theme.danger} />
-                </TouchableOpacity>
+                <View style={styles.exHeaderActions}>
+                  <TouchableOpacity
+                    style={styles.headerActionBtn}
+                    onPress={() => setSupersetModalExIdx(exIdx)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Layers size={18} color={ex.supersetGroup ? theme.supersetTag : theme.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.headerActionBtn}
+                    onPress={() => handleRemoveExercise(exIdx)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Trash2 size={18} color={theme.danger} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Reglage du temps de repos spécifique de l'exercice */}
@@ -436,6 +479,54 @@ export default function TemplateEditorScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* Modal / Volet de Sélection du Groupe Superset */}
+      <Modal
+        visible={supersetModalExIdx !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSupersetModalExIdx(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSupersetModalExIdx(null)}
+        >
+          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.text, textAlign: 'center', marginBottom: 12 }]}>
+              Groupe Superset
+            </Text>
+            {['Superset A', 'Superset B', 'Superset C'].map((group) => {
+              const currentGroup =
+                supersetModalExIdx !== null ? selectedExercises[supersetModalExIdx]?.supersetGroup : undefined;
+              const isSelected = currentGroup === group;
+              return (
+                <TouchableOpacity
+                  key={group}
+                  style={[
+                    styles.menuItem,
+                    { borderBottomColor: theme.border },
+                    isSelected && { backgroundColor: theme.surface },
+                  ]}
+                  onPress={() => supersetModalExIdx !== null && handleSetSupersetGroup(supersetModalExIdx, group)}
+                >
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>{group}</Text>
+                  {isSelected && <Check size={16} color={theme.accent} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            {supersetModalExIdx !== null && selectedExercises[supersetModalExIdx]?.supersetGroup && (
+              <TouchableOpacity
+                style={[styles.menuItem, { marginTop: 6, borderBottomWidth: 0 }]}
+                onPress={() => handleSetSupersetGroup(supersetModalExIdx, undefined)}
+              >
+                <Text style={[styles.menuItemText, { color: theme.danger }]}>Retirer du Superset</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Modal Sélection d'Exercice avec Barre de Recherche */}
       <Modal
         visible={showPickerModal}
@@ -594,11 +685,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
+  supersetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  supersetText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
   exHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  exHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActionBtn: {
+    padding: 4,
+    marginLeft: 8,
   },
   exName: {
     fontSize: 15,
@@ -750,6 +865,29 @@ const styles = StyleSheet.create({
   },
   typeOptionDesc: {
     fontSize: 12,
+  },
+  menuContainer: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    alignSelf: 'center',
+    marginBottom: 'auto',
+    marginTop: 'auto',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderBottomWidth: 0.5,
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
   },
   modalContent: {
     width: '90%',
