@@ -8,7 +8,7 @@ import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasureme
 import { JsonActionsCard } from '../../src/components/Profile/JsonActionsCard';
 
 export default function ProfileTab() {
-  const { data, addMeasurement, reloadAllData } = useWorkout();
+  const { data, addMeasurement, deleteMeasurement, updateUserProfile, reloadAllData } = useWorkout();
   const { theme } = useTheme();
 
   if (!data) return null;
@@ -24,14 +24,18 @@ export default function ProfileTab() {
           </Text>
         </View>
 
-        {/* 1. Carte En-tête Profil */}
-        <ProfileHeaderCard profile={data.profile} />
+        {/* 1. Carte En-tête Profil avec Réglages */}
+        <ProfileHeaderCard profile={data.profile} onUpdateProfile={updateUserProfile} />
 
         {/* 2. Graphiques / Cartes de Performance 1RM */}
         <OneRMChartCard />
 
-        {/* 3. Suivi du Poids et Mensurations */}
-        <BodyMeasurementsCard measurements={data.measurements} onAddMeasurement={addMeasurement} />
+        {/* 3. Suivi du Poids et Mensurations avec option de suppression */}
+        <BodyMeasurementsCard
+          measurements={data.measurements}
+          onAddMeasurement={addMeasurement}
+          onDeleteMeasurement={deleteMeasurement}
+        />
 
         {/* 4. Zone Réglages & Données JSON */}
         <JsonActionsCard data={data} onImportSuccess={reloadAllData} />

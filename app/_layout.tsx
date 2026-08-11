@@ -13,6 +13,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="live-workout" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="template-editor" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="workout-analytics" options={{ presentation: 'card' }} />
         </Stack>
       </WorkoutProvider>
     </ThemeProvider>

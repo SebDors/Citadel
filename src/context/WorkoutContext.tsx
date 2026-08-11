@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FitTrackerData, WorkoutSession, WorkoutTemplate, WorkoutExercise, WorkoutSet, SetType, BodyMeasurement } from '../types';
+import { FitTrackerData, WorkoutSession, WorkoutTemplate, WorkoutExercise, WorkoutSet, SetType, BodyMeasurement, UserProfile } from '../types';
 import { StorageService } from '../services/storage';
 
 interface WorkoutContextType {
@@ -16,7 +16,13 @@ interface WorkoutContextType {
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number) => void;
   removeExercise: (exerciseId: string) => void;
   duplicateExercise: (exerciseId: string) => void;
+  updateExerciseRestTime: (exerciseId: string, newRestSeconds: number) => void;
+  setExerciseSupersetGroup: (exerciseId: string, supersetGroup?: string) => void;
   addMeasurement: (measurement: BodyMeasurement) => Promise<void>;
+  deleteMeasurement: (id: string) => Promise<void>;
+  updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  saveTemplate: (template: WorkoutTemplate) => Promise<void>;
+  deleteTemplate: (templateId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
   // Rest Timer State
   restTimer: {
@@ -36,7 +42,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
 
-  // Rest Timer State
   const [restTimer, setRestTimer] = useState<{
     active: boolean;
     exerciseName: string;
@@ -63,7 +68,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     reloadAllData();
   }, []);
 
-  // Décompte du Minuteur de Repos (basé sur horodatage cible pour fiabilité en arrière-plan)
+  // Décompte du Minuteur de Repos
   useEffect(() => {
     if (!restTimer.active || !restTimer.targetEndTime) return;
 
@@ -80,7 +85,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => clearInterval(interval);
   }, [restTimer.active, restTimer.targetEndTime]);
 
-  // Durée de la séance en cours (Chronomètre)
+  // Durée de la séance en cours
   useEffect(() => {
     if (!activeSession || activeSession.status !== 'in_progress') return;
 
@@ -108,10 +113,20 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       totalSetsCount: template ? template.exercises.reduce((acc, ex) => acc + ex.sets.length, 0) : 0,
       status: 'in_progress',
       isCircuit: template?.isCircuit,
-      circuitRounds: template?.circuitRounds,
-      restBetweenRoundsSeconds: template?.restBetweenRoundsSeconds,
+      circuitRounds: template?.circuitRounds || 3,
+      currentCircuitRound: 1,
+      restBetweenRoundsSeconds: template?.restBetweenRoundsSeconds || 105,
       exercises: template
-        ? JSON.parse(JSON.stringify(template.exercises)) // Deep copy
+        ? JSON.parse(JSON.stringify(template.exercises)).map((ex: WorkoutExercise) => ({
+            ...ex,
+            sets: ex.sets.map((s) => ({
+              ...s,
+              // REMARQUE DEMANDÉE PAR L'UTILISATEUR : Ne pas pré-remplir les inputs weightKg et reps
+              weightKg: undefined,
+              reps: undefined,
+              completed: false,
+            })),
+          }))
         : [],
     };
 
@@ -129,9 +144,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         totalCount++;
         if (s.completed) {
           completedCount++;
-          // Seules les séries non-échauffement sont comptabilisées dans le volume
-          if (s.type !== 'warmup') {
-            volume += (s.weightKg || 0) * (s.reps || 0);
+          if (s.type !== 'warmup' && s.weightKg && s.reps) {
+            volume += s.weightKg * s.reps;
           }
         }
       });
@@ -182,7 +196,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (s.id !== setId) return s;
         const newCompleted = !s.completed;
 
-        // Si la série passe à validée, déclencher le minuteur de repos
         if (newCompleted) {
           const targetEnd = Date.now() + targetRestSeconds * 1000;
           setRestTimer({
@@ -227,11 +240,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         setNumber: ex.sets.length + 1,
         type: lastSet ? lastSet.type : 'normal',
-        weightKg: lastSet ? lastSet.weightKg : 0,
-        reps: lastSet ? lastSet.reps : 10,
+        weightKg: undefined, // Non pré-rempli selon demande utilisateur
+        reps: undefined,     // Non pré-rempli selon demande utilisateur
         rir: lastSet ? lastSet.rir : 2,
         completed: false,
-        previous: lastSet ? `${lastSet.weightKg}kg x ${lastSet.reps}` : undefined,
+        previous: lastSet?.previous || undefined,
       };
 
       return { ...ex, sets: [...ex.sets, newSet] };
@@ -296,8 +309,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           id: `s_${Date.now()}_1`,
           setNumber: 1,
           type: 'normal',
-          weightKg: 20,
-          reps: 10,
+          weightKg: undefined,
+          reps: undefined,
           rir: 2,
           completed: false,
         },
@@ -364,6 +377,40 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveCurrentWorkout(updatedSession);
   };
 
+  const updateExerciseRestTime = (exerciseId: string, newRestSeconds: number) => {
+    if (!activeSession) return;
+
+    const updatedExercises = activeSession.exercises.map((ex) => {
+      if (ex.id !== exerciseId) return ex;
+      return { ...ex, restSeconds: newRestSeconds };
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      exercises: updatedExercises,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const setExerciseSupersetGroup = (exerciseId: string, supersetGroup?: string) => {
+    if (!activeSession) return;
+
+    const updatedExercises = activeSession.exercises.map((ex) => {
+      if (ex.id !== exerciseId) return ex;
+      return { ...ex, supersetGroup };
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      exercises: updatedExercises,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
   const finishWorkout = async () => {
     if (!activeSession) return;
 
@@ -388,6 +435,53 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addMeasurement = async (measurement: BodyMeasurement) => {
     const updatedData = await StorageService.addMeasurement(measurement);
     setData(updatedData);
+  };
+
+  const deleteMeasurement = async (id: string) => {
+    if (!data) return;
+    const updated = {
+      ...data,
+      measurements: data.measurements.filter((m) => m.id !== id),
+    };
+    await StorageService.saveData(updated);
+    setData(updated);
+  };
+
+  const updateUserProfile = async (profileData: Partial<UserProfile>) => {
+    if (!data) return;
+    const updated = {
+      ...data,
+      profile: {
+        ...data.profile,
+        ...profileData,
+      },
+    };
+    await StorageService.saveData(updated);
+    setData(updated);
+  };
+
+  const saveTemplate = async (template: WorkoutTemplate) => {
+    if (!data) return;
+    const existingIndex = data.templates.findIndex((t) => t.id === template.id);
+    let updatedTemplates = [...data.templates];
+    if (existingIndex >= 0) {
+      updatedTemplates[existingIndex] = template;
+    } else {
+      updatedTemplates.push(template);
+    }
+    const updated = { ...data, templates: updatedTemplates };
+    await StorageService.saveData(updated);
+    setData(updated);
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    if (!data) return;
+    const updated = {
+      ...data,
+      templates: data.templates.filter((t) => t.id !== templateId),
+    };
+    await StorageService.saveData(updated);
+    setData(updated);
   };
 
   const dismissRestTimer = () => {
@@ -421,7 +515,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addExerciseToActiveWorkout,
         removeExercise,
         duplicateExercise,
+        updateExerciseRestTime,
+        setExerciseSupersetGroup,
         addMeasurement,
+        deleteMeasurement,
+        updateUserProfile,
+        saveTemplate,
+        deleteTemplate,
         reloadAllData,
         restTimer,
         dismissRestTimer,

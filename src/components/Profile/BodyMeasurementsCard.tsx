@@ -4,16 +4,18 @@ import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { Activity, Plus } from 'lucide-react-native';
+import { Activity, Plus, Trash2 } from 'lucide-react-native';
 
 interface BodyMeasurementsCardProps {
   measurements: BodyMeasurement[];
   onAddMeasurement: (m: BodyMeasurement) => void;
+  onDeleteMeasurement: (id: string) => void;
 }
 
 export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   measurements,
   onAddMeasurement,
+  onDeleteMeasurement,
 }) => {
   const { theme } = useTheme();
   const [showAdd, setShowAdd] = useState(false);
@@ -96,7 +98,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
         </View>
       )}
 
-      {/* Liste des dernières mesures */}
+      {/* Liste des dernières mesures avec bouton de suppression */}
       {measurements.map((m) => (
         <View key={m.id} style={[styles.mRow, { borderBottomColor: theme.border }]}>
           <Text style={[styles.mDate, { color: theme.textMuted }]}>{m.date}</Text>
@@ -105,6 +107,10 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
             {m.chestCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {m.chestCm}cm</Text>}
             {m.waistCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>T: {m.waistCm}cm</Text>}
             {m.bicepsCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {m.bicepsCm}cm</Text>}
+
+            <TouchableOpacity onPress={() => onDeleteMeasurement(m.id)} style={{ marginLeft: 10 }}>
+              <Trash2 size={15} color={theme.danger} />
+            </TouchableOpacity>
           </View>
         </View>
       ))}
@@ -170,10 +176,10 @@ const styles = StyleSheet.create({
   mVal: {
     fontSize: 14,
     fontWeight: '800',
-    marginRight: 8,
+    marginRight: 4,
   },
   mSub: {
     fontSize: 12,
-    marginLeft: 6,
+    marginLeft: 4,
   },
 });
