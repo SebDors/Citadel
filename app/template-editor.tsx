@@ -36,7 +36,7 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 
-const PRESET_REST_TIMES = [45, 60, 75, 90, 120, 180];
+
 
 export default function TemplateEditorScreen() {
   const { theme } = useTheme();
@@ -218,55 +218,29 @@ export default function TemplateEditorScreen() {
 
         {/* Temps de repos par défaut de la séance */}
         <View style={[styles.defaultRestCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.defaultRestHeader}>
-            <View style={styles.rowAlign}>
-              <Timer size={18} color={theme.accent} style={{ marginRight: 6 }} />
-              <Text style={[styles.defaultRestTitle, { color: theme.text }]}>
-                Repos par défaut de la séance
-              </Text>
-            </View>
-            <View style={styles.restStepper}>
-              <TouchableOpacity
-                style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                onPress={() => handleAdjustDefaultRest(-15)}
-              >
-                <Text style={[styles.stepperBtnText, { color: theme.text }]}>-15s</Text>
-              </TouchableOpacity>
-              <Text style={[styles.restValueText, { color: theme.accent }]}>{defaultRestSeconds}s</Text>
-              <TouchableOpacity
-                style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                onPress={() => handleAdjustDefaultRest(15)}
-              >
-                <Text style={[styles.stepperBtnText, { color: theme.text }]}>+15s</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.rowAlign}>
+            <Timer size={18} color={theme.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.defaultRestTitle, { color: theme.text }]}>
+              Repos par défaut de la séance
+            </Text>
           </View>
 
-          {/* Raccourcis temps de repos */}
-          <View style={styles.presetsRow}>
-            {PRESET_REST_TIMES.map((sec) => (
-              <TouchableOpacity
-                key={sec}
-                style={[
-                  styles.presetChip,
-                  {
-                    backgroundColor: defaultRestSeconds === sec ? theme.accent : theme.cardBg,
-                    borderColor: defaultRestSeconds === sec ? theme.accent : theme.border,
-                  },
-                ]}
-                onPress={() => setDefaultRestSeconds(sec)}
-              >
-                <Text
-                  style={[
-                    styles.presetChipText,
-                    { color: defaultRestSeconds === sec ? '#FFFFFF' : theme.text },
-                  ]}
-                >
-                  {sec}s
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.restStepper}>
+            <TouchableOpacity
+              style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+              onPress={() => handleAdjustDefaultRest(-15)}
+            >
+              <Text style={[styles.stepperBtnText, { color: theme.text }]}>-15s</Text>
+            </TouchableOpacity>
+            <Text style={[styles.restValueText, { color: theme.accent }]}>{defaultRestSeconds}s</Text>
+            <TouchableOpacity
+              style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+              onPress={() => handleAdjustDefaultRest(15)}
+            >
+              <Text style={[styles.stepperBtnText, { color: theme.text }]}>+15s</Text>
+            </TouchableOpacity>
           </View>
+
           <Text style={[styles.defaultRestHint, { color: theme.textMuted }]}>
             Ce temps sera attribué par défaut aux nouveaux exercices ajoutés.
           </Text>
@@ -569,12 +543,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 12,
   },
-  defaultRestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
   defaultRestTitle: {
     fontSize: 14,
     fontWeight: '700',
@@ -586,6 +554,7 @@ const styles = StyleSheet.create({
   restStepper: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 10,
   },
   stepperBtn: {
     paddingHorizontal: 8,
@@ -602,25 +571,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginHorizontal: 8,
   },
-  presetsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginVertical: 6,
-  },
-  presetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  presetChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   defaultRestHint: {
     fontSize: 11,
-    marginTop: 4,
+    marginTop: 8,
   },
   estimatedBox: {
     flexDirection: 'row',
