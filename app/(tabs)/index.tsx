@@ -28,6 +28,7 @@ import {
   Folder,
   FolderPlus,
   ChevronDown,
+  ChevronUp,
   Edit2,
   Copy,
   Trash2,
@@ -67,6 +68,13 @@ export default function WorkoutTab() {
   const [selectedFolder, setSelectedFolder] = useState<WorkoutFolder | null>(null);
   const [showRenameFolderModal, setShowRenameFolderModal] = useState(false);
   const [renameFolderName, setRenameFolderName] = useState('');
+
+  // Compact cards state
+  const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
+
+  const toggleCardCollapse = (id: string) => {
+    setCollapsedCards((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleStartFreestyle = () => {
     startWorkout();
@@ -122,13 +130,48 @@ export default function WorkoutTab() {
 
   // Render a Workout Template Card (High Density layout)
   const renderTemplateCard = (tpl: WorkoutTemplate) => {
+    const isCompact = !!collapsedCards[tpl.id];
     const inlineExercisesText = tpl.exercises.map((ex) => ex.exerciseName).join(', ');
     const realLast = getRealLastWorkoutDate(data?.history || [], tpl.title);
-    const lastDateText = realLast ? `${realLast.dateFormatted} - voir le récap` : 'Jamais réalisée';
+
+    if (isCompact) {
+      return (
+        <Card key={tpl.id} style={[styles.programCard, { padding: 10 }]}>
+          <View style={styles.compactCardRow}>
+            <View style={styles.compactTitleArea}>
+              <Text style={[styles.templateTitle, { color: theme.text }]} numberOfLines={1}>
+                {tpl.title}
+              </Text>
+              <Text style={[styles.exCountText, { color: theme.textMuted }]}>
+                {tpl.exercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
+              </Text>
+            </View>
+
+            <View style={styles.compactActionsRow}>
+              <Button
+                title="Démarrer"
+                variant="primary"
+                onPress={() => handleStartTemplate(tpl.id)}
+                icon={<Play size={12} color="#FFFFFF" fill="#FFFFFF" />}
+                style={styles.compactStartBtn}
+                textStyle={styles.compactStartBtnText}
+              />
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => toggleCardCollapse(tpl.id)}
+                accessibilityLabel="Déplier la séance"
+              >
+                <ChevronDown size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Card>
+      );
+    }
 
     return (
       <Card key={tpl.id} style={[styles.programCard, { padding: 12 }]}>
-        {/* Card Header: Title + Graph Icon + Options */}
+        {/* Card Header: Title + Graph Icon + Options + Collapse Toggle */}
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleArea}>
             <Text style={[styles.templateTitle, { color: theme.text }]} numberOfLines={1}>
@@ -149,6 +192,13 @@ export default function WorkoutTab() {
             <TouchableOpacity style={styles.iconBtn} onPress={() => handleOpenTemplateMenu(tpl)}>
               <MoreHorizontal size={19} color={theme.text} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => toggleCardCollapse(tpl.id)}
+              accessibilityLabel="Réduire la séance"
+            >
+              <ChevronUp size={18} color={theme.textMuted} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -157,23 +207,25 @@ export default function WorkoutTab() {
           {inlineExercisesText}
         </Text>
 
-        {/* Last Workout Date Badge */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={[styles.recapBadge, { backgroundColor: theme.surface }]}
-          onPress={() => {
-            if (realLast) {
+        {/* Last Workout Date Badge (Only displayed if realLast exists) */}
+        {realLast && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[styles.recapBadge, { backgroundColor: theme.surface }]}
+            onPress={() => {
               router.push({ pathname: '/workout-analytics', params: { id: tpl.id } });
-            }
-          }}
-        >
-          <View style={[styles.recapBar, { backgroundColor: theme.accent }]} />
-          <View style={styles.recapTextRow}>
-            <Text style={[styles.recapSub, { color: theme.textMuted }]}>DERNIER ENTRAÎNEMENT</Text>
-            <Text style={[styles.recapDate, { color: theme.text }]}>{lastDateText}</Text>
-          </View>
-          <ChevronRight size={14} color={theme.textMuted} />
-        </TouchableOpacity>
+            }}
+          >
+            <View style={[styles.recapBar, { backgroundColor: theme.accent }]} />
+            <View style={styles.recapTextRow}>
+              <Text style={[styles.recapSub, { color: theme.textMuted }]}>DERNIER ENTRAÎNEMENT</Text>
+              <Text style={[styles.recapDate, { color: theme.text }]}>
+                {`${realLast.dateFormatted} - voir le récap`}
+              </Text>
+            </View>
+            <ChevronRight size={14} color={theme.textMuted} />
+          </TouchableOpacity>
+        )}
 
         {/* Big Green/Accent Start Button */}
         <Button
@@ -345,7 +397,7 @@ export default function WorkoutTab() {
               }}
             >
               <Play size={18} color={theme.accent} fill={theme.accent} />
-              <Text style={[styles.menuOptionText, { color: theme.text, fontWeight: '800' }]}>▶ Démarrer la séance</Text>
+              <Text style={[styles.menuOptionText, { color: theme.text, fontWeight: '800' }]}>Démarrer la séance</Text>
             </TouchableOpacity>
 
             {/* 2. Modifier */}
@@ -359,7 +411,7 @@ export default function WorkoutTab() {
               }}
             >
               <Edit2 size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>✏️ Modifier la séance</Text>
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>Modifier la séance</Text>
             </TouchableOpacity>
 
             {/* 3. Renommer */}
@@ -374,7 +426,7 @@ export default function WorkoutTab() {
               }}
             >
               <Tag size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>🏷️ Renommer</Text>
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>Renommer</Text>
             </TouchableOpacity>
 
             {/* 4. Dupliquer */}
@@ -388,7 +440,7 @@ export default function WorkoutTab() {
               }}
             >
               <Copy size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>📋 Dupliquer la séance</Text>
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>Dupliquer la séance</Text>
             </TouchableOpacity>
 
             {/* 5. Exporter JSON (Séance vierge) */}
@@ -399,7 +451,7 @@ export default function WorkoutTab() {
               }}
             >
               <Share2 size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>📤 Exporter JSON (Séance vierge)</Text>
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>Exporter JSON (Séance vierge)</Text>
             </TouchableOpacity>
 
             {/* 6. Supprimer */}
@@ -413,7 +465,7 @@ export default function WorkoutTab() {
               }}
             >
               <Trash2 size={18} color={theme.danger} />
-              <Text style={[styles.menuOptionText, { color: theme.danger }]}>🗑️ Supprimer la séance</Text>
+              <Text style={[styles.menuOptionText, { color: theme.danger }]}>Supprimer la séance</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -757,5 +809,28 @@ const styles = StyleSheet.create({
   modalBtnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  compactCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  compactTitleArea: {
+    flex: 1,
+    marginRight: 8,
+  },
+  compactActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactStartBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginVertical: 0,
+    marginRight: 4,
+  },
+  compactStartBtnText: {
+    fontSize: 13,
   },
 });
