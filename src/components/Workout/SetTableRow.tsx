@@ -73,31 +73,31 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         />
       </View>
 
-      {/* RIR (Reps In Reserve) Selector */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        style={[styles.rirButton, { borderColor: theme.border, backgroundColor: theme.surface }]}
-        onPress={() => {
-          const nextRir = (set.rir + 1) % 6;
-          onUpdate('rir', nextRir);
-        }}
-      >
-        <Text style={[styles.rirText, { color: theme.text }]}>RIR {set.rir}</Text>
-      </TouchableOpacity>
+      {/* RIR Direct Numeric Input (Saisie directe du RIR : 0, 1, 2, 3...) */}
+      <View style={styles.colInput}>
+        <TextInput
+          style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
+          keyboardType="numeric"
+          value={set.rir !== undefined && set.rir !== null ? String(set.rir) : ''}
+          onChangeText={(val: string) => onUpdate('rir', val === '' ? 0 : parseInt(val, 10) || 0)}
+          placeholder="0"
+          placeholderTextColor={theme.textMuted}
+        />
+      </View>
 
-      {/* Validation Checkbox (Coche visible UNIQUEMENT quand validé) */}
+      {/* Validation Checkbox (Carré à bords arrondis, contour vert et fond coché uniquement à la validation) */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onToggleComplete}
         style={[
           styles.checkButton,
           {
-            backgroundColor: set.completed ? theme.primary : 'transparent',
-            borderColor: set.completed ? theme.primary : theme.border,
+            backgroundColor: set.completed ? (theme.success || '#618764') : 'transparent',
+            borderColor: theme.success || '#618764',
           },
         ]}
       >
-        {set.completed && <Check size={16} color="#FFFFFF" />}
+        {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
       </TouchableOpacity>
 
       {/* Delete Set */}

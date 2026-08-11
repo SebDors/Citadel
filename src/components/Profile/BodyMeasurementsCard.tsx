@@ -21,7 +21,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   const [showAdd, setShowAdd] = useState(false);
   const [weight, setWeight] = useState('');
   const [chest, setChest] = useState('');
-  const [waist, setWaist] = useState('');
+  const [thigh, setThigh] = useState('');
   const [biceps, setBiceps] = useState('');
 
   const handleSave = () => {
@@ -31,14 +31,14 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       date: new Date().toISOString().split('T')[0],
       weightKg: parseFloat(weight),
       chestCm: chest ? parseFloat(chest) : undefined,
-      waistCm: waist ? parseFloat(waist) : undefined,
+      thighCm: thigh ? parseFloat(thigh) : undefined,
       bicepsCm: biceps ? parseFloat(biceps) : undefined,
     };
     onAddMeasurement(newM);
     setShowAdd(false);
     setWeight('');
     setChest('');
-    setWaist('');
+    setThigh('');
     setBiceps('');
   };
 
@@ -79,11 +79,11 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-              placeholder="Taille (cm)"
+              placeholder="Cuisse (cm)"
               placeholderTextColor={theme.textMuted}
               keyboardType="numeric"
-              value={waist}
-              onChangeText={setWaist}
+              value={thigh}
+              onChangeText={setThigh}
             />
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.border }]}
@@ -105,7 +105,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
           <View style={styles.mStats}>
             <Text style={[styles.mVal, { color: theme.text }]}>{m.weightKg} kg</Text>
             {m.chestCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {m.chestCm}cm</Text>}
-            {m.waistCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>T: {m.waistCm}cm</Text>}
+            {m.thighCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>C: {m.thighCm}cm</Text>}
             {m.bicepsCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {m.bicepsCm}cm</Text>}
 
             <TouchableOpacity onPress={() => onDeleteMeasurement(m.id)} style={{ marginLeft: 10 }}>

@@ -81,6 +81,13 @@ export interface BodyMeasurement {
   bicepsCm?: number;
 }
 
+export interface WorkoutFolder {
+  id: string;
+  name: string;
+  templateIds: string[];
+  isCollapsed?: boolean;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -94,7 +101,40 @@ export interface FitTrackerData {
   templates: WorkoutTemplate[];
   history: WorkoutSession[];
   measurements: BodyMeasurement[];
+  folders?: WorkoutFolder[];
   currentWorkout?: WorkoutSession | null;
+}
+
+/**
+ * Calcule la VRAIE date du dernier entraînement effectué pour une séance (basée sur history).
+ */
+export function getRealLastWorkoutDate(
+  history: WorkoutSession[],
+  templateTitle: string
+): { dateStr: string; dateFormatted: string } | null {
+  if (!history || history.length === 0) return null;
+
+  const matchingSessions = history.filter(
+    (s) => s.status === 'completed' && s.title.trim().toLowerCase() === templateTitle.trim().toLowerCase()
+  );
+
+  if (matchingSessions.length === 0) return null;
+
+  const sorted = [...matchingSessions].sort(
+    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+  );
+
+  const lastSession = sorted[0];
+  const dateObj = new Date(lastSession.startTime);
+  const dateStr = lastSession.startTime.split('T')[0];
+
+  const dateFormatted = dateObj.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  return { dateStr, dateFormatted };
 }
 
 /**

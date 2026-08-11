@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ProfileHeaderCard } from '../../src/components/Profile/ProfileHeaderCard';
 import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
+import { ModularMeasurementChartCard } from '../../src/components/Profile/ModularMeasurementChartCard';
 import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
 import { JsonActionsCard } from '../../src/components/Profile/JsonActionsCard';
 
@@ -14,7 +15,7 @@ export default function ProfileTab() {
   if (!data) return null;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0 }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header */}
         <View style={styles.header}>
@@ -27,17 +28,20 @@ export default function ProfileTab() {
         {/* 1. Carte En-tête Profil avec Réglages */}
         <ProfileHeaderCard profile={data.profile} onUpdateProfile={updateUserProfile} />
 
-        {/* 2. Graphiques / Cartes de Performance 1RM */}
+        {/* 2. Graphique Modulable de Mensurations (Poids, Poitrine, Cuisse, Bras) */}
+        <ModularMeasurementChartCard measurements={data.measurements} />
+
+        {/* 3. Graphiques / Cartes de Performance 1RM */}
         <OneRMChartCard />
 
-        {/* 3. Suivi du Poids et Mensurations avec option de suppression */}
+        {/* 4. Suivi du Poids et Mensurations avec option de suppression */}
         <BodyMeasurementsCard
           measurements={data.measurements}
           onAddMeasurement={addMeasurement}
           onDeleteMeasurement={deleteMeasurement}
         />
 
-        {/* 4. Zone Réglages & Données JSON */}
+        {/* 5. Zone Réglages & Données JSON */}
         <JsonActionsCard data={data} onImportSuccess={reloadAllData} />
       </ScrollView>
     </SafeAreaView>

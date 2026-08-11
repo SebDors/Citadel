@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement } from '../types';
+import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
 
 const STORAGE_KEY = '@warriorfit_app_data_v1';
@@ -13,7 +13,11 @@ export const StorageService = {
     try {
       const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
       if (jsonValue !== null) {
-        return JSON.parse(jsonValue) as FitTrackerData;
+        const parsed = JSON.parse(jsonValue) as FitTrackerData;
+        if (!parsed.folders) {
+          parsed.folders = INITIAL_MOCK_DATA.folders || [];
+        }
+        return parsed;
       }
       // Première utilisation : Sauvegarder les données mock initiales
       await this.saveData(INITIAL_MOCK_DATA);
@@ -87,9 +91,37 @@ export const StorageService = {
   },
 
   /**
+   * Supprime une mensuration corporelle par ID.
+   */
+  async deleteMeasurement(id: string): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedMeasurements = currentData.measurements.filter((m) => m.id !== id);
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      measurements: updatedMeasurements,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Sauvegarde les dossiers de programmes (WorkoutFolder[]).
+   */
+  async saveFolders(folders: WorkoutFolder[]): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      folders,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
    * Remplace intégralement les données par un objet importé depuis un JSON.
    */
   async importFullData(data: FitTrackerData): Promise<void> {
     await this.saveData(data);
   },
 };
+

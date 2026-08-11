@@ -1,17 +1,72 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Platform,
+  StatusBar as RNStatusBar,
+  Alert,
+} from 'react-native';
 import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { Button } from '../../src/components/UI/Button';
 import { Card } from '../../src/components/UI/Card';
 import { RestTimerBar } from '../../src/components/Workout/RestTimerBar';
 import { useRouter } from 'expo-router';
-import { Play, Plus, Flame, TrendingUp, ChevronRight, MoreHorizontal } from 'lucide-react-native';
+import {
+  Play,
+  Plus,
+  Flame,
+  TrendingUp,
+  ChevronRight,
+  MoreHorizontal,
+  Folder,
+  FolderPlus,
+  ChevronDown,
+  Edit2,
+  Copy,
+  Trash2,
+  Share2,
+  X,
+  Tag,
+} from 'lucide-react-native';
+import { WorkoutTemplate, WorkoutFolder, getRealLastWorkoutDate } from '../../src/types';
+import { JsonExportService } from '../../src/services/jsonExport';
 
 export default function WorkoutTab() {
-  const { data, activeSession, startWorkout } = useWorkout();
+  const {
+    data,
+    activeSession,
+    startWorkout,
+    duplicateTemplate,
+    deleteTemplate,
+    renameTemplate,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    toggleFolderCollapse,
+  } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
+
+  // Modals state
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
+  const [showTemplateMenuModal, setShowTemplateMenuModal] = useState(false);
+
+  const [showRenameTemplateModal, setShowRenameTemplateModal] = useState(false);
+  const [renameTemplateTitle, setRenameTemplateTitle] = useState('');
+
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
+  const [selectedFolder, setSelectedFolder] = useState<WorkoutFolder | null>(null);
+  const [showRenameFolderModal, setShowRenameFolderModal] = useState(false);
+  const [renameFolderName, setRenameFolderName] = useState('');
 
   const handleStartFreestyle = () => {
     startWorkout();
@@ -26,6 +81,112 @@ export default function WorkoutTab() {
     }
   };
 
+  const handleOpenTemplateMenu = (tpl: WorkoutTemplate) => {
+    setSelectedTemplate(tpl);
+    setShowTemplateMenuModal(true);
+  };
+
+  const handleConfirmRenameTemplate = async () => {
+    if (selectedTemplate && renameTemplateTitle.trim()) {
+      await renameTemplate(selectedTemplate.id, renameTemplateTitle);
+      setShowRenameTemplateModal(false);
+      setSelectedTemplate(null);
+    }
+  };
+
+  const handleConfirmCreateFolder = async () => {
+    if (newFolderName.trim()) {
+      await createFolder(newFolderName);
+      setNewFolderName('');
+      setShowCreateFolderModal(false);
+    }
+  };
+
+  const handleConfirmRenameFolder = async () => {
+    if (selectedFolder && renameFolderName.trim()) {
+      await renameFolder(selectedFolder.id, renameFolderName);
+      setShowRenameFolderModal(false);
+      setSelectedFolder(null);
+    }
+  };
+
+  const handleExportTemplateJson = async (tpl: WorkoutTemplate) => {
+    setShowTemplateMenuModal(false);
+    await JsonExportService.shareBlankTemplateJson(tpl);
+  };
+
+  // Group templates by folder
+  const folders = data?.folders || [];
+  const templatesInFolders = new Set(folders.flatMap((f) => f.templateIds));
+  const unassignedTemplates = (data?.templates || []).filter((t) => !templatesInFolders.has(t.id));
+
+  // Render a Workout Template Card (High Density layout)
+  const renderTemplateCard = (tpl: WorkoutTemplate) => {
+    const inlineExercisesText = tpl.exercises.map((ex) => ex.exerciseName).join(', ');
+    const realLast = getRealLastWorkoutDate(data?.history || [], tpl.title);
+    const lastDateText = realLast ? `${realLast.dateFormatted} - voir le récap` : 'Jamais réalisée';
+
+    return (
+      <Card key={tpl.id} style={[styles.programCard, { padding: 12 }]}>
+        {/* Card Header: Title + Graph Icon + Options */}
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleArea}>
+            <Text style={[styles.templateTitle, { color: theme.text }]} numberOfLines={1}>
+              {tpl.title}
+            </Text>
+            <Text style={[styles.exCountText, { color: theme.textMuted }]}>
+              {tpl.exercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
+            </Text>
+          </View>
+
+          <View style={styles.cardHeaderIcons}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push({ pathname: '/workout-analytics', params: { id: tpl.id } })}
+            >
+              <TrendingUp size={17} color={theme.text} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => handleOpenTemplateMenu(tpl)}>
+              <MoreHorizontal size={19} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Inline Exercises List */}
+        <Text style={[styles.inlineExText, { color: theme.textMuted }]} numberOfLines={2}>
+          {inlineExercisesText}
+        </Text>
+
+        {/* Last Workout Date Badge */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[styles.recapBadge, { backgroundColor: theme.surface }]}
+          onPress={() => {
+            if (realLast) {
+              router.push({ pathname: '/workout-analytics', params: { id: tpl.id } });
+            }
+          }}
+        >
+          <View style={[styles.recapBar, { backgroundColor: theme.accent }]} />
+          <View style={styles.recapTextRow}>
+            <Text style={[styles.recapSub, { color: theme.textMuted }]}>DERNIER ENTRAÎNEMENT</Text>
+            <Text style={[styles.recapDate, { color: theme.text }]}>{lastDateText}</Text>
+          </View>
+          <ChevronRight size={14} color={theme.textMuted} />
+        </TouchableOpacity>
+
+        {/* Big Green/Accent Start Button */}
+        <Button
+          title="Démarrer"
+          variant="primary"
+          onPress={() => handleStartTemplate(tpl.id)}
+          icon={<Play size={14} color="#FFFFFF" fill="#FFFFFF" />}
+          style={styles.startBtn}
+        />
+      </Card>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -34,7 +195,7 @@ export default function WorkoutTab() {
           <Text style={[styles.appTitle, { color: theme.text }]}>Séances</Text>
         </View>
 
-        {/* Active Workout Banner (non-colliding layout) */}
+        {/* Active Workout Banner */}
         {activeSession && (
           <View style={[styles.activeBanner, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
             <View style={styles.activeBannerInfo}>
@@ -52,7 +213,7 @@ export default function WorkoutTab() {
           </View>
         )}
 
-        {/* Top Action Buttons (Side by Side matching Screenshot 2) */}
+        {/* Top Action Buttons (Side by Side) */}
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -78,70 +239,248 @@ export default function WorkoutTab() {
           </TouchableOpacity>
         </View>
 
-        {/* Section Header */}
+        {/* Section Header with "Nouveau dossier" button */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>MES SÉANCES</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>MES DOSSIERS & SÉANCES</Text>
+          <TouchableOpacity
+            style={[styles.newFolderBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}
+            onPress={() => setShowCreateFolderModal(true)}
+          >
+            <FolderPlus size={14} color={theme.accent} style={{ marginRight: 4 }} />
+            <Text style={[styles.newFolderText, { color: theme.accent }]}>Nouveau dossier</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Program Cards matching Epilog Screenshot 2 */}
-        {data?.templates.map((tpl) => {
-          // Format exercise names inline: "Dips, Low cable fly, Tirage horizontal..."
-          const inlineExercisesText = tpl.exercises.map((ex) => ex.exerciseName).join(', ');
+        {/* Folders List */}
+        {folders.map((folder) => {
+          const folderTemplates = (data?.templates || []).filter((t) => folder.templateIds.includes(t.id));
+          const isCollapsed = !!folder.isCollapsed;
 
           return (
-            <Card key={tpl.id} style={styles.programCard}>
-              {/* Card Header: Title + Graph Icon + Options */}
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleArea}>
-                  <Text style={[styles.templateTitle, { color: theme.text }]}>{tpl.title}</Text>
-                  <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-                    {tpl.exercises.length} exos
+            <View key={folder.id} style={[styles.folderContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.folderHeader}
+                onPress={() => toggleFolderCollapse(folder.id)}
+              >
+                <View style={styles.folderHeaderLeft}>
+                  <Folder size={18} color={theme.accent} style={{ marginRight: 8 }} />
+                  <Text style={[styles.folderTitle, { color: theme.text }]}>{folder.name}</Text>
+                  <Text style={[styles.folderBadgeCount, { color: theme.textMuted, backgroundColor: theme.cardBg }]}>
+                    {folderTemplates.length}
                   </Text>
                 </View>
 
-                <View style={styles.cardHeaderIcons}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => router.push({ pathname: '/workout-analytics', params: { id: tpl.id } })}
+                    style={{ padding: 4, marginRight: 4 }}
+                    onPress={() => {
+                      setSelectedFolder(folder);
+                      setRenameFolderName(folder.name);
+                      setShowRenameFolderModal(true);
+                    }}
                   >
-                    <TrendingUp size={18} color={theme.text} />
+                    <Edit2 size={15} color={theme.textMuted} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <MoreHorizontal size={18} color={theme.text} />
+
+                  <TouchableOpacity
+                    style={{ padding: 4, marginRight: 4 }}
+                    onPress={() => deleteFolder(folder.id)}
+                  >
+                    <Trash2 size={15} color={theme.danger} />
                   </TouchableOpacity>
-                </View>
-              </View>
 
-              {/* Inline Exercises List (Small font, clear and inline) */}
-              <Text style={[styles.inlineExText, { color: theme.textMuted }]} numberOfLines={2}>
-                {inlineExercisesText}
-              </Text>
-
-              {/* Last Workout Date Badge */}
-              <TouchableOpacity style={[styles.recapBadge, { backgroundColor: theme.surface }]}>
-                <View style={[styles.recapBar, { backgroundColor: '#8B5CF6' }]} />
-                <View style={styles.recapTextRow}>
-                  <Text style={[styles.recapSub, { color: theme.textMuted }]}>DERNIER ENTRAÎNEMENT</Text>
-                  <Text style={[styles.recapDate, { color: theme.text }]}>7 août - voir le récap</Text>
+                  {isCollapsed ? <ChevronRight size={18} color={theme.textMuted} /> : <ChevronDown size={18} color={theme.textMuted} />}
                 </View>
-                <ChevronRight size={14} color={theme.textMuted} />
               </TouchableOpacity>
 
-              {/* Big Green Start Button */}
-              <Button
-                title="Démarrer"
-                variant="primary"
-                onPress={() => handleStartTemplate(tpl.id)}
-                icon={<Play size={14} color="#FFFFFF" fill="#FFFFFF" />}
-                style={styles.startBtn}
-              />
-            </Card>
+              {!isCollapsed && (
+                <View style={styles.folderBody}>
+                  {folderTemplates.length === 0 ? (
+                    <Text style={[styles.emptyFolderText, { color: theme.textMuted }]}>
+                      Aucune séance dans ce dossier.
+                    </Text>
+                  ) : (
+                    folderTemplates.map((tpl) => renderTemplateCard(tpl))
+                  )}
+                </View>
+              )}
+            </View>
           );
         })}
+
+        {/* Unassigned Templates Section */}
+        {unassignedTemplates.length > 0 && (
+          <View style={{ marginTop: 8 }}>
+            {folders.length > 0 && (
+              <Text style={[styles.sectionSubTitle, { color: theme.textMuted }]}>AUTRES SÉANCES</Text>
+            )}
+            {unassignedTemplates.map((tpl) => renderTemplateCard(tpl))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Floating Rest Timer Bar */}
       <RestTimerBar />
+
+      {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}
+      <Modal visible={showTemplateMenuModal} transparent animationType="fade" onRequestClose={() => setShowTemplateMenuModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowTemplateMenuModal(false)}>
+          <View style={[styles.menuModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <View style={styles.modalMenuHeader}>
+              <Text style={[styles.modalMenuTitle, { color: theme.text }]} numberOfLines={1}>
+                {selectedTemplate?.title}
+              </Text>
+              <TouchableOpacity onPress={() => setShowTemplateMenuModal(false)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* 1. Démarrer */}
+            <TouchableOpacity
+              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowTemplateMenuModal(false);
+                if (selectedTemplate) handleStartTemplate(selectedTemplate.id);
+              }}
+            >
+              <Play size={18} color={theme.accent} fill={theme.accent} />
+              <Text style={[styles.menuOptionText, { color: theme.text, fontWeight: '800' }]}>▶ Démarrer la séance</Text>
+            </TouchableOpacity>
+
+            {/* 2. Modifier */}
+            <TouchableOpacity
+              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowTemplateMenuModal(false);
+                if (selectedTemplate) {
+                  router.push({ pathname: '/template-editor', params: { id: selectedTemplate.id } });
+                }
+              }}
+            >
+              <Edit2 size={18} color={theme.text} />
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>✏️ Modifier la séance</Text>
+            </TouchableOpacity>
+
+            {/* 3. Renommer */}
+            <TouchableOpacity
+              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowTemplateMenuModal(false);
+                if (selectedTemplate) {
+                  setRenameTemplateTitle(selectedTemplate.title);
+                  setShowRenameTemplateModal(true);
+                }
+              }}
+            >
+              <Tag size={18} color={theme.text} />
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>🏷️ Renommer</Text>
+            </TouchableOpacity>
+
+            {/* 4. Dupliquer */}
+            <TouchableOpacity
+              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowTemplateMenuModal(false);
+                if (selectedTemplate) {
+                  duplicateTemplate(selectedTemplate.id);
+                }
+              }}
+            >
+              <Copy size={18} color={theme.text} />
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>📋 Dupliquer la séance</Text>
+            </TouchableOpacity>
+
+            {/* 5. Exporter JSON (Séance vierge) */}
+            <TouchableOpacity
+              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                if (selectedTemplate) handleExportTemplateJson(selectedTemplate);
+              }}
+            >
+              <Share2 size={18} color={theme.text} />
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>📤 Exporter JSON (Séance vierge)</Text>
+            </TouchableOpacity>
+
+            {/* 6. Supprimer */}
+            <TouchableOpacity
+              style={styles.menuOptionRow}
+              onPress={() => {
+                setShowTemplateMenuModal(false);
+                if (selectedTemplate) {
+                  deleteTemplate(selectedTemplate.id);
+                }
+              }}
+            >
+              <Trash2 size={18} color={theme.danger} />
+              <Text style={[styles.menuOptionText, { color: theme.danger }]}>🗑️ Supprimer la séance</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ---------------- MODALE RENOMMER SÉANCE ---------------- */}
+      <Modal visible={showRenameTemplateModal} transparent animationType="fade" onRequestClose={() => setShowRenameTemplateModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRenameTemplateModal(false)}>
+          <View style={[styles.inputModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Renommer la séance</Text>
+            <TextInput
+              style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
+              value={renameTemplateTitle}
+              onChangeText={setRenameTemplateTitle}
+              placeholder="Nouveau titre..."
+              placeholderTextColor={theme.textMuted}
+              autoFocus
+            />
+            <View style={styles.modalBtnRow}>
+              <Button title="Annuler" variant="outline" onPress={() => setShowRenameTemplateModal(false)} style={{ flex: 1, marginRight: 6 }} />
+              <Button title="Enregistrer" variant="primary" onPress={handleConfirmRenameTemplate} style={{ flex: 1, marginLeft: 6 }} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ---------------- MODALE CRÉATION DOSSIER ---------------- */}
+      <Modal visible={showCreateFolderModal} transparent animationType="fade" onRequestClose={() => setShowCreateFolderModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowCreateFolderModal(false)}>
+          <View style={[styles.inputModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Nouveau Dossier</Text>
+            <TextInput
+              style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
+              value={newFolderName}
+              onChangeText={setNewFolderName}
+              placeholder="ex: Prise de masse, Upper/Lower..."
+              placeholderTextColor={theme.textMuted}
+              autoFocus
+            />
+            <View style={styles.modalBtnRow}>
+              <Button title="Annuler" variant="outline" onPress={() => setShowCreateFolderModal(false)} style={{ flex: 1, marginRight: 6 }} />
+              <Button title="Créer" variant="primary" onPress={handleConfirmCreateFolder} style={{ flex: 1, marginLeft: 6 }} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ---------------- MODALE RENOMMER DOSSIER ---------------- */}
+      <Modal visible={showRenameFolderModal} transparent animationType="fade" onRequestClose={() => setShowRenameFolderModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRenameFolderModal(false)}>
+          <View style={[styles.inputModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Renommer le dossier</Text>
+            <TextInput
+              style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
+              value={renameFolderName}
+              onChangeText={setRenameFolderName}
+              placeholder="Nom du dossier..."
+              placeholderTextColor={theme.textMuted}
+              autoFocus
+            />
+            <View style={styles.modalBtnRow}>
+              <Button title="Annuler" variant="outline" onPress={() => setShowRenameFolderModal(false)} style={{ flex: 1, marginRight: 6 }} />
+              <Button title="Enregistrer" variant="primary" onPress={handleConfirmRenameFolder} style={{ flex: 1, marginLeft: 6 }} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -149,94 +488,157 @@ export default function WorkoutTab() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0,
   },
   scrollContent: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 90,
   },
   pageHeader: {
-    marginTop: 10,
-    marginBottom: 14,
+    marginTop: 6,
+    marginBottom: 10,
   },
   appTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
   },
   activeBanner: {
-    padding: 12,
-    borderRadius: 14,
+    padding: 10,
+    borderRadius: 12,
     borderWidth: 2,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   activeBannerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   activeBannerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
   activeBannerSub: {
-    fontSize: 12,
+    fontSize: 11,
   },
   resumeBtn: {
-    marginTop: 4,
+    marginTop: 2,
   },
   actionButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 14,
   },
   mainActionBox: {
-    flex: 0.65,
+    flex: 0.66,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 14,
   },
   playIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   mainActionTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
   },
   mainActionSub: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10,
   },
   createActionBox: {
-    flex: 0.32,
+    flex: 0.31,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   createActionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    marginTop: 4,
+    marginTop: 2,
   },
   sectionHeader: {
-    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  sectionSubTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  newFolderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  newFolderText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  folderContainer: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  folderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  folderHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  folderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  folderBadgeCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+    marginLeft: 8,
+    overflow: 'hidden',
+  },
+  folderBody: {
+    paddingHorizontal: 10,
+    paddingBottom: 6,
+  },
+  emptyFolderText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    paddingVertical: 8,
+  },
   programCard: {
-    marginBottom: 14,
-    padding: 16,
-    borderRadius: 18,
+    marginBottom: 10,
+    borderRadius: 14,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -247,11 +649,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   templateTitle: {
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: '900',
   },
   exCountText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     marginTop: 1,
   },
@@ -260,27 +662,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBtn: {
-    padding: 6,
-    marginLeft: 6,
+    padding: 5,
+    marginLeft: 4,
   },
   inlineExText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
-    lineHeight: 18,
-    marginVertical: 10,
+    lineHeight: 16,
+    marginVertical: 8,
   },
   recapBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 12,
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   recapBar: {
     width: 3,
-    height: 24,
+    height: 20,
     borderRadius: 2,
-    marginRight: 10,
+    marginRight: 8,
   },
   recapTextRow: {
     flex: 1,
@@ -291,11 +693,69 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   recapDate: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   startBtn: {
-    borderRadius: 12,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuModalContent: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  modalMenuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalMenuTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    flex: 1,
+  },
+  menuOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
+    borderBottomWidth: 0.5,
+  },
+  menuOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  inputModalContent: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    marginBottom: 14,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FitTrackerData, WorkoutSession, WorkoutTemplate, WorkoutExercise, WorkoutSet, SetType, BodyMeasurement, UserProfile } from '../types';
+import { FitTrackerData, WorkoutSession, WorkoutTemplate, WorkoutExercise, WorkoutSet, SetType, BodyMeasurement, UserProfile, WorkoutFolder } from '../types';
 import { StorageService } from '../services/storage';
 
 interface WorkoutContextType {
@@ -23,6 +23,12 @@ interface WorkoutContextType {
   updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
   saveTemplate: (template: WorkoutTemplate) => Promise<void>;
   deleteTemplate: (templateId: string) => Promise<void>;
+  duplicateTemplate: (templateId: string) => Promise<void>;
+  renameTemplate: (templateId: string, newTitle: string) => Promise<void>;
+  createFolder: (name: string) => Promise<void>;
+  renameFolder: (folderId: string, newName: string) => Promise<void>;
+  deleteFolder: (folderId: string) => Promise<void>;
+  toggleFolderCollapse: (folderId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
   // Rest Timer State
   restTimer: {
@@ -476,11 +482,93 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteTemplate = async (templateId: string) => {
     if (!data) return;
+    const updatedFolders = (data.folders || []).map((f) => ({
+      ...f,
+      templateIds: f.templateIds.filter((id) => id !== templateId),
+    }));
     const updated = {
       ...data,
       templates: data.templates.filter((t) => t.id !== templateId),
+      folders: updatedFolders,
     };
     await StorageService.saveData(updated);
+    setData(updated);
+  };
+
+  const duplicateTemplate = async (templateId: string) => {
+    if (!data) return;
+    const tpl = data.templates.find((t) => t.id === templateId);
+    if (!tpl) return;
+
+    const duplicated: WorkoutTemplate = JSON.parse(JSON.stringify(tpl));
+    duplicated.id = `tpl_${Date.now()}`;
+    duplicated.title = `${tpl.title} (Copie)`;
+
+    const updatedTemplates = [...data.templates, duplicated];
+    // Optionnel : ajouter dans le même dossier si applicable
+    const updatedFolders = (data.folders || []).map((f) => {
+      if (f.templateIds.includes(templateId)) {
+        return { ...f, templateIds: [...f.templateIds, duplicated.id] };
+      }
+      return f;
+    });
+
+    const updated = { ...data, templates: updatedTemplates, folders: updatedFolders };
+    await StorageService.saveData(updated);
+    setData(updated);
+  };
+
+  const renameTemplate = async (templateId: string, newTitle: string) => {
+    if (!data || !newTitle.trim()) return;
+    const updatedTemplates = data.templates.map((t) => {
+      if (t.id === templateId) {
+        return { ...t, title: newTitle.trim() };
+      }
+      return t;
+    });
+    const updated = { ...data, templates: updatedTemplates };
+    await StorageService.saveData(updated);
+    setData(updated);
+  };
+
+  const createFolder = async (name: string) => {
+    if (!data || !name.trim()) return;
+    const newFolder: WorkoutFolder = {
+      id: `fld_${Date.now()}`,
+      name: name.trim(),
+      templateIds: [],
+      isCollapsed: false,
+    };
+    const currentFolders = data.folders || [];
+    const updated = { ...data, folders: [...currentFolders, newFolder] };
+    await StorageService.saveFolders(updated.folders);
+    setData(updated);
+  };
+
+  const renameFolder = async (folderId: string, newName: string) => {
+    if (!data || !newName.trim()) return;
+    const currentFolders = data.folders || [];
+    const updatedFolders = currentFolders.map((f) => (f.id === folderId ? { ...f, name: newName.trim() } : f));
+    const updated = { ...data, folders: updatedFolders };
+    await StorageService.saveFolders(updatedFolders);
+    setData(updated);
+  };
+
+  const deleteFolder = async (folderId: string) => {
+    if (!data) return;
+    const currentFolders = data.folders || [];
+    const updatedFolders = currentFolders.filter((f) => f.id !== folderId);
+    const updated = { ...data, folders: updatedFolders };
+    await StorageService.saveFolders(updatedFolders);
+    setData(updated);
+  };
+
+  const toggleFolderCollapse = async (folderId: string) => {
+    if (!data) return;
+    const currentFolders = data.folders || [];
+    const updatedFolders = currentFolders.map((f) => (f.id === folderId ? { ...f, isCollapsed: !f.isCollapsed } : f));
+    const updated = { ...data, folders: updatedFolders };
+    await StorageService.saveFolders(updatedFolders);
     setData(updated);
   };
 
@@ -522,6 +610,12 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateUserProfile,
         saveTemplate,
         deleteTemplate,
+        duplicateTemplate,
+        renameTemplate,
+        createFolder,
+        renameFolder,
+        deleteFolder,
+        toggleFolderCollapse,
         reloadAllData,
         restTimer,
         dismissRestTimer,

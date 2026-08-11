@@ -1,21 +1,47 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  Platform,
+  StatusBar as RNStatusBar,
+} from 'react-native';
 import { useTheme } from '../src/context/ThemeContext';
 import { useWorkout } from '../src/context/WorkoutContext';
 import { Button } from '../src/components/UI/Button';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EXERCISE_DATABASE, SharedExercise } from '../src/constants/exerciseDatabase';
 import { WorkoutExercise, WorkoutTemplate, calculateEstimatedWorkoutMinutes } from '../src/types';
-import { ArrowLeft, Save, Plus, Clock, Trash2, Dumbbell } from 'lucide-react-native';
+import { ArrowLeft, Save, Plus, Clock, Trash2, Dumbbell, Search } from 'lucide-react-native';
 
 export default function TemplateEditorScreen() {
   const { theme } = useTheme();
-  const { saveTemplate } = useWorkout();
+  const { data, saveTemplate } = useWorkout();
   const router = useRouter();
+  const params = useLocalSearchParams();
+
+  const templateIdParam = params.id as string | undefined;
 
   const [title, setTitle] = useState('');
   const [selectedExercises, setSelectedExercises] = useState<WorkoutExercise[]>([]);
   const [showPickerModal, setShowPickerModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Load existing template if editing
+  useEffect(() => {
+    if (templateIdParam && data?.templates) {
+      const existing = data.templates.find((t) => t.id === templateIdParam);
+      if (existing) {
+        setTitle(existing.title);
+        setSelectedExercises(JSON.parse(JSON.stringify(existing.exercises)));
+      }
+    }
+  }, [templateIdParam, data?.templates]);
 
   const estimatedMinutes = calculateEstimatedWorkoutMinutes(selectedExercises);
 
@@ -36,6 +62,7 @@ export default function TemplateEditorScreen() {
 
     setSelectedExercises([...selectedExercises, newEx]);
     setShowPickerModal(false);
+    setSearchQuery('');
   };
 
   const handleRemoveExercise = (idx: number) => {
@@ -68,7 +95,7 @@ export default function TemplateEditorScreen() {
     if (!title) return;
 
     const newTemplate: WorkoutTemplate = {
-      id: `tpl_${Date.now()}`,
+      id: templateIdParam || `tpl_${Date.now()}`,
       title,
       exercises: selectedExercises,
     };
@@ -77,15 +104,29 @@ export default function TemplateEditorScreen() {
     router.back();
   };
 
+  // Filter 52 exercises for search modal
+  const filteredDatabase = EXERCISE_DATABASE.filter((ex) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      ex.name.toLowerCase().includes(q) ||
+      ex.primaryMuscle.toLowerCase().includes(q) ||
+      ex.category.toLowerCase().includes(q) ||
+      ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0 }]}>
       {/* Top Navigation */}
       <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={20} color={theme.text} />
           <Text style={[styles.backText, { color: theme.text }]}>Retour</Text>
         </TouchableOpacity>
-        <Text style={[styles.topBarTitle, { color: theme.text }]}>Créer une séance</Text>
+        <Text style={[styles.topBarTitle, { color: theme.text }]}>
+          {templateIdParam ? 'Modifier la séance' : 'Créer une séance'}
+        </Text>
         <TouchableOpacity onPress={handleSave}>
           <Save size={20} color={theme.accent} />
         </TouchableOpacity>
@@ -102,7 +143,7 @@ export default function TemplateEditorScreen() {
           onChangeText={setTitle}
         />
 
-        {/* Estimation de la durée de la séance (Demande utilisateur!) */}
+        {/* Estimation de la durée de la séance */}
         <View style={[styles.estimatedBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Clock size={18} color={theme.accent} style={{ marginRight: 8 }} />
           <Text style={[styles.estimatedText, { color: theme.text }]}>
@@ -164,27 +205,45 @@ export default function TemplateEditorScreen() {
         />
       </ScrollView>
 
-      {/* Modal Sélection d'Exercice depuis la Base de Données */}
+      {/* Modal Sélection d'Exercice avec Barre de Recherche */}
       <Modal visible={showPickerModal} transparent animationType="slide" onRequestClose={() => setShowPickerModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowPickerModal(false)}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Base de Données d'Exercices</Text>
+
+            {/* Barre de Recherche Clavier */}
+            <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Search size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Rechercher par nom ou muscle..."
+                placeholderTextColor={theme.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
+            </View>
+
             <ScrollView style={{ maxHeight: 350 }}>
-              {EXERCISE_DATABASE.map((ex) => (
-                <TouchableOpacity
-                  key={ex.id}
-                  style={[styles.dbItemRow, { borderBottomColor: theme.border }]}
-                  onPress={() => handleAddSharedExercise(ex)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dbItemName, { color: theme.text }]}>{ex.name}</Text>
-                    <Text style={[styles.dbItemMuscle, { color: theme.textMuted }]}>
-                      {ex.primaryMuscle} • {ex.defaultRestSeconds}s repos
-                    </Text>
-                  </View>
-                  <Plus size={18} color={theme.accent} />
-                </TouchableOpacity>
-              ))}
+              {filteredDatabase.length === 0 ? (
+                <Text style={[styles.noResultText, { color: theme.textMuted }]}>Aucun exercice trouvé</Text>
+              ) : (
+                filteredDatabase.map((ex) => (
+                  <TouchableOpacity
+                    key={ex.id}
+                    style={[styles.dbItemRow, { borderBottomColor: theme.border }]}
+                    onPress={() => handleAddSharedExercise(ex)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.dbItemName, { color: theme.text }]}>{ex.name}</Text>
+                      <Text style={[styles.dbItemMuscle, { color: theme.textMuted }]}>
+                        {ex.primaryMuscle} • {ex.category} • {ex.defaultRestSeconds}s repos
+                      </Text>
+                    </View>
+                    <Plus size={18} color={theme.accent} />
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -304,8 +363,27 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 17,
     fontWeight: '800',
-    marginBottom: 12,
+    marginBottom: 10,
     textAlign: 'center',
+  },
+  searchBarBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+  noResultText: {
+    textAlign: 'center',
+    fontSize: 13,
+    paddingVertical: 20,
   },
   dbItemRow: {
     flexDirection: 'row',

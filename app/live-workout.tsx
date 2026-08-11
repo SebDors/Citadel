@@ -1,5 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, Modal, TextInput } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Platform,
+  StatusBar as RNStatusBar,
+} from 'react-native';
 import { useWorkout } from '../src/context/WorkoutContext';
 import { useTheme } from '../src/context/ThemeContext';
 import { LiveWorkoutHeader } from '../src/components/Workout/LiveWorkoutHeader';
@@ -8,7 +19,7 @@ import { RestTimerBar } from '../src/components/Workout/RestTimerBar';
 import { Button } from '../src/components/UI/Button';
 import { useRouter } from 'expo-router';
 import { EXERCISE_DATABASE, SharedExercise } from '../src/constants/exerciseDatabase';
-import { Plus, ArrowLeft, Check, Layers, Play, Zap, Repeat } from 'lucide-react-native';
+import { Plus, ArrowLeft, Check, Layers, Play, Zap, Repeat, Search, SkipForward, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 export default function LiveWorkoutScreen() {
   const {
@@ -27,13 +38,21 @@ export default function LiveWorkoutScreen() {
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [showAddExModal, setShowAddExModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeCircuitRound, setActiveCircuitRound] = useState(1);
+  const [currentCircuitIdx, setCurrentCircuitIdx] = useState(0);
+
+  // Status for each exercise in the current circuit round: 'pending' | 'validated' | 'skipped'
+  const [roundStatusMap, setRoundStatusMap] = useState<Record<string, 'pending' | 'validated' | 'skipped'>>({});
+  // Set of exercise IDs manually expanded when collapsed
+  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
   if (!activeSession) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0 }]}>
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune séance en cours</Text>
           <Button title="Retour à l'accueil" variant="primary" onPress={() => router.replace('/(tabs)')} />
@@ -41,6 +60,8 @@ export default function LiveWorkoutScreen() {
       </SafeAreaView>
     );
   }
+
+  const totalRounds = activeSession.circuitRounds || 3;
 
   const handleFinish = async () => {
     await finishWorkout();
@@ -55,10 +76,85 @@ export default function LiveWorkoutScreen() {
   const handleSelectSharedExercise = (ex: SharedExercise) => {
     addExerciseToActiveWorkout(ex.name, ex.primaryMuscle, ex.targetMuscles, ex.defaultRestSeconds);
     setShowAddExModal(false);
+    setSearchQuery('');
   };
 
+  // Helper to check round completion and advance
+  const advanceCircuitAfterAction = (
+    nextStatusMap: Record<string, 'pending' | 'validated' | 'skipped'>,
+    currentIdx: number
+  ) => {
+    const totalEx = activeSession.exercises.length;
+    // Count how many exercises are resolved (validated or skipped)
+    const resolvedCount = activeSession.exercises.filter((ex) => {
+      const status = nextStatusMap[ex.id];
+      return status === 'validated' || status === 'skipped';
+    }).length;
+
+    if (resolvedCount >= totalEx) {
+      // TOUR DE CIRCUIT TERMINÉ !
+      if (activeCircuitRound < totalRounds) {
+        // Pass to next round, reset statuses, reset index, auto-scroll to top!
+        setActiveCircuitRound((prev) => prev + 1);
+        setRoundStatusMap({});
+        setExpandedMap({});
+        setCurrentCircuitIdx(0);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      } else {
+        // Circuit fully complete
+        setRoundStatusMap(nextStatusMap);
+      }
+    } else {
+      // Find next pending exercise
+      let nextIdx = (currentIdx + 1) % totalEx;
+      let count = 0;
+      while (
+        (nextStatusMap[activeSession.exercises[nextIdx].id] === 'validated' ||
+          nextStatusMap[activeSession.exercises[nextIdx].id] === 'skipped') &&
+        count < totalEx
+      ) {
+        nextIdx = (nextIdx + 1) % totalEx;
+        count++;
+      }
+      setCurrentCircuitIdx(nextIdx);
+    }
+  };
+
+  const handleValidateCircuitExercise = (exId: string, setId: string, idx: number) => {
+    // 1. Toggle set completion
+    toggleSetComplete(exId, setId);
+
+    // 2. Mark exercise as validated in current round
+    const nextStatus = { ...roundStatusMap, [exId]: 'validated' as const };
+    setRoundStatusMap(nextStatus);
+
+    // 3. Advance to next pending exercise or next round with auto scroll to top
+    advanceCircuitAfterAction(nextStatus, idx);
+  };
+
+  const handlePassCircuitExercise = (exId: string, idx: number) => {
+    // Mark exercise as skipped for this round
+    const nextStatus = { ...roundStatusMap, [exId]: 'skipped' as const };
+    setRoundStatusMap(nextStatus);
+
+    // Advance to next pending exercise or next round with auto scroll to top
+    advanceCircuitAfterAction(nextStatus, idx);
+  };
+
+  // Filter 52 exercises for search modal
+  const filteredDatabase = EXERCISE_DATABASE.filter((ex) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      ex.name.toLowerCase().includes(q) ||
+      ex.primaryMuscle.toLowerCase().includes(q) ||
+      ex.category.toLowerCase().includes(q) ||
+      ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0 }]}>
       {/* Top Bar Navigation */}
       <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -69,55 +165,111 @@ export default function LiveWorkoutScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
         {/* 1. Carte d'En-tête de Séance (Fixe en haut) */}
         <LiveWorkoutHeader session={activeSession} onFinish={handleFinish} onCancel={handleCancel} />
 
-        {/* SI MODE CIRCUIT : Interface réinventée correspondant exactement à la capture Epilog 1 */}
+        {/* MODE CIRCUIT (Couleurs Sauge/Accent, no violet) */}
         {activeSession.isCircuit ? (
           <View style={[styles.circuitContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <View style={styles.circuitBadgeHeader}>
-              <Repeat size={14} color="#8B5CF6" />
-              <Text style={[styles.circuitBadgeText, { color: '#8B5CF6' }]}>⚡ CIRCUIT</Text>
+            <View style={[styles.circuitBadgeHeader, { backgroundColor: `${theme.accent}20` }]}>
+              <Repeat size={14} color={theme.accent} />
+              <Text style={[styles.circuitBadgeText, { color: theme.accent }]}>⚡ CIRCUIT</Text>
             </View>
 
             <Text style={[styles.circuitTitle, { color: theme.text }]}>{activeSession.title}</Text>
             <Text style={[styles.circuitSub, { color: theme.textMuted }]}>
-              {activeSession.exercises.length} EXOS · {activeSession.circuitRounds || 3} TOURS · 44%
+              {activeSession.exercises.length} EXOS · {totalRounds} TOURS
             </Text>
 
             {/* Tour en cours et bar de progression */}
             <View style={[styles.roundProgressBox, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.roundLabel, { color: '#8B5CF6' }]}>
-                TOUR EN COURS : {activeCircuitRound} / {activeSession.circuitRounds || 3}
+              <Text style={[styles.roundLabel, { color: theme.accent }]}>
+                TOUR EN COURS : {activeCircuitRound} / {totalRounds}
               </Text>
               <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
-                <View style={[styles.progressBarFill, { backgroundColor: '#8B5CF6', width: `${(activeCircuitRound / (activeSession.circuitRounds || 3)) * 100}%` }]} />
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { backgroundColor: theme.accent, width: `${(activeCircuitRound / totalRounds) * 100}%` },
+                  ]}
+                />
               </View>
             </View>
 
             {/* Liste des exercices du circuit */}
             {activeSession.exercises.map((ex, idx) => {
               const currentSet = ex.sets[activeCircuitRound - 1] || ex.sets[0];
-              const isCompleted = currentSet?.completed;
+              const status = roundStatusMap[ex.id] || 'pending';
+              const isCurrentActive = idx === currentCircuitIdx && status === 'pending';
+              const isResolved = status === 'validated' || status === 'skipped';
+              const isForceExpanded = !!expandedMap[ex.id];
+
+              // Réduction de carte de ~50% quand l'exercice est validé ou passé
+              if (isResolved && !isForceExpanded) {
+                return (
+                  <TouchableOpacity
+                    key={ex.id}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.circuitItemCollapsedCard,
+                      { backgroundColor: theme.surface, borderColor: status === 'validated' ? theme.accent : theme.border },
+                    ]}
+                    onPress={() => setExpandedMap((prev) => ({ ...prev, [ex.id]: true }))}
+                  >
+                    <View style={styles.collapsedLeft}>
+                      <View style={[styles.numberCircle, { backgroundColor: status === 'validated' ? theme.accent : theme.border }]}>
+                        <Text style={[styles.numberText, { color: status === 'validated' ? '#FFFFFF' : theme.text }]}>
+                          {idx + 1}
+                        </Text>
+                      </View>
+                      <View style={{ marginLeft: 10 }}>
+                        <Text style={[styles.collapsedExName, { color: theme.text }]} numberOfLines={1}>
+                          {ex.exerciseName}
+                        </Text>
+                        <Text style={[styles.collapsedSub, { color: theme.textMuted }]}>
+                          {currentSet?.reps !== undefined ? `${currentSet.reps} reps` : '10 reps'} · {ex.primaryMuscle}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.collapsedRight}>
+                      {status === 'validated' ? (
+                        <View style={[styles.statusBadge, { backgroundColor: theme.accent }]}>
+                          <Check size={12} color="#FFFFFF" />
+                          <Text style={styles.statusBadgeText}>Validé</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.statusBadge, { backgroundColor: theme.border }]}>
+                          <SkipForward size={12} color={theme.textMuted} />
+                          <Text style={[styles.statusBadgeText, { color: theme.textMuted }]}>Passé</Text>
+                        </View>
+                      )}
+                      <ChevronDown size={16} color={theme.textMuted} style={{ marginLeft: 6 }} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              }
 
               return (
                 <View
                   key={ex.id}
                   style={[
                     styles.circuitItemCard,
-                    { backgroundColor: theme.surface, borderColor: theme.border },
-                    idx === 2 && { borderColor: '#8B5CF6', borderWidth: 2 }, // Highlight active item
+                    { backgroundColor: theme.surface, borderColor: isCurrentActive ? theme.accent : theme.border },
+                    isCurrentActive && { borderWidth: 2.5 }, // Contour actif Sauge/Accent sur l'exercice en cours
                   ]}
                 >
                   <View style={styles.circuitItemTop}>
-                    <View style={[styles.numberCircle, { backgroundColor: theme.cardBg }]}>
-                      <Text style={[styles.numberText, { color: theme.text }]}>{idx + 1}</Text>
+                    <View style={[styles.numberCircle, { backgroundColor: isCurrentActive ? theme.accent : theme.cardBg }]}>
+                      <Text style={[styles.numberText, { color: isCurrentActive ? '#FFFFFF' : theme.text }]}>
+                        {idx + 1}
+                      </Text>
                     </View>
 
                     <View style={{ flex: 1, marginLeft: 10 }}>
                       <Text style={[styles.circuitExName, { color: theme.text }]}>{ex.exerciseName}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                         <TextInput
                           style={[styles.repsInput, { color: theme.text, borderColor: theme.border }]}
                           keyboardType="numeric"
@@ -132,34 +284,57 @@ export default function LiveWorkoutScreen() {
                       </View>
                     </View>
 
-                    {/* Round status dots (e.g. ● ● ◯) */}
+                    {/* Round status dots */}
                     <View style={styles.dotsRow}>
-                      {Array.from({ length: activeSession.circuitRounds || 3 }).map((_, rIdx) => (
+                      {Array.from({ length: totalRounds }).map((_, rIdx) => (
                         <View
                           key={rIdx}
                           style={[
                             styles.roundDot,
-                            { backgroundColor: ex.sets[rIdx]?.completed ? '#8B5CF6' : theme.border },
+                            { backgroundColor: ex.sets[rIdx]?.completed ? theme.accent : theme.border },
                           ]}
                         />
                       ))}
                     </View>
+
+                    {isResolved && (
+                      <TouchableOpacity
+                        style={{ padding: 4, marginLeft: 4 }}
+                        onPress={() => setExpandedMap((prev) => ({ ...prev, [ex.id]: false }))}
+                      >
+                        <ChevronUp size={16} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    )}
                   </View>
 
-                  {/* Big Action Button [✓ Fait] */}
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={[
-                      styles.circuitDoneBtn,
-                      { backgroundColor: isCompleted ? '#8B5CF6' : theme.accent },
-                    ]}
-                    onPress={() => toggleSetComplete(ex.id, currentSet.id)}
-                  >
-                    <Check size={18} color="#FFFFFF" />
-                    <Text style={styles.circuitDoneBtnText}>
-                      {isCompleted ? 'Validé' : '✓ Fait'}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Action Buttons: [Valider] et [Passer] pour l'exercice en cours */}
+                  <View style={styles.circuitActionsRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[
+                        styles.circuitDoneBtn,
+                        { flex: 1, backgroundColor: currentSet?.completed ? theme.accent : theme.accent, marginRight: 6 },
+                      ]}
+                      onPress={() => handleValidateCircuitExercise(ex.id, currentSet.id, idx)}
+                    >
+                      <Check size={16} color="#FFFFFF" />
+                      <Text style={styles.circuitDoneBtnText}>
+                        {currentSet?.completed || status === 'validated' ? 'Validé' : 'Valider'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={[
+                        styles.circuitPassBtn,
+                        { borderColor: theme.border, backgroundColor: theme.cardBg },
+                      ]}
+                      onPress={() => handlePassCircuitExercise(ex.id, idx)}
+                    >
+                      <SkipForward size={14} color={theme.textMuted} />
+                      <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passer</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })}
@@ -192,25 +367,45 @@ export default function LiveWorkoutScreen() {
         />
       </ScrollView>
 
-      {/* Modal Ajout d'Exercice depuis la Base de Données */}
+      {/* Modal Ajout d'Exercice avec Barre de Recherche */}
       <Modal visible={showAddExModal} transparent animationType="slide" onRequestClose={() => setShowAddExModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAddExModal(false)}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Sélectionner un exercice</Text>
+
+            {/* Barre de Recherche Clavier */}
+            <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Search size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Rechercher par nom ou muscle..."
+                placeholderTextColor={theme.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
+            </View>
+
             <ScrollView style={{ maxHeight: 380 }}>
-              {EXERCISE_DATABASE.map((ex) => (
-                <TouchableOpacity
-                  key={ex.id}
-                  style={[styles.dbRow, { borderBottomColor: theme.border }]}
-                  onPress={() => handleSelectSharedExercise(ex)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dbExName, { color: theme.text }]}>{ex.name}</Text>
-                    <Text style={[styles.dbExMuscle, { color: theme.textMuted }]}>{ex.primaryMuscle}</Text>
-                  </View>
-                  <Plus size={18} color={theme.accent} />
-                </TouchableOpacity>
-              ))}
+              {filteredDatabase.length === 0 ? (
+                <Text style={[styles.noResultText, { color: theme.textMuted }]}>Aucun exercice trouvé</Text>
+              ) : (
+                filteredDatabase.map((ex) => (
+                  <TouchableOpacity
+                    key={ex.id}
+                    style={[styles.dbRow, { borderBottomColor: theme.border }]}
+                    onPress={() => handleSelectSharedExercise(ex)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.dbExName, { color: theme.text }]}>{ex.name}</Text>
+                      <Text style={[styles.dbExMuscle, { color: theme.textMuted }]}>
+                        {ex.primaryMuscle} • {ex.category}
+                      </Text>
+                    </View>
+                    <Plus size={18} color={theme.accent} />
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -274,7 +469,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: 'rgba(139,92,246,0.15)',
     alignSelf: 'flex-start',
     marginBottom: 6,
   },
@@ -317,6 +511,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 10,
   },
+  circuitItemCollapsedCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  collapsedLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  collapsedExName: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  collapsedSub: {
+    fontSize: 11,
+  },
+  collapsedRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    marginLeft: 3,
+  },
   circuitItemTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -338,8 +571,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   repsInput: {
-    width: 40,
-    height: 28,
+    width: 44,
+    height: 30,
     borderWidth: 1,
     borderRadius: 6,
     textAlign: 'center',
@@ -358,6 +591,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginLeft: 4,
   },
+  circuitActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   circuitDoneBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -367,9 +605,23 @@ const styles = StyleSheet.create({
   },
   circuitDoneBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     marginLeft: 6,
+  },
+  circuitPassBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  circuitPassBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -386,8 +638,27 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 17,
     fontWeight: '800',
-    marginBottom: 12,
+    marginBottom: 10,
     textAlign: 'center',
+  },
+  searchBarBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+  noResultText: {
+    textAlign: 'center',
+    fontSize: 13,
+    paddingVertical: 20,
   },
   dbRow: {
     flexDirection: 'row',
@@ -397,10 +668,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   dbExName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   dbExMuscle: {
-    fontSize: 12,
+    fontSize: 11,
   },
 });

@@ -244,7 +244,11 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
     },
   ],
   measurements: [
-    { id: 'm1', date: '2026-08-01', weightKg: 79.0, chestCm: 104, waistCm: 82, bicepsCm: 39 },
-    { id: 'm2', date: '2026-08-08', weightKg: 78.5, chestCm: 104.5, waistCm: 81.5, bicepsCm: 39.2 },
+    { id: 'm1', date: '2026-08-01', weightKg: 79.0, chestCm: 104, thighCm: 58, bicepsCm: 39 },
+    { id: 'm2', date: '2026-08-08', weightKg: 78.5, chestCm: 104.5, thighCm: 58.5, bicepsCm: 39.2 },
+  ],
+  folders: [
+    { id: 'fld_1', name: 'Mes Programmes', templateIds: ['tpl_upper_b', 'tpl_circuit_abdos'], isCollapsed: false },
   ],
 };
+
