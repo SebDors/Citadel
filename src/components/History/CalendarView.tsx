@@ -12,7 +12,6 @@ import { WorkoutSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
-import { Badge } from '../UI/Badge';
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,7 +19,7 @@ import {
   Trash2,
   Clock,
   Dumbbell,
-  CheckCircle2,
+  Layers,
 } from 'lucide-react-native';
 
 interface CalendarViewProps {
@@ -44,7 +43,7 @@ const MONTHS_NAMES = [
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const { theme } = useTheme();
-  const { deleteWorkoutSession, deleteExerciseFromSession, deleteSetFromSession } = useWorkout();
+  const { deleteWorkoutSession } = useWorkout();
 
   const now = new Date();
   const [currentMonthIndex, setCurrentMonthIndex] = useState(now.getMonth());
@@ -110,40 +109,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           style: 'destructive',
           onPress: async () => {
             await deleteWorkoutSession(sessionId);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDeleteExercise = (sessionId: string, exerciseId: string, exerciseName: string) => {
-    Alert.alert(
-      'Supprimer l\'exercice',
-      `Voulez-vous supprimer l'exercice "${exerciseName}" de cette séance ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteExerciseFromSession(sessionId, exerciseId);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDeleteSet = (sessionId: string, exerciseId: string, setId: string, setNum: number) => {
-    Alert.alert(
-      'Supprimer la série',
-      `Voulez-vous supprimer la série n°${setNum} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteSetFromSession(sessionId, exerciseId, setId);
           },
         },
       ]
@@ -254,104 +219,64 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                   </Text>
                 </View>
               ) : (
-                daySessions.map((session) => (
-                  <View
-                    key={session.id}
-                    style={[
-                      styles.sessionCard,
-                      { backgroundColor: theme.surface, borderColor: theme.border },
-                    ]}
-                  >
-                    {/* Session Title & Delete Session Button */}
-                    <View style={styles.sessionCardHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
-                          {session.title}
-                        </Text>
-                        <Text style={[styles.sessionMetaText, { color: theme.textMuted }]}>
-                          <Clock size={12} color={theme.textMuted} />{' '}
-                          {Math.floor(session.durationSeconds / 60)} min •{' '}
-                          <Dumbbell size={12} color={theme.secondary} /> {session.totalVolumeKg} kg
-                        </Text>
-                      </View>
+                daySessions.map((session) => {
+                  const setsCount =
+                    session.completedSetsCount ??
+                    session.totalSetsCount ??
+                    session.exercises?.reduce((sum, e) => sum + e.sets.length, 0) ??
+                    0;
 
-                      <TouchableOpacity
-                        style={[styles.deleteIconButton, { backgroundColor: theme.cardBg }]}
-                        onPress={() => handleDeleteSession(session.id)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Trash2 size={16} color={theme.danger} />
-                      </TouchableOpacity>
-                    </View>
+                  return (
+                    <View
+                      key={session.id}
+                      style={[
+                        styles.sessionCard,
+                        { backgroundColor: theme.surface, borderColor: theme.border },
+                      ]}
+                    >
+                      {/* Session Header: Details & Delete Session Button */}
+                      <View style={styles.sessionCardHeader}>
+                        <View style={styles.sessionInfo}>
+                          <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
+                            {session.title}
+                          </Text>
 
-                    {/* Exercices de la séance */}
-                    {session.exercises.map((exercise) => (
-                      <View
-                        key={exercise.id}
-                        style={[
-                          styles.exerciseBox,
-                          { backgroundColor: theme.cardBg, borderColor: theme.border },
-                        ]}
-                      >
-                        <View style={styles.exerciseHeaderRow}>
-                          <View style={styles.exerciseTitleArea}>
-                            <Text style={[styles.exerciseName, { color: theme.text }]}>
-                              {exercise.exerciseName}
-                            </Text>
-                            <Badge label={exercise.primaryMuscle} variant="secondary" />
-                          </View>
-
-                          <TouchableOpacity
-                            onPress={() =>
-                              handleDeleteExercise(session.id, exercise.id, exercise.exerciseName)
-                            }
-                            style={styles.deleteExBtn}
-                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                          >
-                            <Trash2 size={14} color={theme.danger} />
-                          </TouchableOpacity>
-                        </View>
-
-                        {/* Séries de l'exercice */}
-                        <View style={styles.setsListContainer}>
-                          {exercise.sets.map((s) => (
-                            <View
-                              key={s.id}
-                              style={[
-                                styles.setRowItem,
-                                { backgroundColor: theme.surface, borderColor: theme.border },
-                              ]}
-                            >
-                              <View style={styles.setInfoArea}>
-                                <Text style={[styles.setNumText, { color: theme.text }]}>
-                                  Série {s.setNumber}
-                                </Text>
-                                <Text style={[styles.setDetailText, { color: theme.textMuted }]}>
-                                  {s.weightKg ? `${s.weightKg} kg` : '-'} ×{' '}
-                                  {s.reps ? `${s.reps} reps` : '-'} (RIR {s.rir ?? 0})
-                                </Text>
-                              </View>
-
-                              {s.completed && (
-                                <CheckCircle2 size={14} color={theme.primary} style={{ marginRight: 8 }} />
-                              )}
-
-                              <TouchableOpacity
-                                onPress={() =>
-                                  handleDeleteSet(session.id, exercise.id, s.id, s.setNumber)
-                                }
-                                style={styles.deleteSetBtn}
-                                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                              >
-                                <Trash2 size={12} color={theme.danger} />
-                              </TouchableOpacity>
+                          <View style={styles.statsRow}>
+                            <View style={styles.statBadge}>
+                              <Clock size={14} color={theme.textMuted} />
+                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                {Math.floor(session.durationSeconds / 60)} min
+                              </Text>
                             </View>
-                          ))}
+
+                            <View style={styles.statBadge}>
+                              <Dumbbell size={14} color={theme.secondary} />
+                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                {session.totalVolumeKg} kg
+                              </Text>
+                            </View>
+
+                            <View style={styles.statBadge}>
+                              <Layers size={14} color={theme.primary} />
+                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                {setsCount} {setsCount > 1 ? 'séries' : 'série'}
+                              </Text>
+                            </View>
+                          </View>
                         </View>
+
+                        <TouchableOpacity
+                          style={[styles.deleteIconButton, { backgroundColor: theme.cardBg }]}
+                          onPress={() => handleDeleteSession(session.id)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityLabel="Supprimer la séance"
+                        >
+                          <Trash2 size={18} color={theme.danger} />
+                        </TouchableOpacity>
                       </View>
-                    ))}
-                  </View>
-                ))
+                    </View>
+                  );
+                })
               )}
             </ScrollView>
           </View>
@@ -470,79 +395,40 @@ const styles = StyleSheet.create({
   sessionCard: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 14,
+    padding: 14,
+    marginBottom: 12,
   },
   sessionCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+  },
+  sessionInfo: {
+    flex: 1,
+    marginRight: 12,
   },
   sessionCardTitle: {
     fontSize: 16,
     fontWeight: '800',
-  },
-  sessionMetaText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  deleteIconButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  exerciseBox: {
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
-    marginTop: 8,
-  },
-  exerciseHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
   },
-  exerciseTitleArea: {
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  exerciseName: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  deleteExBtn: {
-    padding: 4,
-  },
-  setsListContainer: {
+  statBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  setRowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
+  statBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
-  setInfoArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  setNumText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  setDetailText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  deleteSetBtn: {
-    padding: 4,
+  deleteIconButton: {
+    padding: 10,
+    borderRadius: 10,
   },
 });
