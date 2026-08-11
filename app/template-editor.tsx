@@ -554,6 +554,7 @@ const styles = StyleSheet.create({
   restStepper: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 10,
   },
   stepperBtn: {
@@ -567,9 +568,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   restValueText: {
-    fontSize: 15,
+    fontSize: 22,
     fontWeight: '900',
-    marginHorizontal: 8,
+    marginHorizontal: 12,
   },
   defaultRestHint: {
     fontSize: 11,
