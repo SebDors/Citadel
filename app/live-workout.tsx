@@ -141,6 +141,27 @@ export default function LiveWorkoutScreen() {
     advanceCircuitAfterAction(nextStatus, idx);
   };
 
+  // Check if all sets/rounds in the session are finished
+  const isAllCompleted = React.useMemo(() => {
+    if (!activeSession || activeSession.exercises.length === 0) return false;
+
+    if (activeSession.isCircuit) {
+      const totalEx = activeSession.exercises.length;
+      const resolvedCount = activeSession.exercises.filter((ex) => {
+        const status = roundStatusMap[ex.id];
+        return status === 'validated' || status === 'skipped';
+      }).length;
+      const allSetsCompleted = activeSession.exercises.every(
+        (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
+      );
+      return (activeCircuitRound >= totalRounds && resolvedCount >= totalEx) || allSetsCompleted;
+    }
+
+    return activeSession.exercises.every(
+      (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
+    );
+  }, [activeSession, activeCircuitRound, totalRounds, roundStatusMap]);
+
   // Filter 52 exercises for search modal
   const filteredDatabase = EXERCISE_DATABASE.filter((ex) => {
     const q = searchQuery.toLowerCase().trim();
@@ -307,34 +328,36 @@ export default function LiveWorkoutScreen() {
                     )}
                   </View>
 
-                  {/* Action Buttons: [Valider] et [Passer] pour l'exercice en cours */}
-                  <View style={styles.circuitActionsRow}>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.circuitDoneBtn,
-                        { flex: 1, backgroundColor: currentSet?.completed ? theme.accent : theme.accent, marginRight: 6 },
-                      ]}
-                      onPress={() => handleValidateCircuitExercise(ex.id, currentSet.id, idx)}
-                    >
-                      <Check size={16} color="#FFFFFF" />
-                      <Text style={styles.circuitDoneBtnText}>
-                        {currentSet?.completed || status === 'validated' ? 'Validé' : 'Valider'}
-                      </Text>
-                    </TouchableOpacity>
+                  {/* Action Buttons: [Valider] et [Passer] pour l'exercice en cours uniquement */}
+                  {isCurrentActive && (
+                    <View style={styles.circuitActionsRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.circuitDoneBtn,
+                          { flex: 1, backgroundColor: currentSet?.completed ? theme.accent : theme.accent, marginRight: 6 },
+                        ]}
+                        onPress={() => handleValidateCircuitExercise(ex.id, currentSet.id, idx)}
+                      >
+                        <Check size={16} color="#FFFFFF" />
+                        <Text style={styles.circuitDoneBtnText}>
+                          {currentSet?.completed ? 'Validé' : 'Valider'}
+                        </Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[
-                        styles.circuitPassBtn,
-                        { borderColor: theme.border, backgroundColor: theme.cardBg },
-                      ]}
-                      onPress={() => handlePassCircuitExercise(ex.id, idx)}
-                    >
-                      <SkipForward size={14} color={theme.textMuted} />
-                      <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passer</Text>
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={[
+                          styles.circuitPassBtn,
+                          { borderColor: theme.border, backgroundColor: theme.cardBg },
+                        ]}
+                        onPress={() => handlePassCircuitExercise(ex.id, idx)}
+                      >
+                        <SkipForward size={14} color={theme.textMuted} />
+                        <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passer</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -364,6 +387,15 @@ export default function LiveWorkoutScreen() {
           onPress={() => setShowAddExModal(true)}
           icon={<Plus size={18} color={theme.accent} />}
           style={{ marginTop: 14 }}
+        />
+
+        {/* Bouton Terminer l'entraînement */}
+        <Button
+          title="Terminer l'entraînement"
+          variant={isAllCompleted ? 'primary' : 'outline'}
+          onPress={handleFinish}
+          icon={<Check size={18} color={isAllCompleted ? '#FFFFFF' : theme.text} />}
+          style={{ marginTop: 10 }}
         />
       </ScrollView>
 
