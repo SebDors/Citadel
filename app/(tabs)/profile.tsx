@@ -1,0 +1,63 @@
+import React from 'react';
+import { View, Text, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
+import { useWorkout } from '../../src/context/WorkoutContext';
+import { useTheme } from '../../src/context/ThemeContext';
+import { ProfileHeaderCard } from '../../src/components/Profile/ProfileHeaderCard';
+import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
+import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
+import { JsonActionsCard } from '../../src/components/Profile/JsonActionsCard';
+
+export default function ProfileTab() {
+  const { data, addMeasurement, reloadAllData } = useWorkout();
+  const { theme } = useTheme();
+
+  if (!data) return null;
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Page Header */}
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.text }]}>Performances & Profil</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+            Progression 1RM, Mensurations et Sauvegardes JSON
+          </Text>
+        </View>
+
+        {/* 1. Carte En-tête Profil */}
+        <ProfileHeaderCard profile={data.profile} />
+
+        {/* 2. Graphiques / Cartes de Performance 1RM */}
+        <OneRMChartCard />
+
+        {/* 3. Suivi du Poids et Mensurations */}
+        <BodyMeasurementsCard measurements={data.measurements} onAddMeasurement={addMeasurement} />
+
+        {/* 4. Zone Réglages & Données JSON */}
+        <JsonActionsCard data={data} onImportSuccess={reloadAllData} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  header: {
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
