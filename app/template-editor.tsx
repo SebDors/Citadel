@@ -34,6 +34,7 @@ import {
   Timer,
   RotateCcw,
   Layers,
+  Zap,
 } from 'lucide-react-native';
 
 
@@ -48,6 +49,9 @@ export default function TemplateEditorScreen() {
 
   const [title, setTitle] = useState('');
   const [defaultRestSeconds, setDefaultRestSeconds] = useState<number>(75);
+  const [isCircuit, setIsCircuit] = useState<boolean>(false);
+  const [circuitRounds, setCircuitRounds] = useState<number>(3);
+  const [restBetweenRoundsSeconds, setRestBetweenRoundsSeconds] = useState<number>(90);
   const [selectedExercises, setSelectedExercises] = useState<WorkoutExercise[]>([]);
   const [showPickerModal, setShowPickerModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +81,9 @@ export default function TemplateEditorScreen() {
         setTitle(existing.title);
         setSelectedExercises(JSON.parse(JSON.stringify(existing.exercises)));
         setDefaultRestSeconds(existing.defaultRestSeconds || 75);
+        setIsCircuit(!!existing.isCircuit);
+        setCircuitRounds(existing.circuitRounds ?? 3);
+        setRestBetweenRoundsSeconds(existing.restBetweenRoundsSeconds ?? 90);
       }
     }
   }, [templateIdParam, data?.templates]);
@@ -174,6 +181,9 @@ export default function TemplateEditorScreen() {
       title,
       defaultRestSeconds,
       exercises: selectedExercises,
+      isCircuit,
+      circuitRounds,
+      restBetweenRoundsSeconds,
     };
 
     await saveTemplate(newTemplate);
@@ -227,6 +237,102 @@ export default function TemplateEditorScreen() {
           value={title}
           onChangeText={setTitle}
         />
+
+        {/* Sélecteur Mode de la séance */}
+        <Text style={[styles.label, { color: theme.text, marginTop: 14 }]}>Mode de la séance</Text>
+        <View style={[styles.modeSelectorContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.modeOption,
+              !isCircuit && [styles.modeOptionActive, { backgroundColor: theme.accent }],
+            ]}
+            onPress={() => setIsCircuit(false)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.modeOptionText,
+                { color: !isCircuit ? '#FFFFFF' : theme.textMuted },
+              ]}
+            >
+              Normale
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeOption,
+              isCircuit && [styles.modeOptionActive, { backgroundColor: theme.accent }],
+            ]}
+            onPress={() => setIsCircuit(true)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.modeOptionText,
+                { color: isCircuit ? '#FFFFFF' : theme.textMuted },
+              ]}
+            >
+              ⚡ Circuit
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Réglages du Mode Circuit */}
+        {isCircuit && (
+          <View style={[styles.circuitCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={styles.rowAlign}>
+              <Zap size={18} color={theme.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.circuitCardTitle, { color: theme.text }]}>
+                Réglages du Circuit
+              </Text>
+            </View>
+
+            {/* Nombre de tours */}
+            <View style={styles.circuitControlRow}>
+              <Text style={[styles.circuitControlLabel, { color: theme.text }]}>Nombre de tours</Text>
+              <View style={styles.circuitStepper}>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+                  onPress={() => setCircuitRounds((prev) => Math.max(1, prev - 1))}
+                >
+                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>-1</Text>
+                </TouchableOpacity>
+                <Text style={[styles.circuitValueText, { color: theme.accent }]}>
+                  {circuitRounds} tour{circuitRounds > 1 ? 's' : ''}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+                  onPress={() => setCircuitRounds((prev) => prev + 1)}
+                >
+                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>+1</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Repos entre les tours */}
+            <View style={styles.circuitControlRow}>
+              <Text style={[styles.circuitControlLabel, { color: theme.text }]}>Repos entre les tours</Text>
+              <View style={styles.circuitStepperCenter}>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+                  onPress={() => setRestBetweenRoundsSeconds((prev) => Math.max(0, prev - 15))}
+                >
+                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>-15s</Text>
+                </TouchableOpacity>
+                <Text style={[styles.circuitValueText, { color: theme.accent }]}>
+                  {restBetweenRoundsSeconds}s
+                </Text>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+                  onPress={() => setRestBetweenRoundsSeconds((prev) => prev + 15)}
+                >
+                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>+15s</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Temps de repos par défaut de la séance */}
         <View style={[styles.defaultRestCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -927,5 +1033,62 @@ const styles = StyleSheet.create({
   },
   dbItemMuscle: {
     fontSize: 11,
+  },
+  modeSelectorContainer: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 12,
+  },
+  modeOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeOptionActive: {
+    // Dynamiquement coloré avec theme.accent
+  },
+  modeOptionText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  circuitCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  circuitCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  circuitControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  circuitControlLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  circuitStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circuitStepperCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circuitValueText: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginHorizontal: 10,
+    minWidth: 50,
+    textAlign: 'center',
   },
 });
