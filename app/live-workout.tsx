@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -35,18 +35,29 @@ import {
   SkipForward,
   ChevronDown,
   ChevronUp,
+  Play,
+  Clock,
 } from 'lucide-react-native';
 
 const EPILOG_PURPLE = '#8B5CF6';
 const EPILOG_PURPLE_BG = 'rgba(139, 92, 246, 0.12)';
 const EPILOG_PURPLE_BORDER = 'rgba(139, 92, 246, 0.4)';
 
+const formatMinutesSeconds = (totalSeconds: number): string => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
 interface CircuitState {
+  started: boolean;
   currentRound: number;
   activeExerciseIdx: number;
   roundStatusMap: Record<string, 'pending' | 'validated' | 'skipped'>;
   expandedMap: Record<string, boolean>;
   customValues: Record<string, number>;
+  amrapSecondsLeft?: number;
+  completedRoundsCount?: number;
 }
 
 export default function LiveWorkoutScreen() {
@@ -82,16 +93,20 @@ export default function LiveWorkoutScreen() {
   }, [activeSession]);
 
   // Helper to get state of a specific CircuitBlock
-  const getCircuitState = (blockId: string): CircuitState => {
-    return (
-      circuitStates[blockId] || {
-        currentRound: 1,
-        activeExerciseIdx: 0,
-        roundStatusMap: {},
-        expandedMap: {},
-        customValues: {},
-      }
-    );
+  const getCircuitState = (block: CircuitBlock): CircuitState => {
+    const existing = circuitStates[block.id];
+    if (existing) return existing;
+
+    return {
+      started: false,
+      currentRound: 0,
+      activeExerciseIdx: 0,
+      roundStatusMap: {},
+      expandedMap: {},
+      customValues: {},
+      amrapSecondsLeft: (block.amrapDurationMinutes || 12) * 60,
+      completedRoundsCount: 0,
+    };
   };
 
   const updateCircuitState = (
@@ -100,11 +115,13 @@ export default function LiveWorkoutScreen() {
   ) => {
     setCircuitStates((prev) => {
       const current = prev[blockId] || {
-        currentRound: 1,
+        started: false,
+        currentRound: 0,
         activeExerciseIdx: 0,
         roundStatusMap: {},
         expandedMap: {},
         customValues: {},
+        completedRoundsCount: 0,
       };
       return {
         ...prev,
@@ -112,6 +129,41 @@ export default function LiveWorkoutScreen() {
       };
     });
   };
+
+  const handleStartCircuit = (block: CircuitBlock) => {
+    updateCircuitState(block.id, (prev) => ({
+      ...prev,
+      started: true,
+      currentRound: 1,
+      amrapSecondsLeft: (block.amrapDurationMinutes || 12) * 60,
+    }));
+  };
+
+  // Timer dégressif AMRAP
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCircuitStates((prevStates) => {
+        let hasChanges = false;
+        const nextStates = { ...prevStates };
+
+        Object.keys(nextStates).forEach((blockId) => {
+          const state = nextStates[blockId];
+          const block = blocks.find((b) => b.id === blockId && b.type === 'circuit') as CircuitBlock | undefined;
+          if (state && state.started && block && block.circuitType === 'amrap' && (state.amrapSecondsLeft ?? 0) > 0) {
+            hasChanges = true;
+            nextStates[blockId] = {
+              ...state,
+              amrapSecondsLeft: Math.max(0, (state.amrapSecondsLeft ?? 0) - 1),
+            };
+          }
+        });
+
+        return hasChanges ? nextStates : prevStates;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [blocks]);
 
   // Check if all blocks (single exercises and circuits) are completed
   const isAllCompleted = useMemo(() => {
@@ -122,7 +174,11 @@ export default function LiveWorkoutScreen() {
         const sets = block.exercise.sets || [];
         return sets.length > 0 && sets.every((s) => s.completed);
       } else if (block.type === 'circuit') {
-        const cState = getCircuitState(block.id);
+        const cState = getCircuitState(block);
+        if (!cState.started) return false;
+        if (block.circuitType === 'amrap') {
+          return (cState.completedRoundsCount || 0) > 0 || (cState.amrapSecondsLeft ?? 0) === 0;
+        }
         const totalEx = block.exercises.length;
         const resolvedCount = block.exercises.filter((ex) => {
           const st = cState.roundStatusMap[ex.id];
@@ -196,28 +252,37 @@ export default function LiveWorkoutScreen() {
 
     if (resolvedCount >= totalEx) {
       // Round completed!
-      const restTime = block.restBetweenRoundsSeconds || 120;
+      const restTime = block.restBetweenRoundsSeconds || 90;
       startRestTimer(`Tour ${currentState.currentRound} terminé`, restTime);
 
-      if (currentState.currentRound < block.rounds) {
-        // Advance to next round
+      if (block.circuitType === 'amrap') {
         updateCircuitState(block.id, (prev) => ({
           ...prev,
           currentRound: prev.currentRound + 1,
+          completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
+          activeExerciseIdx: 0,
+          roundStatusMap: {},
+          expandedMap: {},
+        }));
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      } else if (currentState.currentRound < block.rounds) {
+        updateCircuitState(block.id, (prev) => ({
+          ...prev,
+          currentRound: prev.currentRound + 1,
+          completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
           activeExerciseIdx: 0,
           roundStatusMap: {},
           expandedMap: {},
         }));
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       } else {
-        // Circuit fully complete
         updateCircuitState(block.id, (prev) => ({
           ...prev,
+          completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
           roundStatusMap: nextStatusMap,
         }));
       }
     } else {
-      // Find next pending exercise
       let nextIdx = (currentState.activeExerciseIdx + 1) % totalEx;
       let count = 0;
       while (
@@ -237,13 +302,15 @@ export default function LiveWorkoutScreen() {
   };
 
   const handleValidateCircuitExercise = (block: CircuitBlock, exId: string) => {
-    const currentState = getCircuitState(block.id);
+    const currentState = getCircuitState(block);
+    if (!currentState.started) return;
     const nextStatus = { ...currentState.roundStatusMap, [exId]: 'validated' as const };
     advanceCircuitBlock(block, nextStatus, currentState);
   };
 
   const handlePassCircuitExercise = (block: CircuitBlock, exId: string) => {
-    const currentState = getCircuitState(block.id);
+    const currentState = getCircuitState(block);
+    if (!currentState.started) return;
     const nextStatus = { ...currentState.roundStatusMap, [exId]: 'skipped' as const };
     advanceCircuitBlock(block, nextStatus, currentState);
   };
@@ -307,7 +374,6 @@ export default function LiveWorkoutScreen() {
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
         {blocks.map((block, blockIdx) => {
           if (block.type === 'single') {
-            // Rendu Exercice Individuel Standard (SingleExerciseBlock)
             const ex = block.exercise;
             return (
               <ExerciseCard
@@ -324,11 +390,19 @@ export default function LiveWorkoutScreen() {
               />
             );
           } else if (block.type === 'circuit') {
-            // Rendu Bloc Circuit (CircuitBlock) - Moteur Violet Epilog
-            const circuitState = getCircuitState(block.id);
-            const { currentRound, activeExerciseIdx, roundStatusMap, expandedMap, customValues } =
-              circuitState;
+            const circuitState = getCircuitState(block);
+            const {
+              started,
+              currentRound,
+              activeExerciseIdx,
+              roundStatusMap,
+              expandedMap,
+              customValues,
+              amrapSecondsLeft,
+              completedRoundsCount,
+            } = circuitState;
             const totalRounds = block.rounds || 3;
+            const isAmrap = block.circuitType === 'amrap';
 
             return (
               <View
@@ -338,50 +412,83 @@ export default function LiveWorkoutScreen() {
                   { backgroundColor: theme.cardBg, borderColor: EPILOG_PURPLE_BORDER },
                 ]}
               >
-                {/* En-tête Moteur Violet Epilog avec Badge C */}
+                {/* En-tête Moteur Violet avec Badge C */}
                 <View style={styles.epilogHeaderRow}>
                   <View style={styles.epilogBadge}>
                     <Text style={styles.epilogBadgeText}>C</Text>
                   </View>
                   <View style={{ marginLeft: 8 }}>
-                    <Text style={[styles.epilogTag, { color: EPILOG_PURPLE }]}>CIRCUIT EPILOG</Text>
+                    <Text style={[styles.epilogTag, { color: EPILOG_PURPLE }]}>CIRCUIT</Text>
                   </View>
                 </View>
 
                 <Text style={[styles.circuitTitle, { color: theme.text }]}>{block.title}</Text>
                 <Text style={[styles.circuitSub, { color: theme.textMuted }]}>
-                  {block.exercises.length} EXOS · {totalRounds} TOURS
+                  {block.exercises.length} EXOS · {isAmrap ? `AMRAP ${block.amrapDurationMinutes || 12} MIN` : `${totalRounds} TOURS`}
                 </Text>
 
-                {/* Tour en cours et barre de progression */}
-                <View style={[styles.roundProgressBox, { backgroundColor: EPILOG_PURPLE_BG }]}>
-                  <Text style={[styles.roundLabel, { color: EPILOG_PURPLE }]}>
-                    TOUR EN COURS : {currentRound} / {totalRounds}
-                  </Text>
-                  <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          backgroundColor: EPILOG_PURPLE,
-                          width: `${(currentRound / totalRounds) * 100}%`,
-                        },
-                      ]}
-                    />
+                {/* Bouton [Commencer le circuit] ou Progression & Chrono AMRAP */}
+                {!started ? (
+                  <View style={styles.startCircuitContainer}>
+                    <View style={[styles.roundProgressBox, { backgroundColor: EPILOG_PURPLE_BG, marginBottom: 10 }]}>
+                      <Text style={[styles.roundLabel, { color: EPILOG_PURPLE }]}>
+                        TOUR EN COURS : Tour 0 / {isAmrap ? '∞' : totalRounds} (Non démarré)
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[styles.startCircuitBtn, { backgroundColor: EPILOG_PURPLE }]}
+                      onPress={() => handleStartCircuit(block)}
+                    >
+                      <Play size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={styles.startCircuitBtnText}>Commencer le circuit</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                ) : (
+                  <View style={[styles.roundProgressBox, { backgroundColor: EPILOG_PURPLE_BG }]}>
+                    {isAmrap ? (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View>
+                          <Text style={[styles.roundLabel, { color: EPILOG_PURPLE, marginBottom: 2 }]}>
+                            AMRAP · TOUR {currentRound} ({completedRoundsCount || 0} tour(s) complété(s))
+                          </Text>
+                        </View>
+                        <View style={[styles.amrapTimerBadge, { backgroundColor: EPILOG_PURPLE }]}>
+                          <Clock size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.amrapTimerText}>{formatMinutesSeconds(amrapSecondsLeft ?? 0)}</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <>
+                        <Text style={[styles.roundLabel, { color: EPILOG_PURPLE }]}>
+                          TOUR EN COURS : {currentRound} / {totalRounds}
+                        </Text>
+                        <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
+                          <View
+                            style={[
+                              styles.progressBarFill,
+                              {
+                                backgroundColor: EPILOG_PURPLE,
+                                width: `${(currentRound / totalRounds) * 100}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                      </>
+                    )}
+                  </View>
+                )}
 
                 {/* Liste des exercices du circuit */}
                 {block.exercises.map((ex: CircuitExerciseItem, idx: number) => {
                   const status = roundStatusMap[ex.id] || 'pending';
-                  const isCurrentActive = idx === activeExerciseIdx && status === 'pending';
+                  const isCurrentActive = started && idx === activeExerciseIdx && status === 'pending';
                   const isResolved = status === 'validated' || status === 'skipped';
                   const isForceExpanded = !!expandedMap[ex.id];
 
                   const targetVal = customValues[ex.id] ?? ex.targetValue ?? 10;
                   const valLabel = ex.targetType === 'time' ? `${targetVal}s` : `${targetVal} reps`;
 
-                  // Carte réduite / compacte (~50% de hauteur) quand l'exercice est validé ou passé (et non force-déplié)
                   if (isResolved && !isForceExpanded) {
                     return (
                       <TouchableOpacity
@@ -442,7 +549,6 @@ export default function LiveWorkoutScreen() {
                     );
                   }
 
-                  // Carte d'exercice complète (Actif ou Ré-expansée)
                   return (
                     <View
                       key={ex.id}
@@ -495,7 +601,7 @@ export default function LiveWorkoutScreen() {
 
                         {/* Round status dots */}
                         <View style={styles.dotsRow}>
-                          {Array.from({ length: totalRounds }).map((_, rIdx) => (
+                          {Array.from({ length: isAmrap ? (completedRoundsCount || 1) + 1 : totalRounds }).map((_, rIdx) => (
                             <View
                               key={rIdx}
                               style={[
@@ -523,13 +629,19 @@ export default function LiveWorkoutScreen() {
                       </View>
 
                       {/* Action Buttons: [Valider] et [Passer] pour l'exercice actif */}
-                      {isCurrentActive && (
+                      {(isCurrentActive || (!started && idx === activeExerciseIdx)) && (
                         <View style={styles.circuitActionsRow}>
                           <TouchableOpacity
                             activeOpacity={0.8}
+                            disabled={!started}
                             style={[
                               styles.circuitDoneBtn,
-                              { flex: 1, backgroundColor: EPILOG_PURPLE, marginRight: 6 },
+                              {
+                                flex: 1,
+                                backgroundColor: started ? EPILOG_PURPLE : theme.border,
+                                marginRight: 6,
+                                opacity: started ? 1 : 0.6,
+                              },
                             ]}
                             onPress={() => handleValidateCircuitExercise(block, ex.id)}
                           >
@@ -539,9 +651,10 @@ export default function LiveWorkoutScreen() {
 
                           <TouchableOpacity
                             activeOpacity={0.7}
+                            disabled={!started}
                             style={[
                               styles.circuitPassBtn,
-                              { borderColor: theme.border, backgroundColor: theme.cardBg },
+                              { borderColor: theme.border, backgroundColor: theme.cardBg, opacity: started ? 1 : 0.6 },
                             ]}
                             onPress={() => handlePassCircuitExercise(block, ex.id)}
                           >
@@ -746,6 +859,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
+  startCircuitContainer: {
+    marginBottom: 12,
+  },
+  startCircuitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  startCircuitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   roundProgressBox: {
     padding: 10,
     borderRadius: 12,
@@ -755,6 +884,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     marginBottom: 6,
+  },
+  amrapTimerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  amrapTimerText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   progressBarTrack: {
     height: 8,
@@ -800,20 +941,19 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   statusBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    marginLeft: 3,
+    marginLeft: 4,
   },
   circuitItemTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   numberCircle: {
     width: 28,
@@ -824,28 +964,29 @@ const styles = StyleSheet.create({
   },
   numberText: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   circuitExName: {
     fontSize: 15,
     fontWeight: '800',
   },
+  circuitExSub: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   repsInput: {
-    width: 44,
-    height: 36,
-    paddingVertical: 2,
-    marginTop: 2,
+    height: 30,
+    width: 48,
     borderWidth: 1,
     borderRadius: 6,
     textAlign: 'center',
     fontSize: 13,
     fontWeight: '800',
-  },
-  circuitExSub: {
-    fontSize: 12,
+    paddingVertical: 2,
   },
   dotsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   roundDot: {
     width: 8,
@@ -856,85 +997,83 @@ const styles = StyleSheet.create({
   circuitActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 10,
   },
   circuitDoneBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   circuitDoneBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
     marginLeft: 6,
   },
   circuitPassBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
   },
   circuitPassBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
     marginLeft: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '90%',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
-    marginBottom: 10,
+    marginBottom: 12,
     textAlign: 'center',
   },
   searchBarBox: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    height: 38,
+    height: 40,
     borderRadius: 10,
     borderWidth: 1,
     marginBottom: 12,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    paddingVertical: 0,
+    fontSize: 14,
   },
   noResultText: {
     textAlign: 'center',
-    fontSize: 13,
     paddingVertical: 20,
+    fontSize: 14,
   },
   dbRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 0.5,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
   },
   dbExName: {
     fontSize: 14,
     fontWeight: '700',
   },
   dbExMuscle: {
-    fontSize: 11,
+    fontSize: 12,
+    marginTop: 2,
   },
 });
-

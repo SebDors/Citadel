@@ -150,19 +150,19 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderRadius: 8,
     marginVertical: 2,
   },
   typeButton: {
-    width: 28,
+    width: 30,
     height: 28,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
+    marginRight: 4,
   },
   typeText: {
     color: '#FFFFFF',
@@ -171,22 +171,26 @@ const styles = StyleSheet.create({
   },
   colPrevious: {
     flex: 1.2,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   previousText: {
     fontSize: 12,
     fontWeight: '500',
+    textAlign: 'center',
   },
   colInput: {
     flex: 1,
-    marginHorizontal: 3,
+    marginHorizontal: 2,
   },
   input: {
     height: 34,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
     borderWidth: 1,
     borderRadius: 6,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   rirButton: {
@@ -210,6 +214,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   deleteButton: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 4,
     marginLeft: 4,
   },

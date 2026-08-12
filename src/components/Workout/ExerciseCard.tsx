@@ -95,12 +95,25 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
       {/* Table Header */}
       <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
-        <Text style={[styles.thText, { flex: 0.8, color: theme.textMuted }]}>Set</Text>
-        <Text style={[styles.thText, { flex: 1.2, color: theme.textMuted }]}>Précédent</Text>
-        <Text style={[styles.thText, { flex: 1, color: theme.textMuted }]}>Kg</Text>
-        <Text style={[styles.thText, { flex: 1, color: theme.textMuted }]}>Reps</Text>
-        <Text style={[styles.thText, { flex: 1, color: theme.textMuted }]}>RIR</Text>
-        <Text style={[styles.thText, { flex: 0.8, color: theme.textMuted }]}>Valider</Text>
+        <View style={{ width: 30, marginRight: 4, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: theme.textMuted }]}>#</Text>
+        </View>
+        <View style={{ flex: 1.2, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: theme.textMuted }]}>PREV</Text>
+        </View>
+        <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: theme.textMuted }]}>KG</Text>
+        </View>
+        <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: theme.textMuted }]}>REPS</Text>
+        </View>
+        <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: theme.textMuted }]}>RIR</Text>
+        </View>
+        <View style={{ width: 30, marginLeft: 4, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: theme.textMuted }]}>Check</Text>
+        </View>
+        <View style={{ width: 24, marginLeft: 4 }} />
       </View>
 
       {/* Set Table Rows */}
@@ -306,7 +319,9 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 6,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
     marginBottom: 4,
   },

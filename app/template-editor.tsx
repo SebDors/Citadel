@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   StatusBar as RNStatusBar,
+  Alert,
 } from 'react-native';
 import { useTheme } from '../src/context/ThemeContext';
 import { useWorkout } from '../src/context/WorkoutContext';
@@ -46,6 +47,7 @@ import {
   Copy,
   ChevronUp,
   ChevronDown,
+  Repeat,
 } from 'lucide-react-native';
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
@@ -198,7 +200,37 @@ export default function TemplateEditorScreen() {
     setSelectedBlocks((prev) => [...prev, newCircuitBlock]);
   };
 
-  // Contrôles sur le conteneur circuit (tours et repos)
+  // Contrôles sur le conteneur circuit (type, tours, amrap, repos)
+  const handleSetCircuitType = (blockId: string, type: 'rounds' | 'amrap') => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            circuitType: type,
+            amrapDurationMinutes: b.amrapDurationMinutes || 12,
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleAdjustCircuitAmrapDuration = (blockId: string, deltaMinutes: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          const current = b.amrapDurationMinutes || 12;
+          return {
+            ...b,
+            amrapDurationMinutes: Math.max(1, current + deltaMinutes),
+          };
+        }
+        return b;
+      })
+    );
+  };
+
   const handleAdjustCircuitRounds = (blockId: string, delta: number) => {
     setSelectedBlocks((prev) =>
       prev.map((b) => {
@@ -595,7 +627,13 @@ export default function TemplateEditorScreen() {
 
   // Enregistrement du programme
   const handleSave = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || selectedBlocks.length === 0) {
+      Alert.alert(
+        'Information manquante',
+        'Veuillez entrer un nom de séance et ajouter au moins un exercice ou circuit.'
+      );
+      return;
+    }
 
     const singleExercises: WorkoutExercise[] = selectedBlocks
       .filter((b): b is SingleExerciseBlock => b.type === 'single')
@@ -739,25 +777,40 @@ export default function TemplateEditorScreen() {
                       <Text style={styles.circuitBadgeCText}>C</Text>
                     </View>
 
-                    {/* Titre Round · X tours + Steppers */}
-                    <Text style={[styles.circuitTitleText, { color: purpleHeader }]}>
-                      Round · {block.rounds} tour{block.rounds > 1 ? 's' : ''}
-                    </Text>
-                    <View style={styles.circuitSteppersBox}>
-                      <TouchableOpacity
-                        style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
-                        onPress={() => handleAdjustCircuitRounds(block.id, -1)}
-                      >
-                        <Text style={[styles.smallStepperText, { color: theme.text }]}>-1</Text>
-                      </TouchableOpacity>
+                    {/* Switcher Round vs AMRAP */}
+                    <View style={[styles.typeToggleContainer, { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE', marginLeft: 8 }]}>
                       <TouchableOpacity
                         style={[
-                          styles.smallStepperBtn,
-                          { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                          styles.typeToggleBtn,
+                          (block.circuitType !== 'amrap') && { backgroundColor: purpleBadgeBg },
                         ]}
-                        onPress={() => handleAdjustCircuitRounds(block.id, 1)}
+                        onPress={() => handleSetCircuitType(block.id, 'rounds')}
                       >
-                        <Text style={[styles.smallStepperText, { color: theme.text }]}>+1</Text>
+                        <Text
+                          style={[
+                            styles.typeToggleText,
+                            { color: block.circuitType !== 'amrap' ? '#FFFFFF' : purpleSubText },
+                          ]}
+                        >
+                          Round
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.typeToggleBtn,
+                          block.circuitType === 'amrap' && { backgroundColor: purpleBadgeBg },
+                        ]}
+                        onPress={() => handleSetCircuitType(block.id, 'amrap')}
+                      >
+                        <Text
+                          style={[
+                            styles.typeToggleText,
+                            { color: block.circuitType === 'amrap' ? '#FFFFFF' : purpleSubText },
+                          ]}
+                        >
+                          AMRAP
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -775,6 +828,65 @@ export default function TemplateEditorScreen() {
                   >
                     <MoreVertical size={20} color={purpleHeader} />
                   </TouchableOpacity>
+                </View>
+
+                {/* Réglage du nombre de tours (Round) ou de la durée (AMRAP) */}
+                <View style={[styles.circuitRestRow, { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE', marginBottom: 6 }]}>
+                  {block.circuitType === 'amrap' ? (
+                    <>
+                      <View style={styles.rowAlign}>
+                        <Clock size={14} color={purpleSubText} style={{ marginRight: 6 }} />
+                        <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                          Durée AMRAP ·{' '}
+                          <Text style={{ fontWeight: '900' }}>{block.amrapDurationMinutes || 12} min</Text>
+                        </Text>
+                      </View>
+                      <View style={styles.rowAlign}>
+                        <TouchableOpacity
+                          style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                          onPress={() => handleAdjustCircuitAmrapDuration(block.id, -1)}
+                        >
+                          <Text style={[styles.smallStepperText, { color: theme.text }]}>-1 min</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.smallStepperBtn,
+                            { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                          ]}
+                          onPress={() => handleAdjustCircuitAmrapDuration(block.id, 1)}
+                        >
+                          <Text style={[styles.smallStepperText, { color: theme.text }]}>+1 min</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.rowAlign}>
+                        <Repeat size={14} color={purpleSubText} style={{ marginRight: 6 }} />
+                        <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                          Tours ·{' '}
+                          <Text style={{ fontWeight: '900' }}>{block.rounds} tour{block.rounds > 1 ? 's' : ''}</Text>
+                        </Text>
+                      </View>
+                      <View style={styles.rowAlign}>
+                        <TouchableOpacity
+                          style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                          onPress={() => handleAdjustCircuitRounds(block.id, -1)}
+                        >
+                          <Text style={[styles.smallStepperText, { color: theme.text }]}>-1</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.smallStepperBtn,
+                            { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                          ]}
+                          onPress={() => handleAdjustCircuitRounds(block.id, 1)}
+                        >
+                          <Text style={[styles.smallStepperText, { color: theme.text }]}>+1</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
                 </View>
 
                 {/* Repos entre les tours · M:SS avec Steppers -15s / +15s */}
@@ -1102,7 +1214,6 @@ export default function TemplateEditorScreen() {
           title="Enregistrer le programme"
           variant="primary"
           onPress={handleSave}
-          disabled={!title.trim() || selectedBlocks.length === 0}
           style={{ marginTop: 24, marginBottom: 40 }}
         />
       </ScrollView>
@@ -1566,6 +1677,20 @@ const styles = StyleSheet.create({
   defaultRestHint: {
     fontSize: 11,
     marginTop: 8,
+  },
+  typeToggleContainer: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    padding: 2,
+  },
+  typeToggleBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  typeToggleText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   estimatedBox: {
     flexDirection: 'row',

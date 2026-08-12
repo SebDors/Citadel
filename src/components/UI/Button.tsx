@@ -45,9 +45,9 @@ export const Button: React.FC<ButtonProps> = ({
       style={[
         styles.button,
         {
-          backgroundColor: disabled ? theme.border : bgColor,
+          backgroundColor: disabled ? theme.background : bgColor,
           borderColor: theme.border,
-          borderWidth: variant === 'outline' ? 1.5 : 0,
+          borderWidth: disabled || variant === 'outline' ? 1.5 : 0,
         },
         style,
       ]}
@@ -56,7 +56,7 @@ export const Button: React.FC<ButtonProps> = ({
       <Text
         style={[
           styles.text,
-          { color: textColor, marginLeft: icon ? 8 : 0 },
+          { color: disabled ? theme.textMuted : textColor, marginLeft: icon ? 8 : 0 },
           textStyle,
         ]}
       >
