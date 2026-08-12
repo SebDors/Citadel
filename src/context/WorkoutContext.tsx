@@ -33,6 +33,7 @@ interface WorkoutContextType {
   duplicateExercise: (exerciseId: string) => void;
   updateExerciseRestTime: (exerciseId: string, newRestSeconds: number) => void;
   setExerciseSupersetGroup: (exerciseId: string, supersetGroup?: string) => void;
+  updateActiveSessionCircuitStates: (states: Record<string, any>) => void;
   addMeasurement: (measurement: BodyMeasurement) => Promise<void>;
   deleteMeasurement: (id: string) => Promise<void>;
   updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
@@ -697,6 +698,25 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveCurrentWorkout(updatedSession);
   };
 
+  const updateActiveSessionCircuitStates = (states: Record<string, any>) => {
+    if (!activeSession) return;
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      circuitStates: states,
+    };
+    setActiveSession(updatedSession);
+    if (data) {
+      const updatedData: FitTrackerData = {
+        ...data,
+        currentWorkout: updatedSession,
+      };
+      setData(updatedData);
+      StorageService.saveData(updatedData);
+    } else {
+      StorageService.saveCurrentWorkout(updatedSession);
+    }
+  };
+
   const finishWorkout = async () => {
     if (!activeSession) return;
 
@@ -886,6 +906,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         duplicateExercise,
         updateExerciseRestTime,
         setExerciseSupersetGroup,
+        updateActiveSessionCircuitStates,
         addMeasurement,
         deleteMeasurement,
         updateUserProfile,

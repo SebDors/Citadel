@@ -86,6 +86,7 @@ export interface WorkoutSession {
   circuitRounds?: number;
   currentCircuitRound?: number;
   restBetweenRoundsSeconds?: number;
+  circuitStates?: Record<string, any>;
 }
 
 export interface WorkoutTemplate {
