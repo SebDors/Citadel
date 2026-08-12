@@ -199,7 +199,7 @@ export default function TemplateEditorScreen() {
         styles.safeArea,
         {
           backgroundColor: theme.background,
-          paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 0,
+          paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
         },
       ]}
     >

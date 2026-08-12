@@ -540,7 +540,7 @@ export default function WorkoutTab() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0,
+    paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
   },
   scrollContent: {
     padding: 12,
