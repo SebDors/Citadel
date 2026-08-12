@@ -203,6 +203,33 @@ export default function LiveWorkoutScreen() {
     );
   }, [searchQuery]);
 
+  const circuitInfo = useMemo(() => {
+    const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
+    if (!circuitBlock) {
+      if (activeSession?.isCircuit) {
+        return {
+          isCircuit: true,
+          isAmrap: false,
+          currentRound: activeSession.currentCircuitRound || 1,
+          totalRounds: activeSession.circuitRounds || 3,
+        };
+      }
+      return undefined;
+    }
+
+    const cState = getCircuitState(circuitBlock);
+    const isAmrap = circuitBlock.circuitType === 'amrap';
+
+    return {
+      isCircuit: true,
+      isAmrap,
+      currentRound: cState.currentRound,
+      totalRounds: circuitBlock.rounds || 3,
+      amrapSecondsLeft: cState.amrapSecondsLeft,
+      amrapDurationMinutes: circuitBlock.amrapDurationMinutes || 12,
+    };
+  }, [blocks, circuitStates, activeSession]);
+
   if (!activeSession) {
     return (
       <SafeAreaView
@@ -348,33 +375,6 @@ export default function LiveWorkoutScreen() {
       customValues: { ...prev.customValues, [exId]: value },
     }));
   };
-
-  const circuitInfo = useMemo(() => {
-    const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
-    if (!circuitBlock) {
-      if (activeSession?.isCircuit) {
-        return {
-          isCircuit: true,
-          isAmrap: false,
-          currentRound: activeSession.currentCircuitRound || 1,
-          totalRounds: activeSession.circuitRounds || 3,
-        };
-      }
-      return undefined;
-    }
-
-    const cState = getCircuitState(circuitBlock);
-    const isAmrap = circuitBlock.circuitType === 'amrap';
-
-    return {
-      isCircuit: true,
-      isAmrap,
-      currentRound: cState.currentRound,
-      totalRounds: circuitBlock.rounds || 3,
-      amrapSecondsLeft: cState.amrapSecondsLeft,
-      amrapDurationMinutes: circuitBlock.amrapDurationMinutes || 12,
-    };
-  }, [blocks, circuitStates, activeSession]);
 
   return (
     <SafeAreaView
