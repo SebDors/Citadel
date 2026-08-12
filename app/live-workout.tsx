@@ -70,6 +70,7 @@ export default function LiveWorkoutScreen() {
     addSet,
     removeSet,
     addExerciseToActiveWorkout,
+    addExerciseToCircuit,
     removeExercise,
     duplicateExercise,
     updateExerciseRestTime,
@@ -83,6 +84,9 @@ export default function LiveWorkoutScreen() {
 
   const [showAddExModal, setShowAddExModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<string | null>(null);
+
+  const isInitialMount = useRef(true);
 
   // Local state per CircuitBlock ID
   const [circuitStates, setCircuitStates] = useState<Record<string, CircuitState>>(
@@ -95,6 +99,16 @@ export default function LiveWorkoutScreen() {
       setCircuitStates(activeSession.circuitStates);
     }
   }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (circuitStates && Object.keys(circuitStates).length > 0) {
+      updateActiveSessionCircuitStates(circuitStates);
+    }
+  }, [circuitStates]);
 
   // Extract blocks sequentially (mixed single exercises & circuits)
   const blocks = useMemo(() => {
@@ -133,12 +147,10 @@ export default function LiveWorkoutScreen() {
         customValues: {},
         completedRoundsCount: 0,
       };
-      const nextState = {
+      return {
         ...prev,
         [blockId]: updater(current),
       };
-      updateActiveSessionCircuitStates(nextState);
-      return nextState;
     });
   };
 
@@ -280,10 +292,19 @@ export default function LiveWorkoutScreen() {
     router.replace('/(tabs)');
   };
 
-  const handleSelectSharedExercise = (ex: SharedExercise) => {
-    addExerciseToActiveWorkout(ex.name, ex.primaryMuscle, ex.targetMuscles, ex.defaultRestSeconds);
+  const handleCloseModal = () => {
     setShowAddExModal(false);
     setSearchQuery('');
+    setTargetCircuitBlockId(null);
+  };
+
+  const handleSelectSharedExercise = (ex: SharedExercise) => {
+    if (targetCircuitBlockId) {
+      addExerciseToCircuit(targetCircuitBlockId, ex.name, ex.primaryMuscle, ex.targetMuscles);
+    } else {
+      addExerciseToActiveWorkout(ex.name, ex.primaryMuscle, ex.targetMuscles, ex.defaultRestSeconds);
+    }
+    handleCloseModal();
   };
 
   // Advance logic for CircuitBlock after an exercise action (Validate / Pass)
@@ -756,6 +777,21 @@ export default function LiveWorkoutScreen() {
                     </View>
                   );
                 })}
+
+                {/* Bouton [+ Ajouter un exercice au circuit] */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.addCircuitExBtn}
+                  onPress={() => {
+                    setTargetCircuitBlockId(block.id);
+                    setShowAddExModal(true);
+                  }}
+                >
+                  <Plus size={16} color={EPILOG_PURPLE} style={{ marginRight: 6 }} />
+                  <Text style={styles.addCircuitExBtnText}>
+                    Ajouter un exercice au circuit
+                  </Text>
+                </TouchableOpacity>
               </View>
             );
           }
@@ -766,7 +802,10 @@ export default function LiveWorkoutScreen() {
         <Button
           title="Ajouter un exercice à la séance"
           variant="outline"
-          onPress={() => setShowAddExModal(true)}
+          onPress={() => {
+            setTargetCircuitBlockId(null);
+            setShowAddExModal(true);
+          }}
           icon={<Plus size={18} color={theme.accent} />}
           style={{ marginTop: 14 }}
         />
@@ -786,11 +825,13 @@ export default function LiveWorkoutScreen() {
         visible={showAddExModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowAddExModal(false)}
+        onRequestClose={handleCloseModal}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAddExModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleCloseModal}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Sélectionner un exercice</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              {targetCircuitBlockId ? 'Ajouter au circuit' : 'Sélectionner un exercice'}
+            </Text>
 
             {/* Barre de Recherche Clavier */}
             <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -1130,5 +1171,21 @@ const styles = StyleSheet.create({
   dbExMuscle: {
     fontSize: 12,
     marginTop: 2,
+  },
+  addCircuitExBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: EPILOG_PURPLE_BORDER,
+    backgroundColor: EPILOG_PURPLE_BG,
+    marginTop: 6,
+  },
+  addCircuitExBtnText: {
+    color: EPILOG_PURPLE,
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
