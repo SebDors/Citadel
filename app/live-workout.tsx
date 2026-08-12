@@ -349,6 +349,33 @@ export default function LiveWorkoutScreen() {
     }));
   };
 
+  const circuitInfo = useMemo(() => {
+    const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
+    if (!circuitBlock) {
+      if (activeSession?.isCircuit) {
+        return {
+          isCircuit: true,
+          isAmrap: false,
+          currentRound: activeSession.currentCircuitRound || 1,
+          totalRounds: activeSession.circuitRounds || 3,
+        };
+      }
+      return undefined;
+    }
+
+    const cState = getCircuitState(circuitBlock);
+    const isAmrap = circuitBlock.circuitType === 'amrap';
+
+    return {
+      isCircuit: true,
+      isAmrap,
+      currentRound: cState.currentRound,
+      totalRounds: circuitBlock.rounds || 3,
+      amrapSecondsLeft: cState.amrapSecondsLeft,
+      amrapDurationMinutes: circuitBlock.amrapDurationMinutes || 12,
+    };
+  }, [blocks, circuitStates, activeSession]);
+
   return (
     <SafeAreaView
       style={[
@@ -371,7 +398,12 @@ export default function LiveWorkoutScreen() {
 
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
         {/* 1. Carte d'En-tête de Séance (Fixe en haut) */}
-        <LiveWorkoutHeader session={activeSession} onFinish={handleFinish} onCancel={handleCancel} />
+        <LiveWorkoutHeader
+          session={activeSession}
+          onFinish={handleFinish}
+          onCancel={handleCancel}
+          circuitInfo={circuitInfo}
+        />
 
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
         {blocks.map((block, blockIdx) => {

@@ -3,18 +3,29 @@ import { View, Text, StyleSheet } from 'react-native';
 import { WorkoutSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../UI/Button';
-import { Clock, Dumbbell, CheckCircle } from 'lucide-react-native';
+import { Clock, Dumbbell, CheckCircle, RotateCw, Timer } from 'lucide-react-native';
+
+export interface CircuitInfo {
+  isCircuit: boolean;
+  isAmrap: boolean;
+  currentRound: number;
+  totalRounds: number;
+  amrapSecondsLeft?: number;
+  amrapDurationMinutes?: number;
+}
 
 interface LiveWorkoutHeaderProps {
   session: WorkoutSession;
   onFinish: () => void;
   onCancel: () => void;
+  circuitInfo?: CircuitInfo;
 }
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
   onFinish,
   onCancel,
+  circuitInfo,
 }) => {
   const { theme } = useTheme();
 
@@ -30,6 +41,61 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
     return `${pad(mins)}:${pad(secs)}`;
   };
 
+  const formatMinutesSeconds = (totalSeconds: number = 0): string => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const renderSubtitle = () => {
+    if (circuitInfo?.isCircuit) {
+      if (circuitInfo.isAmrap) {
+        const amrapMins = circuitInfo.amrapDurationMinutes ?? 12;
+        return `Circuit AMRAP (${amrapMins} min)`;
+      }
+      return `Circuit (${circuitInfo.totalRounds} tours)`;
+    }
+    if (session.isCircuit) {
+      return `Circuit (${session.circuitRounds ?? 0} tours)`;
+    }
+    return 'Séance en cours';
+  };
+
+  const renderThirdStatBox = () => {
+    if (circuitInfo?.isCircuit) {
+      if (circuitInfo.isAmrap) {
+        return (
+          <View style={styles.statBox}>
+            <Timer size={16} color={theme.primary} />
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {formatMinutesSeconds(circuitInfo.amrapSecondsLeft ?? 0)}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Temps restant</Text>
+          </View>
+        );
+      }
+      return (
+        <View style={styles.statBox}>
+          <RotateCw size={16} color={theme.primary} />
+          <Text style={[styles.statValue, { color: theme.text }]}>
+            {circuitInfo.currentRound} / {circuitInfo.totalRounds}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tours</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.statBox}>
+        <CheckCircle size={16} color={theme.primary} />
+        <Text style={[styles.statValue, { color: theme.text }]}>
+          {session.completedSetsCount} / {session.totalSetsCount}
+        </Text>
+        <Text style={[styles.statLabel, { color: theme.textMuted }]}>Séries</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.headerContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <View style={styles.topRow}>
@@ -38,7 +104,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
             {session.title}
           </Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            {session.isCircuit ? `Circuit (${session.circuitRounds} tours)` : 'Séance en cours'}
+            {renderSubtitle()}
           </Text>
         </View>
 
@@ -65,14 +131,8 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           <Text style={[styles.statLabel, { color: theme.textMuted }]}>Volume</Text>
         </View>
 
-        {/* Sets Completed */}
-        <View style={styles.statBox}>
-          <CheckCircle size={16} color={theme.primary} />
-          <Text style={[styles.statValue, { color: theme.text }]}>
-            {session.completedSetsCount} / {session.totalSetsCount}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Séries</Text>
-        </View>
+        {/* 3ème stat: Tours / Temps restant / Séries */}
+        {renderThirdStatBox()}
       </View>
     </View>
   );
