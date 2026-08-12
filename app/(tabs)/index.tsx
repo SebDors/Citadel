@@ -36,8 +36,54 @@ import {
   X,
   Tag,
 } from 'lucide-react-native';
-import { WorkoutTemplate, WorkoutFolder, getRealLastWorkoutDate, getTemplateBlocks } from '../../src/types';
+import {
+  WorkoutSession,
+  WorkoutTemplate,
+  WorkoutFolder,
+  CircuitBlock,
+  getRealLastWorkoutDate,
+  getTemplateBlocks,
+  getSessionBlocks,
+} from '../../src/types';
 import { JsonExportService } from '../../src/services/jsonExport';
+
+function getActiveBannerSubtitle(session: WorkoutSession): string {
+  const blocks = getSessionBlocks(session);
+  const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
+
+  if (circuitBlock || session.isCircuit) {
+    const totalRounds = circuitBlock?.rounds || session.circuitRounds || 3;
+    const isAmrap = circuitBlock?.circuitType === 'amrap';
+
+    if (circuitBlock) {
+      const cState = session.circuitStates?.[circuitBlock.id];
+      if (cState && cState.started) {
+        const currentRound = cState.currentRound || 1;
+        const validatedCount = Object.values(cState.roundStatusMap || {}).filter(
+          (st) => st === 'validated'
+        ).length;
+
+        if (isAmrap) {
+          const roundsDone = cState.completedRoundsCount || 0;
+          if (validatedCount > 0) {
+            return `Tour ${currentRound} (AMRAP) · ${validatedCount} exo${validatedCount > 1 ? 's' : ''} validé${validatedCount > 1 ? 's' : ''}`;
+          }
+          return `${roundsDone} tour${roundsDone !== 1 ? 's' : ''} complété${roundsDone !== 1 ? 's' : ''}`;
+        }
+
+        if (validatedCount > 0) {
+          return `Tour ${currentRound} / ${totalRounds} (${validatedCount} exo${validatedCount > 1 ? 's' : ''} validé${validatedCount > 1 ? 's' : ''})`;
+        }
+        return `Tour ${currentRound} / ${totalRounds}`;
+      }
+    }
+
+    const currentRound = session.currentCircuitRound || 1;
+    return `Tour ${currentRound} / ${totalRounds}`;
+  }
+
+  return `${session.completedSetsCount} / ${session.totalSetsCount} séries complétées`;
+}
 
 export default function WorkoutTab() {
   const {
@@ -280,7 +326,7 @@ export default function WorkoutTab() {
                   Séance en cours : {activeSession.title}
                 </Text>
                 <Text style={[styles.activeBannerSub, { color: theme.textMuted }]}>
-                  {activeSession.completedSetsCount} / {activeSession.totalSetsCount} séries complétées
+                  {getActiveBannerSubtitle(activeSession)}
                 </Text>
               </View>
             </View>

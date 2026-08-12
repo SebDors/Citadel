@@ -75,6 +75,7 @@ export default function LiveWorkoutScreen() {
     updateExerciseRestTime,
     setExerciseSupersetGroup,
     startRestTimer,
+    updateActiveSessionCircuitStates,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -84,7 +85,16 @@ export default function LiveWorkoutScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Local state per CircuitBlock ID
-  const [circuitStates, setCircuitStates] = useState<Record<string, CircuitState>>({});
+  const [circuitStates, setCircuitStates] = useState<Record<string, CircuitState>>(
+    () => activeSession?.circuitStates || {}
+  );
+
+  // Sync circuitStates if activeSession.circuitStates changes externally
+  useEffect(() => {
+    if (activeSession?.circuitStates && Object.keys(activeSession.circuitStates).length > 0) {
+      setCircuitStates(activeSession.circuitStates);
+    }
+  }, [activeSession?.id]);
 
   // Extract blocks sequentially (mixed single exercises & circuits)
   const blocks = useMemo(() => {
@@ -123,10 +133,12 @@ export default function LiveWorkoutScreen() {
         customValues: {},
         completedRoundsCount: 0,
       };
-      return {
+      const nextState = {
         ...prev,
         [blockId]: updater(current),
       };
+      updateActiveSessionCircuitStates(nextState);
+      return nextState;
     });
   };
 
