@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useTheme } from '../../src/context/ThemeContext';
 import { Dumbbell, Calendar, User } from 'lucide-react-native';
@@ -16,9 +17,9 @@ export default function TabLayout() {
           backgroundColor: theme.background,
           borderTopColor: theme.border,
           borderTopWidth: 1,
-          height: 62,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: Platform.OS === 'android' ? 76 : 68,
+          paddingBottom: Platform.OS === 'android' ? 18 : 12,
+          paddingTop: Platform.OS === 'android' ? 8 : 6,
         },
         tabBarLabelStyle: {
           fontSize: 12,
