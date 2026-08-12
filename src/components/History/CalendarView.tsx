@@ -46,12 +46,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const { deleteWorkoutSession } = useWorkout();
 
   const now = new Date();
+  const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+
   const [currentMonthIndex, setCurrentMonthIndex] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
 
   // État de la modale pour le jour sélectionné
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const isCurrentMonthView =
+    currentMonthIndex === now.getMonth() && currentYear === now.getFullYear();
 
   const handlePrevMonth = () => {
     if (currentMonthIndex === 0) {
@@ -69,6 +74,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
     } else {
       setCurrentMonthIndex((m) => m + 1);
     }
+  };
+
+  const handleResetToToday = () => {
+    setCurrentMonthIndex(now.getMonth());
+    setCurrentYear(now.getFullYear());
   };
 
   const daysInMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate();
@@ -124,9 +134,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
         </TouchableOpacity>
 
         <View style={styles.titleBox}>
-          <Text style={[styles.title, { color: theme.text }]}>
-            {MONTHS_NAMES[currentMonthIndex]} {currentYear}
-          </Text>
+          <TouchableOpacity onPress={handleResetToToday} activeOpacity={0.7}>
+            <Text style={[styles.title, { color: theme.text }]}>
+              {MONTHS_NAMES[currentMonthIndex]} {currentYear}
+            </Text>
+          </TouchableOpacity>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
             {workoutDates.length} séances réalisées
           </Text>
@@ -150,6 +162,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           const dayPad = d < 10 ? `0${d}` : `${d}`;
           const dateStr = `${currentYear}-${monthStr}-${dayPad}`;
           const hasWorkout = workoutDates.includes(dateStr);
+          const isToday = dateStr === todayStr;
 
           return (
             <TouchableOpacity
@@ -159,6 +172,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
               style={[
                 styles.dayCell,
                 hasWorkout ? { backgroundColor: theme.surface, borderRadius: 8 } : null,
+                isToday
+                  ? {
+                      borderColor: theme.accent,
+                      borderWidth: 2,
+                      borderRadius: 10,
+                      backgroundColor: hasWorkout ? `${theme.accent}25` : `${theme.accent}15`,
+                    }
+                  : null,
               ]}
               activeOpacity={hasWorkout ? 0.6 : 1}
             >
@@ -167,6 +188,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                   styles.dayNum,
                   { color: theme.text },
                   hasWorkout ? { fontWeight: '900', color: theme.accent } : null,
+                  isToday ? { fontWeight: '900', color: theme.accent } : null,
                 ]}
               >
                 {d}
