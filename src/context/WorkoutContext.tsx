@@ -79,6 +79,32 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     secondsRemaining: 0,
   });
 
+  const startRestTimer = (exerciseName: string, seconds: number) => {
+    if (seconds <= 0) return;
+    const targetEnd = Date.now() + seconds * 1000;
+    setRestTimer({
+      active: true,
+      exerciseName,
+      targetEndTime: targetEnd,
+      secondsRemaining: seconds,
+    });
+  };
+
+  const dismissRestTimer = () => {
+    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+  };
+
+  const adjustRestTimer = (deltaSeconds: number) => {
+    if (!restTimer.targetEndTime) return;
+    const newTarget = restTimer.targetEndTime + deltaSeconds * 1000;
+    const newRemaining = Math.max(0, Math.ceil((newTarget - Date.now()) / 1000));
+    setRestTimer((prev) => ({
+      ...prev,
+      targetEndTime: newTarget,
+      secondsRemaining: newRemaining,
+    }));
+  };
+
   const reloadAllData = async () => {
     setLoading(true);
     const loaded = await StorageService.loadData();
@@ -297,14 +323,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (s.id !== setId) return s;
         const newCompleted = !s.completed;
 
-        if (newCompleted && !activeSession.isCircuit) {
-          const targetEnd = Date.now() + targetRestSeconds * 1000;
-          setRestTimer({
-            active: true,
-            exerciseName: ex.exerciseName,
-            targetEndTime: targetEnd,
-            secondsRemaining: targetRestSeconds,
-          });
+        if (newCompleted) {
+          startRestTimer(ex.exerciseName, targetRestSeconds);
         }
 
         return {
@@ -327,14 +347,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               if (s.id !== setId) return s;
               const newCompleted = !s.completed;
 
-              if (newCompleted && !activeSession.isCircuit) {
-                const targetEnd = Date.now() + targetRestSeconds * 1000;
-                setRestTimer({
-                  active: true,
-                  exerciseName: block.exercise.exerciseName,
-                  targetEndTime: targetEnd,
-                  secondsRemaining: targetRestSeconds,
-                });
+              if (newCompleted) {
+                startRestTimer(block.exercise.exerciseName, targetRestSeconds);
               }
 
               return {
@@ -853,31 +867,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
-  const startRestTimer = (exerciseName: string, seconds: number) => {
-    if (seconds <= 0) return;
-    const targetEnd = Date.now() + seconds * 1000;
-    setRestTimer({
-      active: true,
-      exerciseName,
-      targetEndTime: targetEnd,
-      secondsRemaining: seconds,
-    });
-  };
-
-  const dismissRestTimer = () => {
-    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
-  };
-
-  const adjustRestTimer = (deltaSeconds: number) => {
-    if (!restTimer.targetEndTime) return;
-    const newTarget = restTimer.targetEndTime + deltaSeconds * 1000;
-    const newRemaining = Math.max(0, Math.ceil((newTarget - Date.now()) / 1000));
-    setRestTimer((prev) => ({
-      ...prev,
-      targetEndTime: newTarget,
-      secondsRemaining: newRemaining,
-    }));
-  };
 
   return (
     <WorkoutContext.Provider

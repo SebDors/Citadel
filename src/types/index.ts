@@ -57,6 +57,8 @@ export interface CircuitBlock {
   rounds: number;
   restBetweenRoundsSeconds: number;
   exercises: CircuitExerciseItem[];
+  circuitType?: 'rounds' | 'amrap';
+  amrapDurationMinutes?: number;
 }
 
 export interface SingleExerciseBlock {
@@ -268,10 +270,14 @@ export function calculateEstimatedWorkoutMinutes(items: WorkoutExercise[] | Work
           totalSeconds += (setsCount - 1) * (block.exercise.restSeconds || 75);
         }
       } else if (block.type === 'circuit') {
-        const exercisesCount = block.exercises.length;
-        const totalCircuitWork = block.rounds * exercisesCount * 45;
-        const totalCircuitRest = (block.rounds - 1) * (block.restBetweenRoundsSeconds || 120);
-        totalSeconds += totalCircuitWork + totalCircuitRest;
+        if (block.circuitType === 'amrap' && block.amrapDurationMinutes) {
+          totalSeconds += (block.amrapDurationMinutes * 60) + (block.restBetweenRoundsSeconds || 120);
+        } else {
+          const exercisesCount = block.exercises.length;
+          const totalCircuitWork = block.rounds * exercisesCount * 45;
+          const totalCircuitRest = (block.rounds - 1) * (block.restBetweenRoundsSeconds || 120);
+          totalSeconds += totalCircuitWork + totalCircuitRest;
+        }
       }
     });
 
