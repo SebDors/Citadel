@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { FitTrackerData, WorkoutTemplate, WorkoutSession } from '../types';
+import { FitTrackerData, WorkoutTemplate, WorkoutSession, getTemplateBlocks, getSessionBlocks } from '../types';
 
 export const JsonExportService = {
   /**
@@ -53,9 +53,10 @@ export const JsonExportService = {
    * Exporte une séance vierge (WorkoutTemplate) sous forme de chaîne JSON partageable.
    */
   exportBlankTemplateJson(template: WorkoutTemplate): string {
+    const blocks = getTemplateBlocks(template);
     const exportObject = {
       type: 'warriorfit_blank_template',
-      version: '1.0',
+      version: '2.0',
       exportedAt: new Date().toISOString(),
       template: {
         id: template.id,
@@ -65,21 +66,62 @@ export const JsonExportService = {
         isCircuit: template.isCircuit || false,
         circuitRounds: template.circuitRounds,
         restBetweenRoundsSeconds: template.restBetweenRoundsSeconds,
-        exercises: template.exercises.map((ex) => ({
-          exerciseId: ex.exerciseId,
-          exerciseName: ex.exerciseName,
-          primaryMuscle: ex.primaryMuscle,
-          targetMuscles: ex.targetMuscles,
-          restSeconds: ex.restSeconds,
-          supersetGroup: ex.supersetGroup,
-          setsCount: ex.sets.length,
-          sets: ex.sets.map((s) => ({
-            setNumber: s.setNumber,
-            type: s.type,
-            rir: s.rir,
-            durationSeconds: s.durationSeconds,
-          })),
-        })),
+        blocks: blocks.map((block) => {
+          if (block.type === 'circuit') {
+            return {
+              id: block.id,
+              type: 'circuit',
+              title: block.title,
+              rounds: block.rounds,
+              restBetweenRoundsSeconds: block.restBetweenRoundsSeconds,
+              exercises: block.exercises.map((ex) => ({
+                id: ex.id,
+                exerciseName: ex.exerciseName,
+                primaryMuscle: ex.primaryMuscle,
+                targetMuscles: ex.targetMuscles,
+                targetValue: ex.targetValue,
+                targetType: ex.targetType,
+              })),
+            };
+          } else {
+            return {
+              id: block.id,
+              type: 'single',
+              exercise: {
+                exerciseId: block.exercise.exerciseId,
+                exerciseName: block.exercise.exerciseName,
+                primaryMuscle: block.exercise.primaryMuscle,
+                targetMuscles: block.exercise.targetMuscles,
+                restSeconds: block.exercise.restSeconds,
+                supersetGroup: block.exercise.supersetGroup,
+                setsCount: block.exercise.sets.length,
+                sets: block.exercise.sets.map((s) => ({
+                  setNumber: s.setNumber,
+                  type: s.type,
+                  rir: s.rir,
+                  durationSeconds: s.durationSeconds,
+                })),
+              },
+            };
+          }
+        }),
+        exercises: template.exercises
+          ? template.exercises.map((ex) => ({
+              exerciseId: ex.exerciseId,
+              exerciseName: ex.exerciseName,
+              primaryMuscle: ex.primaryMuscle,
+              targetMuscles: ex.targetMuscles,
+              restSeconds: ex.restSeconds,
+              supersetGroup: ex.supersetGroup,
+              setsCount: ex.sets.length,
+              sets: ex.sets.map((s) => ({
+                setNumber: s.setNumber,
+                type: s.type,
+                rir: s.rir,
+                durationSeconds: s.durationSeconds,
+              })),
+            }))
+          : undefined,
       },
     };
     return JSON.stringify(exportObject, null, 2);
@@ -92,38 +134,80 @@ export const JsonExportService = {
     const completedHistory = history.filter((s) => s.status === 'completed');
     const exportObject = {
       type: 'warriorfit_ai_history_export',
-      version: '1.0',
+      version: '2.0',
       exportedAt: new Date().toISOString(),
       totalCompletedSessions: completedHistory.length,
-      history: completedHistory.map((session) => ({
-        id: session.id,
-        title: session.title,
-        startTime: session.startTime,
-        endTime: session.endTime,
-        durationMinutes: Math.round((session.durationSeconds || 0) / 60),
-        totalVolumeKg: session.totalVolumeKg,
-        completedSetsCount: session.completedSetsCount,
-        isCircuit: session.isCircuit || false,
-        exercises: session.exercises.map((ex) => ({
-          exerciseName: ex.exerciseName,
-          primaryMuscle: ex.primaryMuscle,
-          targetMuscles: ex.targetMuscles,
-          sets: ex.sets
-            .filter((s) => s.completed)
-            .map((s) => ({
-              setNumber: s.setNumber,
-              type: s.type,
-              weightKg: s.weightKg ?? 0,
-              reps: s.reps ?? 0,
-              rir: s.rir,
-              estimated1RMEpleyKg:
-                s.weightKg && s.reps
-                  ? Math.round(s.weightKg * (1 + s.reps / 30))
-                  : 0,
-              completedAt: s.completedAt,
-            })),
-        })),
-      })),
+      history: completedHistory.map((session) => {
+        const blocks = getSessionBlocks(session);
+        return {
+          id: session.id,
+          title: session.title,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          durationMinutes: Math.round((session.durationSeconds || 0) / 60),
+          totalVolumeKg: session.totalVolumeKg,
+          completedSetsCount: session.completedSetsCount,
+          isCircuit: session.isCircuit || false,
+          blocks: blocks.map((block) => {
+            if (block.type === 'circuit') {
+              return {
+                id: block.id,
+                type: 'circuit',
+                title: block.title,
+                rounds: block.rounds,
+                restBetweenRoundsSeconds: block.restBetweenRoundsSeconds,
+                exercises: block.exercises,
+              };
+            } else {
+              const ex = block.exercise;
+              return {
+                id: block.id,
+                type: 'single',
+                exercise: {
+                  exerciseName: ex.exerciseName,
+                  primaryMuscle: ex.primaryMuscle,
+                  targetMuscles: ex.targetMuscles,
+                  sets: ex.sets
+                    .filter((s) => s.completed)
+                    .map((s) => ({
+                      setNumber: s.setNumber,
+                      type: s.type,
+                      weightKg: s.weightKg ?? 0,
+                      reps: s.reps ?? 0,
+                      rir: s.rir,
+                      estimated1RMEpleyKg:
+                        s.weightKg && s.reps
+                          ? Math.round(s.weightKg * (1 + s.reps / 30))
+                          : 0,
+                      completedAt: s.completedAt,
+                    })),
+                },
+              };
+            }
+          }),
+          exercises: session.exercises
+            ? session.exercises.map((ex) => ({
+                exerciseName: ex.exerciseName,
+                primaryMuscle: ex.primaryMuscle,
+                targetMuscles: ex.targetMuscles,
+                sets: ex.sets
+                  .filter((s) => s.completed)
+                  .map((s) => ({
+                    setNumber: s.setNumber,
+                    type: s.type,
+                    weightKg: s.weightKg ?? 0,
+                    reps: s.reps ?? 0,
+                    rir: s.rir,
+                    estimated1RMEpleyKg:
+                      s.weightKg && s.reps
+                        ? Math.round(s.weightKg * (1 + s.reps / 30))
+                        : 0,
+                    completedAt: s.completedAt,
+                  })),
+              }))
+            : undefined,
+        };
+      }),
     };
     return JSON.stringify(exportObject, null, 2);
   },

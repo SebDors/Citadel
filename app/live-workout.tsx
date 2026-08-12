@@ -55,21 +55,22 @@ export default function LiveWorkoutScreen() {
 
   // Check if all sets/rounds in the session are finished
   const isAllCompleted = useMemo(() => {
-    if (!activeSession || activeSession.exercises.length === 0) return false;
+    const sessionExercises = activeSession?.exercises || [];
+    if (!activeSession || sessionExercises.length === 0) return false;
 
     if (activeSession.isCircuit) {
-      const totalEx = activeSession.exercises.length;
-      const resolvedCount = activeSession.exercises.filter((ex) => {
+      const totalEx = sessionExercises.length;
+      const resolvedCount = sessionExercises.filter((ex) => {
         const status = roundStatusMap[ex.id];
         return status === 'validated' || status === 'skipped';
       }).length;
-      const allSetsCompleted = activeSession.exercises.every(
+      const allSetsCompleted = sessionExercises.every(
         (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
       );
       return (activeCircuitRound >= totalRounds && resolvedCount >= totalEx) || allSetsCompleted;
     }
 
-    return activeSession.exercises.every(
+    return sessionExercises.every(
       (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
     );
   }, [activeSession, activeCircuitRound, totalRounds, roundStatusMap]);
@@ -120,9 +121,10 @@ export default function LiveWorkoutScreen() {
     currentIdx: number
   ) => {
     if (!activeSession) return;
-    const totalEx = activeSession.exercises.length;
+    const sessionExercises = activeSession.exercises || [];
+    const totalEx = sessionExercises.length;
     // Count how many exercises are resolved (validated or skipped)
-    const resolvedCount = activeSession.exercises.filter((ex) => {
+    const resolvedCount = sessionExercises.filter((ex) => {
       const status = nextStatusMap[ex.id];
       return status === 'validated' || status === 'skipped';
     }).length;
@@ -148,8 +150,8 @@ export default function LiveWorkoutScreen() {
       let nextIdx = (currentIdx + 1) % totalEx;
       let count = 0;
       while (
-        (nextStatusMap[activeSession.exercises[nextIdx].id] === 'validated' ||
-          nextStatusMap[activeSession.exercises[nextIdx].id] === 'skipped') &&
+        (nextStatusMap[sessionExercises[nextIdx]?.id] === 'validated' ||
+          nextStatusMap[sessionExercises[nextIdx]?.id] === 'skipped') &&
         count < totalEx
       ) {
         nextIdx = (nextIdx + 1) % totalEx;
@@ -219,7 +221,7 @@ export default function LiveWorkoutScreen() {
 
             <Text style={[styles.circuitTitle, { color: theme.text }]}>{activeSession.title}</Text>
             <Text style={[styles.circuitSub, { color: theme.textMuted }]}>
-              {activeSession.exercises.length} EXOS · {totalRounds} TOURS
+              {(activeSession.exercises || []).length} EXOS · {totalRounds} TOURS
             </Text>
 
             {/* Tour en cours et bar de progression */}
@@ -238,7 +240,7 @@ export default function LiveWorkoutScreen() {
             </View>
 
             {/* Liste des exercices du circuit */}
-            {activeSession.exercises.map((ex, idx) => {
+            {(activeSession.exercises || []).map((ex, idx) => {
               const currentSet = ex.sets[activeCircuitRound - 1] || ex.sets[0];
               const status = roundStatusMap[ex.id] || 'pending';
               const isCurrentActive = idx === currentCircuitIdx && status === 'pending';
@@ -412,7 +414,7 @@ export default function LiveWorkoutScreen() {
           </View>
         ) : (
           /* SÉANCE NORMALE OU LIBRE */
-          activeSession.exercises.map((ex) => (
+          (activeSession.exercises || []).map((ex) => (
             <ExerciseCard
               key={ex.id}
               exercise={ex}

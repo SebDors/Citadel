@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { WorkoutSession } from '../../types';
+import { WorkoutSession, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
@@ -51,14 +51,25 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
       year: 'numeric',
     });
 
-    const exercisesStr = session.exercises.map((ex) => ex.exerciseName).join(', ');
-
-    // Collecte des muscles ciblés sans doublons
+    const blocks = getSessionBlocks(session);
+    const exerciseNames: string[] = [];
     const targetMusclesSet = new Set<string>();
-    session.exercises.forEach((ex) => {
-      if (ex.primaryMuscle) targetMusclesSet.add(ex.primaryMuscle);
-      if (ex.targetMuscles) ex.targetMuscles.forEach((m) => targetMusclesSet.add(m));
+
+    blocks.forEach((b) => {
+      if (b.type === 'single') {
+        exerciseNames.push(b.exercise.exerciseName);
+        if (b.exercise.primaryMuscle) targetMusclesSet.add(b.exercise.primaryMuscle);
+        if (b.exercise.targetMuscles) b.exercise.targetMuscles.forEach((m) => targetMusclesSet.add(m));
+      } else if (b.type === 'circuit') {
+        b.exercises.forEach((ex) => {
+          exerciseNames.push(ex.exerciseName);
+          if (ex.primaryMuscle) targetMusclesSet.add(ex.primaryMuscle);
+          if (ex.targetMuscles) ex.targetMuscles.forEach((m) => targetMusclesSet.add(m));
+        });
+      }
     });
+
+    const exercisesStr = exerciseNames.join(', ');
     const targetMusclesList = Array.from(targetMusclesSet);
 
     return (

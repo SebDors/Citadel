@@ -41,6 +41,32 @@ export interface WorkoutExercise {
   sets: WorkoutSet[];
 }
 
+export interface CircuitExerciseItem {
+  id: string;
+  exerciseName: string;
+  primaryMuscle: string;
+  targetMuscles?: string[];
+  targetValue: number;
+  targetType: 'reps' | 'time';
+}
+
+export interface CircuitBlock {
+  id: string;
+  type: 'circuit';
+  title: string;
+  rounds: number;
+  restBetweenRoundsSeconds: number;
+  exercises: CircuitExerciseItem[];
+}
+
+export interface SingleExerciseBlock {
+  id: string;
+  type: 'single';
+  exercise: WorkoutExercise;
+}
+
+export type WorkoutBlock = SingleExerciseBlock | CircuitBlock;
+
 export interface WorkoutSession {
   id: string;
   title: string;
@@ -51,7 +77,8 @@ export interface WorkoutSession {
   totalVolumeKg: number;
   completedSetsCount: number;
   totalSetsCount: number;
-  exercises: WorkoutExercise[];
+  exercises?: WorkoutExercise[];
+  blocks?: WorkoutBlock[];
   status: 'in_progress' | 'completed';
   isCircuit?: boolean;
   circuitRounds?: number;
@@ -64,7 +91,8 @@ export interface WorkoutTemplate {
   title: string;
   description?: string;
   targetMuscles?: string[];
-  exercises: WorkoutExercise[];
+  exercises?: WorkoutExercise[];
+  blocks?: WorkoutBlock[];
   isCircuit?: boolean;
   circuitRounds?: number;
   restBetweenRoundsSeconds?: number;
@@ -107,6 +135,90 @@ export interface FitTrackerData {
 }
 
 /**
+ * Renvoie un tableau de WorkoutBlock[] pour un WorkoutTemplate (gère la rétrocompatibilité legacy).
+ */
+export function getTemplateBlocks(template: WorkoutTemplate): WorkoutBlock[] {
+  if (template.blocks && template.blocks.length > 0) {
+    return template.blocks;
+  }
+
+  if (template.isCircuit && template.exercises && template.exercises.length > 0) {
+    const circuitBlock: CircuitBlock = {
+      id: `blk_circuit_${template.id}`,
+      type: 'circuit',
+      title: template.title || 'Circuit',
+      rounds: template.circuitRounds || 3,
+      restBetweenRoundsSeconds: template.restBetweenRoundsSeconds || 120,
+      exercises: template.exercises.map((ex, index) => {
+        const firstSet = ex.sets?.[0];
+        const isTime = !!(firstSet?.durationSeconds && firstSet.durationSeconds > 0);
+        return {
+          id: ex.id || `circ_ex_${index}`,
+          exerciseName: ex.exerciseName,
+          primaryMuscle: ex.primaryMuscle,
+          targetMuscles: ex.targetMuscles,
+          targetValue: isTime ? firstSet!.durationSeconds! : (firstSet?.reps || 10),
+          targetType: isTime ? 'time' : 'reps',
+        };
+      }),
+    };
+    return [circuitBlock];
+  }
+
+  if (template.exercises && template.exercises.length > 0) {
+    return template.exercises.map((ex) => ({
+      id: `blk_single_${ex.id}`,
+      type: 'single',
+      exercise: ex,
+    }));
+  }
+
+  return [];
+}
+
+/**
+ * Renvoie un tableau de WorkoutBlock[] pour une WorkoutSession (gère la rétrocompatibilité legacy).
+ */
+export function getSessionBlocks(session: WorkoutSession): WorkoutBlock[] {
+  if (session.blocks && session.blocks.length > 0) {
+    return session.blocks;
+  }
+
+  if (session.isCircuit && session.exercises && session.exercises.length > 0) {
+    const circuitBlock: CircuitBlock = {
+      id: `blk_circuit_${session.id}`,
+      type: 'circuit',
+      title: session.title || 'Circuit',
+      rounds: session.circuitRounds || 3,
+      restBetweenRoundsSeconds: session.restBetweenRoundsSeconds || 120,
+      exercises: session.exercises.map((ex, index) => {
+        const firstSet = ex.sets?.[0];
+        const isTime = !!(firstSet?.durationSeconds && firstSet.durationSeconds > 0);
+        return {
+          id: ex.id || `circ_ex_${index}`,
+          exerciseName: ex.exerciseName,
+          primaryMuscle: ex.primaryMuscle,
+          targetMuscles: ex.targetMuscles,
+          targetValue: isTime ? firstSet!.durationSeconds! : (firstSet?.reps || 10),
+          targetType: isTime ? 'time' : 'reps',
+        };
+      }),
+    };
+    return [circuitBlock];
+  }
+
+  if (session.exercises && session.exercises.length > 0) {
+    return session.exercises.map((ex) => ({
+      id: `blk_single_${ex.id}`,
+      type: 'single',
+      exercise: ex,
+    }));
+  }
+
+  return [];
+}
+
+/**
  * Calcule la VRAIE date du dernier entraînement effectué pour une séance (basée sur history).
  */
 export function getRealLastWorkoutDate(
@@ -140,23 +252,45 @@ export function getRealLastWorkoutDate(
 
 /**
  * Calculateur du temps estimé d'une séance (en minutes).
- * Basé sur une durée moyenne d'exécution de 45s par série + le temps de repos préconisé.
+ * Accepte WorkoutExercise[] ou WorkoutBlock[].
  */
-export function calculateEstimatedWorkoutMinutes(exercises: WorkoutExercise[]): number {
+export function calculateEstimatedWorkoutMinutes(items: WorkoutExercise[] | WorkoutBlock[]): number {
+  if (!items || items.length === 0) return 0;
   let totalSeconds = 0;
-  exercises.forEach((ex) => {
-    const setsCount = ex.sets.length;
-    // Execution: ~45 sec par série
-    totalSeconds += setsCount * 45;
-    // Repos entre les séries de l'exercice
-    if (setsCount > 1) {
-      totalSeconds += (setsCount - 1) * (ex.restSeconds || 75);
-    }
-  });
 
-  // Ajouter 2 minutes de transition entre les exercices
-  if (exercises.length > 1) {
-    totalSeconds += (exercises.length - 1) * 120;
+  if ('type' in items[0]) {
+    const blocks = items as WorkoutBlock[];
+    blocks.forEach((block) => {
+      if (block.type === 'single') {
+        const setsCount = block.exercise.sets.length;
+        totalSeconds += setsCount * 45;
+        if (setsCount > 1) {
+          totalSeconds += (setsCount - 1) * (block.exercise.restSeconds || 75);
+        }
+      } else if (block.type === 'circuit') {
+        const exercisesCount = block.exercises.length;
+        const totalCircuitWork = block.rounds * exercisesCount * 45;
+        const totalCircuitRest = (block.rounds - 1) * (block.restBetweenRoundsSeconds || 120);
+        totalSeconds += totalCircuitWork + totalCircuitRest;
+      }
+    });
+
+    if (blocks.length > 1) {
+      totalSeconds += (blocks.length - 1) * 120;
+    }
+  } else {
+    const exercises = items as WorkoutExercise[];
+    exercises.forEach((ex) => {
+      const setsCount = ex.sets.length;
+      totalSeconds += setsCount * 45;
+      if (setsCount > 1) {
+        totalSeconds += (setsCount - 1) * (ex.restSeconds || 75);
+      }
+    });
+
+    if (exercises.length > 1) {
+      totalSeconds += (exercises.length - 1) * 120;
+    }
   }
 
   return Math.ceil(totalSeconds / 60);

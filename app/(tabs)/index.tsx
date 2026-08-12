@@ -131,7 +131,8 @@ export default function WorkoutTab() {
   // Render a Workout Template Card (High Density layout)
   const renderTemplateCard = (tpl: WorkoutTemplate) => {
     const isCompact = !!collapsedCards[tpl.id];
-    const inlineExercisesText = tpl.exercises.map((ex) => ex.exerciseName).join(', ');
+    const templateExercises = tpl.exercises || [];
+    const inlineExercisesText = templateExercises.map((ex) => ex.exerciseName).join(', ');
     const realLast = getRealLastWorkoutDate(data?.history || [], tpl.title);
 
     if (isCompact) {
@@ -143,7 +144,7 @@ export default function WorkoutTab() {
                 {tpl.title}
               </Text>
               <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-                {tpl.exercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
+                {templateExercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
               </Text>
             </View>
 
@@ -178,7 +179,7 @@ export default function WorkoutTab() {
               {tpl.title}
             </Text>
             <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-              {tpl.exercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
+              {templateExercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
             </Text>
           </View>
 

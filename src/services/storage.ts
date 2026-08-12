@@ -150,26 +150,51 @@ export const StorageService = {
     const updatedHistory = currentData.history.map((session) => {
       if (session.id !== sessionId) return session;
 
-      const updatedExercises = session.exercises.filter((ex) => ex.id !== exerciseId);
+      const updatedExercises = (session.exercises || []).filter((ex) => ex.id !== exerciseId);
+      const updatedBlocks = session.blocks
+        ? session.blocks.filter((block) => {
+            if (block.type === 'single') {
+              return block.exercise.id !== exerciseId;
+            }
+            return true;
+          })
+        : undefined;
 
       let volume = 0;
       let completedCount = 0;
       let totalCount = 0;
 
-      updatedExercises.forEach((ex) => {
-        ex.sets.forEach((s) => {
-          totalCount++;
-          if (s.completed) {
-            completedCount++;
-            if (s.type !== 'warmup' && s.weightKg && s.reps) {
-              volume += s.weightKg * s.reps;
-            }
+      if (updatedBlocks && updatedBlocks.length > 0) {
+        updatedBlocks.forEach((block) => {
+          if (block.type === 'single') {
+            block.exercise.sets.forEach((s) => {
+              totalCount++;
+              if (s.completed) {
+                completedCount++;
+                if (s.type !== 'warmup' && s.weightKg && s.reps) {
+                  volume += s.weightKg * s.reps;
+                }
+              }
+            });
           }
         });
-      });
+      } else {
+        updatedExercises.forEach((ex) => {
+          ex.sets.forEach((s) => {
+            totalCount++;
+            if (s.completed) {
+              completedCount++;
+              if (s.type !== 'warmup' && s.weightKg && s.reps) {
+                volume += s.weightKg * s.reps;
+              }
+            }
+          });
+        });
+      }
 
       return {
         ...session,
+        blocks: updatedBlocks,
         exercises: updatedExercises,
         totalVolumeKg: volume,
         completedSetsCount: completedCount,
@@ -193,7 +218,7 @@ export const StorageService = {
     const updatedHistory = currentData.history.map((session) => {
       if (session.id !== sessionId) return session;
 
-      const updatedExercises = session.exercises.map((ex) => {
+      const updatedExercises = (session.exercises || []).map((ex) => {
         if (ex.id !== exerciseId) return ex;
 
         const updatedSets = ex.sets
@@ -203,24 +228,53 @@ export const StorageService = {
         return { ...ex, sets: updatedSets };
       });
 
+      const updatedBlocks = session.blocks
+        ? session.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              const updatedSets = block.exercise.sets
+                .filter((s) => s.id !== setId)
+                .map((s, idx) => ({ ...s, setNumber: idx + 1 }));
+              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+            }
+            return block;
+          })
+        : undefined;
+
       let volume = 0;
       let completedCount = 0;
       let totalCount = 0;
 
-      updatedExercises.forEach((ex) => {
-        ex.sets.forEach((s) => {
-          totalCount++;
-          if (s.completed) {
-            completedCount++;
-            if (s.type !== 'warmup' && s.weightKg && s.reps) {
-              volume += s.weightKg * s.reps;
-            }
+      if (updatedBlocks && updatedBlocks.length > 0) {
+        updatedBlocks.forEach((block) => {
+          if (block.type === 'single') {
+            block.exercise.sets.forEach((s) => {
+              totalCount++;
+              if (s.completed) {
+                completedCount++;
+                if (s.type !== 'warmup' && s.weightKg && s.reps) {
+                  volume += s.weightKg * s.reps;
+                }
+              }
+            });
           }
         });
-      });
+      } else {
+        updatedExercises.forEach((ex) => {
+          ex.sets.forEach((s) => {
+            totalCount++;
+            if (s.completed) {
+              completedCount++;
+              if (s.type !== 'warmup' && s.weightKg && s.reps) {
+                volume += s.weightKg * s.reps;
+              }
+            }
+          });
+        });
+      }
 
       return {
         ...session,
+        blocks: updatedBlocks,
         exercises: updatedExercises,
         totalVolumeKg: volume,
         completedSetsCount: completedCount,

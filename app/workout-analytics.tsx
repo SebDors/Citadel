@@ -118,7 +118,7 @@ export default function WorkoutAnalyticsScreen() {
             </Text>
           </View>
 
-          {template?.exercises.map((ex, idx) => (
+          {(template?.exercises || []).map((ex, idx) => (
             <View key={idx} style={[styles.prRow, { borderTopColor: theme.border }]}>
               <View style={styles.prLeft}>
                 <View style={styles.starCircle}>
@@ -143,7 +143,7 @@ export default function WorkoutAnalyticsScreen() {
         </Text>
 
         <View style={[styles.cardBox, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-          {template?.exercises.map((ex, idx) => (
+          {(template?.exercises || []).map((ex, idx) => (
             <TouchableOpacity key={idx} style={[styles.exLinkRow, { borderBottomColor: theme.border }]}>
               <Text style={[styles.exLinkName, { color: theme.text }]}>{ex.exerciseName}</Text>
               <ChevronRight size={18} color={theme.textMuted} />
