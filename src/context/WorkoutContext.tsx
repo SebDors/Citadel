@@ -40,6 +40,7 @@ interface WorkoutContextType {
     targetEndTime: number | null;
     secondsRemaining: number;
   };
+  startRestTimer: (exerciseName: string, seconds: number) => void;
   dismissRestTimer: () => void;
   adjustRestTimer: (deltaSeconds: number) => void;
 }
@@ -205,7 +206,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (s.id !== setId) return s;
         const newCompleted = !s.completed;
 
-        if (newCompleted) {
+        if (newCompleted && !activeSession.isCircuit) {
           const targetEnd = Date.now() + targetRestSeconds * 1000;
           setRestTimer({
             active: true,
@@ -590,6 +591,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const startRestTimer = (exerciseName: string, seconds: number) => {
+    if (seconds <= 0) return;
+    const targetEnd = Date.now() + seconds * 1000;
+    setRestTimer({
+      active: true,
+      exerciseName,
+      targetEndTime: targetEnd,
+      secondsRemaining: seconds,
+    });
+  };
+
   const dismissRestTimer = () => {
     setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
   };
@@ -639,6 +651,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteSetFromSession,
         reloadAllData,
         restTimer,
+        startRestTimer,
         dismissRestTimer,
         adjustRestTimer,
       }}

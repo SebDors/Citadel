@@ -1,16 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Modal,
   TextInput,
   Platform,
   StatusBar as RNStatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkout } from '../src/context/WorkoutContext';
 import { useTheme } from '../src/context/ThemeContext';
 import { LiveWorkoutHeader } from '../src/components/Workout/LiveWorkoutHeader';
@@ -35,6 +35,7 @@ export default function LiveWorkoutScreen() {
     duplicateExercise,
     updateExerciseRestTime,
     setExerciseSupersetGroup,
+    startRestTimer,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -50,6 +51,42 @@ export default function LiveWorkoutScreen() {
   // Set of exercise IDs manually expanded when collapsed
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
+  const totalRounds = activeSession?.circuitRounds || 3;
+
+  // Check if all sets/rounds in the session are finished
+  const isAllCompleted = useMemo(() => {
+    if (!activeSession || activeSession.exercises.length === 0) return false;
+
+    if (activeSession.isCircuit) {
+      const totalEx = activeSession.exercises.length;
+      const resolvedCount = activeSession.exercises.filter((ex) => {
+        const status = roundStatusMap[ex.id];
+        return status === 'validated' || status === 'skipped';
+      }).length;
+      const allSetsCompleted = activeSession.exercises.every(
+        (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
+      );
+      return (activeCircuitRound >= totalRounds && resolvedCount >= totalEx) || allSetsCompleted;
+    }
+
+    return activeSession.exercises.every(
+      (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
+    );
+  }, [activeSession, activeCircuitRound, totalRounds, roundStatusMap]);
+
+  // Filter 52 exercises for search modal
+  const filteredDatabase = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return EXERCISE_DATABASE;
+    return EXERCISE_DATABASE.filter(
+      (ex) =>
+        ex.name.toLowerCase().includes(q) ||
+        ex.primaryMuscle.toLowerCase().includes(q) ||
+        ex.category.toLowerCase().includes(q) ||
+        ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
+    );
+  }, [searchQuery]);
+
   if (!activeSession) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0 }]}>
@@ -60,8 +97,6 @@ export default function LiveWorkoutScreen() {
       </SafeAreaView>
     );
   }
-
-  const totalRounds = activeSession.circuitRounds || 3;
 
   const handleFinish = async () => {
     await finishWorkout();
@@ -84,6 +119,7 @@ export default function LiveWorkoutScreen() {
     nextStatusMap: Record<string, 'pending' | 'validated' | 'skipped'>,
     currentIdx: number
   ) => {
+    if (!activeSession) return;
     const totalEx = activeSession.exercises.length;
     // Count how many exercises are resolved (validated or skipped)
     const resolvedCount = activeSession.exercises.filter((ex) => {
@@ -93,6 +129,9 @@ export default function LiveWorkoutScreen() {
 
     if (resolvedCount >= totalEx) {
       // TOUR DE CIRCUIT TERMINÉ !
+      const restTime = activeSession.restBetweenRoundsSeconds || 105;
+      startRestTimer(`Tour ${activeCircuitRound} terminé`, restTime);
+
       if (activeCircuitRound < totalRounds) {
         // Pass to next round, reset statuses, reset index, auto-scroll to top!
         setActiveCircuitRound((prev) => prev + 1);
@@ -141,38 +180,18 @@ export default function LiveWorkoutScreen() {
     advanceCircuitAfterAction(nextStatus, idx);
   };
 
-  // Check if all sets/rounds in the session are finished
-  const isAllCompleted = React.useMemo(() => {
-    if (!activeSession || activeSession.exercises.length === 0) return false;
+  const handleUnvalidateCircuitExercise = (exId: string, setId: string, idx: number) => {
+    toggleSetComplete(exId, setId);
+    setRoundStatusMap((prev) => ({ ...prev, [exId]: 'pending' }));
+    setCurrentCircuitIdx(idx);
+    setExpandedMap((prev) => ({ ...prev, [exId]: false }));
+  };
 
-    if (activeSession.isCircuit) {
-      const totalEx = activeSession.exercises.length;
-      const resolvedCount = activeSession.exercises.filter((ex) => {
-        const status = roundStatusMap[ex.id];
-        return status === 'validated' || status === 'skipped';
-      }).length;
-      const allSetsCompleted = activeSession.exercises.every(
-        (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
-      );
-      return (activeCircuitRound >= totalRounds && resolvedCount >= totalEx) || allSetsCompleted;
-    }
-
-    return activeSession.exercises.every(
-      (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
-    );
-  }, [activeSession, activeCircuitRound, totalRounds, roundStatusMap]);
-
-  // Filter 52 exercises for search modal
-  const filteredDatabase = EXERCISE_DATABASE.filter((ex) => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      ex.name.toLowerCase().includes(q) ||
-      ex.primaryMuscle.toLowerCase().includes(q) ||
-      ex.category.toLowerCase().includes(q) ||
-      ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
-    );
-  });
+  const handleUnpassCircuitExercise = (exId: string, idx: number) => {
+    setRoundStatusMap((prev) => ({ ...prev, [exId]: 'pending' }));
+    setCurrentCircuitIdx(idx);
+    setExpandedMap((prev) => ({ ...prev, [exId]: false }));
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0 }]}>
@@ -278,7 +297,7 @@ export default function LiveWorkoutScreen() {
                   style={[
                     styles.circuitItemCard,
                     { backgroundColor: theme.surface, borderColor: isCurrentActive ? theme.accent : theme.border },
-                    isCurrentActive && { borderWidth: 2.5 }, // Contour actif Sauge/Accent sur l'exercice en cours
+                    isCurrentActive && { borderWidth: 2.5 },
                   ]}
                 >
                   <View style={styles.circuitItemTop}>
@@ -328,21 +347,19 @@ export default function LiveWorkoutScreen() {
                     )}
                   </View>
 
-                  {/* Action Buttons: [Valider] et [Passer] pour l'exercice en cours uniquement */}
+                  {/* Action Buttons: [Valider] et [Passer] pour l'exercice en cours */}
                   {isCurrentActive && (
                     <View style={styles.circuitActionsRow}>
                       <TouchableOpacity
                         activeOpacity={0.8}
                         style={[
                           styles.circuitDoneBtn,
-                          { flex: 1, backgroundColor: currentSet?.completed ? theme.accent : theme.accent, marginRight: 6 },
+                          { flex: 1, backgroundColor: theme.accent, marginRight: 6 },
                         ]}
                         onPress={() => handleValidateCircuitExercise(ex.id, currentSet.id, idx)}
                       >
                         <Check size={16} color="#FFFFFF" />
-                        <Text style={styles.circuitDoneBtnText}>
-                          {currentSet?.completed ? 'Validé' : 'Valider'}
-                        </Text>
+                        <Text style={styles.circuitDoneBtnText}>Valider</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -356,6 +373,37 @@ export default function LiveWorkoutScreen() {
                         <SkipForward size={14} color={theme.textMuted} />
                         <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passer</Text>
                       </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Carte ré-expansée (isForceExpanded && isResolved) */}
+                  {isForceExpanded && isResolved && !isCurrentActive && (
+                    <View style={styles.circuitActionsRow}>
+                      {status === 'validated' ? (
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[
+                            styles.circuitDoneBtn,
+                            { flex: 1, backgroundColor: theme.accent },
+                          ]}
+                          onPress={() => handleUnvalidateCircuitExercise(ex.id, currentSet.id, idx)}
+                        >
+                          <Check size={16} color="#FFFFFF" />
+                          <Text style={styles.circuitDoneBtnText}>Validé</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          style={[
+                            styles.circuitPassBtn,
+                            { flex: 1, borderColor: theme.border, backgroundColor: theme.cardBg },
+                          ]}
+                          onPress={() => handleUnpassCircuitExercise(ex.id, idx)}
+                        >
+                          <SkipForward size={14} color={theme.textMuted} />
+                          <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passé</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
                 </View>
@@ -604,7 +652,9 @@ const styles = StyleSheet.create({
   },
   repsInput: {
     width: 44,
-    height: 30,
+    height: 36,
+    paddingVertical: 2,
+    marginTop: 2,
     borderWidth: 1,
     borderRadius: 6,
     textAlign: 'center',
