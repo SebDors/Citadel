@@ -21,6 +21,11 @@ import {
   WorkoutTemplate,
   SetType,
   SET_TYPES_CONFIG,
+  WorkoutBlock,
+  SingleExerciseBlock,
+  CircuitBlock,
+  CircuitExerciseItem,
+  getTemplateBlocks,
   calculateEstimatedWorkoutMinutes,
 } from '../src/types';
 import {
@@ -35,12 +40,22 @@ import {
   RotateCcw,
   Layers,
   Zap,
+  MoreVertical,
+  ArrowUp,
+  ArrowDown,
+  Copy,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react-native';
 
-
+const formatMinutesSeconds = (totalSeconds: number): string => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
 
 export default function TemplateEditorScreen() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { data, saveTemplate } = useWorkout();
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -49,148 +64,562 @@ export default function TemplateEditorScreen() {
 
   const [title, setTitle] = useState('');
   const [defaultRestSeconds, setDefaultRestSeconds] = useState<number>(75);
-  const [isCircuit, setIsCircuit] = useState<boolean>(false);
-  const [circuitRounds, setCircuitRounds] = useState<number>(3);
-  const [restBetweenRoundsSeconds, setRestBetweenRoundsSeconds] = useState<number>(90);
-  const [selectedExercises, setSelectedExercises] = useState<WorkoutExercise[]>([]);
+
+  // État unifié par blocs (SingleExerciseBlock & CircuitBlock)
+  const [selectedBlocks, setSelectedBlocks] = useState<WorkoutBlock[]>([]);
+
+  // Modaux et Cibles
   const [showPickerModal, setShowPickerModal] = useState(false);
+  const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Target set for type picker modal: { exIdx, setIdx }
-  const [activeSetTarget, setActiveSetTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
+  // Target set pour modal de type de série: { blockId, setIdx }
+  const [activeSetTarget, setActiveSetTarget] = useState<{ blockId: string; setIdx: number } | null>(null);
 
-  // Target exercise for superset modal
-  const [supersetModalExIdx, setSupersetModalExIdx] = useState<number | null>(null);
+  // Target single exercise pour modal de superset
+  const [supersetModalBlockId, setSupersetModalBlockId] = useState<string | null>(null);
 
-  // Set or remove superset group for exercise
-  const handleSetSupersetGroup = (exIdx: number, supersetGroup?: string) => {
-    const updated = [...selectedExercises];
-    updated[exIdx] = {
-      ...updated[exIdx],
-      supersetGroup: supersetGroup || undefined,
-    };
-    setSelectedExercises(updated);
-    setSupersetModalExIdx(null);
-  };
+  // Target single block pour le choix de circuit ("Inclure dans le circuit") si multi-circuits
+  const [targetIncludeSingleBlockId, setTargetIncludeSingleBlockId] = useState<string | null>(null);
 
-  // Load existing template if editing
+  // Target block/exercise pour le modal d'options (...)
+  const [activeBlockOptions, setActiveBlockOptions] = useState<{
+    type: 'circuit' | 'circuit_exercise' | 'single';
+    blockId: string;
+    exIdx?: number;
+  } | null>(null);
+
+  // Charger le template existant si édition
   useEffect(() => {
     if (templateIdParam && data?.templates) {
       const existing = data.templates.find((t) => t.id === templateIdParam);
       if (existing) {
         setTitle(existing.title);
-        setSelectedExercises(JSON.parse(JSON.stringify(existing.exercises)));
         setDefaultRestSeconds(existing.defaultRestSeconds || 75);
-        setIsCircuit(!!existing.isCircuit);
-        setCircuitRounds(existing.circuitRounds ?? 3);
-        setRestBetweenRoundsSeconds(existing.restBetweenRoundsSeconds ?? 90);
+        const blocks = getTemplateBlocks(existing);
+        setSelectedBlocks(JSON.parse(JSON.stringify(blocks)));
       }
     }
   }, [templateIdParam, data?.templates]);
 
-  const estimatedMinutes = calculateEstimatedWorkoutMinutes(selectedExercises);
+  // Durée estimée de la séance
+  const estimatedMinutes = calculateEstimatedWorkoutMinutes(selectedBlocks);
 
-  // Add exercise from DB
-  const handleAddSharedExercise = (ex: SharedExercise) => {
-    const newEx: WorkoutExercise = {
-      id: `ex_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      exerciseId: ex.id,
-      exerciseName: ex.name,
-      primaryMuscle: ex.primaryMuscle,
-      targetMuscles: ex.targetMuscles,
-      restSeconds: defaultRestSeconds || ex.defaultRestSeconds || 75,
-      sets: [
-        { id: `s1_${Date.now()}`, setNumber: 1, type: 'normal', rir: 2, completed: false },
-        { id: `s2_${Date.now()}`, setNumber: 2, type: 'normal', rir: 2, completed: false },
-        { id: `s3_${Date.now()}`, setNumber: 3, type: 'normal', rir: 2, completed: false },
-      ],
-    };
+  // Liste des blocs circuits actuellement dans la séance
+  const circuitBlocks = selectedBlocks.filter((b): b is CircuitBlock => b.type === 'circuit');
 
-    setSelectedExercises([...selectedExercises, newEx]);
-    setShowPickerModal(false);
-    setSearchQuery('');
-  };
-
-  const handleRemoveExercise = (idx: number) => {
-    const updated = selectedExercises.filter((_, i) => i !== idx);
-    setSelectedExercises(updated);
-  };
-
-  // Default rest adjustment for session
+  // Ajustement du temps de repos par défaut
   const handleAdjustDefaultRest = (delta: number) => {
     setDefaultRestSeconds((prev) => Math.max(0, prev + delta));
   };
 
-  // Specific rest adjustment for an exercise
-  const handleAdjustExerciseRest = (exIdx: number, delta: number) => {
-    const updated = [...selectedExercises];
-    const currentRest = updated[exIdx].restSeconds ?? defaultRestSeconds;
-    updated[exIdx].restSeconds = Math.max(0, currentRest + delta);
-    setSelectedExercises(updated);
+  // Superset pour exercice individuel
+  const handleSetSupersetGroup = (blockId: string, supersetGroup?: string) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          return {
+            ...b,
+            exercise: {
+              ...b.exercise,
+              supersetGroup: supersetGroup || undefined,
+            },
+          };
+        }
+        return b;
+      })
+    );
+    setSupersetModalBlockId(null);
   };
 
-  // Reset exercise rest to default session rest
-  const handleResetExerciseRest = (exIdx: number) => {
-    const updated = [...selectedExercises];
-    updated[exIdx].restSeconds = defaultRestSeconds;
-    setSelectedExercises(updated);
+  // Ajouter un exercice depuis la base (individuel ou dans circuit)
+  const handleAddSharedExercise = (ex: SharedExercise) => {
+    if (targetCircuitBlockId) {
+      const newCircuitEx: CircuitExerciseItem = {
+        id: `circ_ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        exerciseName: ex.name,
+        primaryMuscle: ex.primaryMuscle,
+        targetMuscles: ex.targetMuscles,
+        targetValue: 12,
+        targetType: 'reps',
+      };
+
+      setSelectedBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id === targetCircuitBlockId && b.type === 'circuit') {
+            return {
+              ...b,
+              exercises: [...b.exercises, newCircuitEx],
+            };
+          }
+          return b;
+        })
+      );
+    } else {
+      const newEx: WorkoutExercise = {
+        id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        exerciseId: ex.id,
+        exerciseName: ex.name,
+        primaryMuscle: ex.primaryMuscle,
+        targetMuscles: ex.targetMuscles,
+        restSeconds: defaultRestSeconds || ex.defaultRestSeconds || 75,
+        sets: [
+          { id: `s1_${Date.now()}`, setNumber: 1, type: 'normal', rir: 2, completed: false },
+          { id: `s2_${Date.now()}`, setNumber: 2, type: 'normal', rir: 2, completed: false },
+          { id: `s3_${Date.now()}`, setNumber: 3, type: 'normal', rir: 2, completed: false },
+        ],
+      };
+
+      const newBlock: SingleExerciseBlock = {
+        id: `blk_single_${newEx.id}`,
+        type: 'single',
+        exercise: newEx,
+      };
+
+      setSelectedBlocks((prev) => [...prev, newBlock]);
+    }
+
+    setShowPickerModal(false);
+    setTargetCircuitBlockId(null);
+    setSearchQuery('');
   };
 
-  // Add set to exercise
-  const handleAddSet = (exIdx: number) => {
-    const updated = [...selectedExercises];
-    const targetEx = updated[exIdx];
-    const newSetNumber = targetEx.sets.length + 1;
-    targetEx.sets.push({
-      id: `s_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      setNumber: newSetNumber,
-      type: 'normal',
-      rir: 2,
-      completed: false,
+  // Créer un nouveau conteneur Circuit ([+ Circuit])
+  const handleAddCircuitContainer = () => {
+    const circuitCount = circuitBlocks.length + 1;
+    const newCircuitBlock: CircuitBlock = {
+      id: `blk_circuit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      type: 'circuit',
+      title: `Circuit ${circuitCount}`,
+      rounds: 3,
+      restBetweenRoundsSeconds: 90,
+      exercises: [],
+    };
+    setSelectedBlocks((prev) => [...prev, newCircuitBlock]);
+  };
+
+  // Contrôles sur le conteneur circuit (tours et repos)
+  const handleAdjustCircuitRounds = (blockId: string, delta: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return { ...b, rounds: Math.max(1, b.rounds + delta) };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleAdjustCircuitRest = (blockId: string, delta: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            restBetweenRoundsSeconds: Math.max(0, b.restBetweenRoundsSeconds + delta),
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  // Modification d'un exercice dans le circuit (valeur et type)
+  const handleUpdateCircuitItemValue = (blockId: string, exId: string, valStr: string) => {
+    const val = parseInt(valStr.replace(/[^0-9]/g, ''), 10) || 0;
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: b.exercises.map((item) =>
+              item.id === exId ? { ...item, targetValue: val } : item
+            ),
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleToggleCircuitItemType = (blockId: string, exId: string) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: b.exercises.map((item) =>
+              item.id === exId
+                ? { ...item, targetType: item.targetType === 'reps' ? 'time' : 'reps' }
+                : item
+            ),
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  // Inclure un exercice individuel dans un circuit
+  const handleIncludeInCircuit = (singleBlockId: string, targetCircuitId?: string) => {
+    const singleBlock = selectedBlocks.find(
+      (b): b is SingleExerciseBlock => b.id === singleBlockId && b.type === 'single'
+    );
+    if (!singleBlock) return;
+
+    let destCircuitId = targetCircuitId;
+    if (!destCircuitId) {
+      if (circuitBlocks.length === 1) {
+        destCircuitId = circuitBlocks[0].id;
+      } else if (circuitBlocks.length > 1) {
+        setTargetIncludeSingleBlockId(singleBlockId);
+        return;
+      } else {
+        return;
+      }
+    }
+
+    const firstSet = singleBlock.exercise.sets[0];
+    const targetVal = firstSet?.reps || 12;
+    const targetType: 'reps' | 'time' =
+      firstSet?.durationSeconds && firstSet.durationSeconds > 0 ? 'time' : 'reps';
+
+    const newCircuitItem: CircuitExerciseItem = {
+      id: `circ_ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      exerciseName: singleBlock.exercise.exerciseName,
+      primaryMuscle: singleBlock.exercise.primaryMuscle,
+      targetMuscles: singleBlock.exercise.targetMuscles,
+      targetValue: targetVal,
+      targetType,
+    };
+
+    setSelectedBlocks((prev) => {
+      const filtered = prev.filter((b) => b.id !== singleBlockId);
+      return filtered.map((b) => {
+        if (b.id === destCircuitId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: [...b.exercises, newCircuitItem],
+          };
+        }
+        return b;
+      });
     });
-    setSelectedExercises(updated);
+
+    setTargetIncludeSingleBlockId(null);
   };
 
-  // Remove specific set from exercise
-  const handleRemoveSet = (exIdx: number, setIdx: number) => {
-    const updated = [...selectedExercises];
-    const targetEx = updated[exIdx];
-    if (targetEx.sets.length <= 1) return;
+  // --- ACTIONS DU MENU D'OPTIONS (...) ---
 
-    targetEx.sets = targetEx.sets.filter((_, i) => i !== setIdx).map((s, i) => ({
-      ...s,
-      setNumber: i + 1,
-    }));
+  // Monter / Descendre un bloc dans selectedBlocks
+  const handleMoveBlock = (blockId: string, direction: 'up' | 'down') => {
+    const blockIdx = selectedBlocks.findIndex((b) => b.id === blockId);
+    if (blockIdx < 0) return;
+    const newIndex = direction === 'up' ? blockIdx - 1 : blockIdx + 1;
+    if (newIndex < 0 || newIndex >= selectedBlocks.length) return;
 
-    setSelectedExercises(updated);
+    setSelectedBlocks((prev) => {
+      const updated = [...prev];
+      const temp = updated[blockIdx];
+      updated[blockIdx] = updated[newIndex];
+      updated[newIndex] = temp;
+      return updated;
+    });
+    setActiveBlockOptions(null);
   };
 
-  // Update set type
-  const handleUpdateSetType = (exIdx: number, setIdx: number, newType: SetType) => {
-    const updated = [...selectedExercises];
-    updated[exIdx].sets[setIdx].type = newType;
-    setSelectedExercises(updated);
+  // Dupliquer un bloc circuit
+  const handleDuplicateCircuitBlock = (blockId: string) => {
+    const blockIdx = selectedBlocks.findIndex((b) => b.id === blockId);
+    if (blockIdx < 0) return;
+    const targetBlock = selectedBlocks[blockIdx];
+    if (targetBlock.type !== 'circuit') return;
+
+    const dupBlock: CircuitBlock = {
+      ...JSON.parse(JSON.stringify(targetBlock)),
+      id: `blk_circuit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: `${targetBlock.title} (Copie)`,
+      exercises: targetBlock.exercises.map((item: CircuitExerciseItem) => ({
+        ...item,
+        id: `circ_ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      })),
+    };
+
+    setSelectedBlocks((prev) => {
+      const updated = [...prev];
+      updated.splice(blockIdx + 1, 0, dupBlock);
+      return updated;
+    });
+    setActiveBlockOptions(null);
+  };
+
+  // Supprimer un bloc circuit
+  const handleDeleteCircuitBlock = (blockId: string) => {
+    setSelectedBlocks((prev) => prev.filter((b) => b.id !== blockId));
+    setActiveBlockOptions(null);
+  };
+
+  // Monter / Descendre un exercice dans un circuit
+  const handleMoveCircuitExercise = (blockId: string, exIdx: number, direction: 'up' | 'down') => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          const newIdx = direction === 'up' ? exIdx - 1 : exIdx + 1;
+          if (newIdx < 0 || newIdx >= b.exercises.length) return b;
+          const updatedEx = [...b.exercises];
+          const temp = updatedEx[exIdx];
+          updatedEx[exIdx] = updatedEx[newIdx];
+          updatedEx[newIdx] = temp;
+          return { ...b, exercises: updatedEx };
+        }
+        return b;
+      })
+    );
+    setActiveBlockOptions(null);
+  };
+
+  // Dupliquer un exercice au sein d'un circuit
+  const handleDuplicateCircuitExercise = (blockId: string, exIdx: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          const targetItem = b.exercises[exIdx];
+          if (!targetItem) return b;
+          const dupItem: CircuitExerciseItem = {
+            ...targetItem,
+            id: `circ_ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            exerciseName: `${targetItem.exerciseName} (Copie)`,
+          };
+          const updatedEx = [...b.exercises];
+          updatedEx.splice(exIdx + 1, 0, dupItem);
+          return { ...b, exercises: updatedEx };
+        }
+        return b;
+      })
+    );
+    setActiveBlockOptions(null);
+  };
+
+  // Convertir un exercice de circuit en exercice individuel
+  const handleConvertCircuitExToSingle = (blockId: string, exIdx: number) => {
+    const blockIdx = selectedBlocks.findIndex((b) => b.id === blockId);
+    if (blockIdx < 0) return;
+    const circuitBlock = selectedBlocks[blockIdx];
+    if (circuitBlock.type !== 'circuit') return;
+
+    const item = circuitBlock.exercises[exIdx];
+    if (!item) return;
+
+    const newSingleEx: WorkoutExercise = {
+      id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      exerciseId: item.exerciseName.toLowerCase().replace(/\s+/g, '_'),
+      exerciseName: item.exerciseName,
+      primaryMuscle: item.primaryMuscle,
+      targetMuscles: item.targetMuscles || [],
+      restSeconds: defaultRestSeconds,
+      sets: [
+        {
+          id: `s1_${Date.now()}`,
+          setNumber: 1,
+          type: 'normal',
+          reps: item.targetType === 'reps' ? item.targetValue : undefined,
+          durationSeconds: item.targetType === 'time' ? item.targetValue : undefined,
+          rir: 2,
+          completed: false,
+        },
+      ],
+    };
+
+    const newSingleBlock: SingleExerciseBlock = {
+      id: `blk_single_${newSingleEx.id}`,
+      type: 'single',
+      exercise: newSingleEx,
+    };
+
+    setSelectedBlocks((prev) => {
+      const updated = prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: b.exercises.filter((_, i) => i !== exIdx),
+          };
+        }
+        return b;
+      });
+      updated.splice(blockIdx + 1, 0, newSingleBlock);
+      return updated;
+    });
+
+    setActiveBlockOptions(null);
+  };
+
+  // Supprimer un exercice du circuit
+  const handleDeleteCircuitExercise = (blockId: string, exIdx: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: b.exercises.filter((_, i) => i !== exIdx),
+          };
+        }
+        return b;
+      })
+    );
+    setActiveBlockOptions(null);
+  };
+
+  // --- ACTIONS SUR EXERCICES INDIVIDUELS ---
+
+  const handleDuplicateSingleBlock = (blockId: string) => {
+    const blockIdx = selectedBlocks.findIndex((b) => b.id === blockId);
+    if (blockIdx < 0) return;
+    const targetBlock = selectedBlocks[blockIdx];
+    if (targetBlock.type !== 'single') return;
+
+    const dupEx: WorkoutExercise = {
+      ...JSON.parse(JSON.stringify(targetBlock.exercise)),
+      id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      exerciseName: `${targetBlock.exercise.exerciseName} (Copie)`,
+    };
+    const dupBlock: SingleExerciseBlock = {
+      id: `blk_single_${dupEx.id}`,
+      type: 'single',
+      exercise: dupEx,
+    };
+
+    setSelectedBlocks((prev) => {
+      const updated = [...prev];
+      updated.splice(blockIdx + 1, 0, dupBlock);
+      return updated;
+    });
+    setActiveBlockOptions(null);
+  };
+
+  const handleRemoveSingleBlock = (blockId: string) => {
+    setSelectedBlocks((prev) => prev.filter((b) => b.id !== blockId));
+    setActiveBlockOptions(null);
+  };
+
+  const handleAdjustExerciseRest = (blockId: string, delta: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          const currentRest = b.exercise.restSeconds ?? defaultRestSeconds;
+          return {
+            ...b,
+            exercise: {
+              ...b.exercise,
+              restSeconds: Math.max(0, currentRest + delta),
+            },
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleResetExerciseRest = (blockId: string) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          return {
+            ...b,
+            exercise: { ...b.exercise, restSeconds: defaultRestSeconds },
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleAddSetToSingle = (blockId: string) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          const newSetNumber = b.exercise.sets.length + 1;
+          const newSet = {
+            id: `s_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            setNumber: newSetNumber,
+            type: 'normal' as SetType,
+            rir: 2,
+            completed: false,
+          };
+          return {
+            ...b,
+            exercise: {
+              ...b.exercise,
+              sets: [...b.exercise.sets, newSet],
+            },
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleRemoveSetFromSingle = (blockId: string, setIdx: number) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          if (b.exercise.sets.length <= 1) return b;
+          const updatedSets = b.exercise.sets
+            .filter((_, i) => i !== setIdx)
+            .map((s, i) => ({ ...s, setNumber: i + 1 }));
+          return {
+            ...b,
+            exercise: { ...b.exercise, sets: updatedSets },
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleUpdateSetType = (blockId: string, setIdx: number, newType: SetType) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          const updatedSets = [...b.exercise.sets];
+          updatedSets[setIdx] = { ...updatedSets[setIdx], type: newType };
+          return {
+            ...b,
+            exercise: { ...b.exercise, sets: updatedSets },
+          };
+        }
+        return b;
+      })
+    );
     setActiveSetTarget(null);
   };
 
+  // Enregistrement du programme
   const handleSave = async () => {
-    if (!title) return;
+    if (!title.trim()) return;
+
+    const singleExercises: WorkoutExercise[] = selectedBlocks
+      .filter((b): b is SingleExerciseBlock => b.type === 'single')
+      .map((b) => b.exercise);
+
+    const isAnyCircuit = selectedBlocks.some((b) => b.type === 'circuit');
+    const firstCircuitBlock = selectedBlocks.find((b): b is CircuitBlock => b.type === 'circuit');
 
     const newTemplate: WorkoutTemplate = {
       id: templateIdParam || `tpl_${Date.now()}`,
-      title,
+      title: title.trim(),
       defaultRestSeconds,
-      exercises: selectedExercises,
-      isCircuit,
-      circuitRounds,
-      restBetweenRoundsSeconds,
+      blocks: selectedBlocks,
+      exercises: singleExercises,
+      isCircuit: isAnyCircuit,
+      circuitRounds: firstCircuitBlock?.rounds ?? 3,
+      restBetweenRoundsSeconds: firstCircuitBlock?.restBetweenRoundsSeconds ?? 90,
     };
 
     await saveTemplate(newTemplate);
     router.back();
   };
 
-  // Filter exercises for modal
+  // Filtrage de la base d'exercices
   const filteredDatabase = EXERCISE_DATABASE.filter((ex) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
@@ -202,6 +631,15 @@ export default function TemplateEditorScreen() {
     );
   });
 
+  // Styles Thème Violet Epilog pour cartes conteneurs Circuit
+  const purpleBg = isDark ? '#231735' : '#F5F3FF';
+  const purpleBorder = isDark ? '#8B5CF6' : '#7C3AED';
+  const purpleHeader = isDark ? '#E9D5FF' : '#4C1D95';
+  const purpleSubText = isDark ? '#C4B5FD' : '#6D28D9';
+  const purpleBadgeBg = '#7C3AED';
+  const purpleItemBg = isDark ? '#1C122B' : '#FFFFFF';
+  const purpleItemBorder = isDark ? '#4C1D95' : '#DDD6FE';
+
   return (
     <SafeAreaView
       style={[
@@ -212,7 +650,7 @@ export default function TemplateEditorScreen() {
         },
       ]}
     >
-      {/* Top Navigation */}
+      {/* Barre de navigation haute */}
       <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={20} color={theme.text} />
@@ -237,102 +675,6 @@ export default function TemplateEditorScreen() {
           value={title}
           onChangeText={setTitle}
         />
-
-        {/* Sélecteur Mode de la séance */}
-        <Text style={[styles.label, { color: theme.text, marginTop: 14 }]}>Mode de la séance</Text>
-        <View style={[styles.modeSelectorContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <TouchableOpacity
-            style={[
-              styles.modeOption,
-              !isCircuit && [styles.modeOptionActive, { backgroundColor: theme.accent }],
-            ]}
-            onPress={() => setIsCircuit(false)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.modeOptionText,
-                { color: !isCircuit ? '#FFFFFF' : theme.textMuted },
-              ]}
-            >
-              Normale
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modeOption,
-              isCircuit && [styles.modeOptionActive, { backgroundColor: theme.accent }],
-            ]}
-            onPress={() => setIsCircuit(true)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.modeOptionText,
-                { color: isCircuit ? '#FFFFFF' : theme.textMuted },
-              ]}
-            >
-              ⚡ Circuit
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Réglages du Mode Circuit */}
-        {isCircuit && (
-          <View style={[styles.circuitCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.rowAlign}>
-              <Zap size={18} color={theme.accent} style={{ marginRight: 6 }} />
-              <Text style={[styles.circuitCardTitle, { color: theme.text }]}>
-                Réglages du Circuit
-              </Text>
-            </View>
-
-            {/* Nombre de tours */}
-            <View style={styles.circuitControlRow}>
-              <Text style={[styles.circuitControlLabel, { color: theme.text }]}>Nombre de tours</Text>
-              <View style={styles.circuitStepper}>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                  onPress={() => setCircuitRounds((prev) => Math.max(1, prev - 1))}
-                >
-                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>-1</Text>
-                </TouchableOpacity>
-                <Text style={[styles.circuitValueText, { color: theme.accent }]}>
-                  {circuitRounds} tour{circuitRounds > 1 ? 's' : ''}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                  onPress={() => setCircuitRounds((prev) => prev + 1)}
-                >
-                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>+1</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Repos entre les tours */}
-            <View style={styles.circuitControlRow}>
-              <Text style={[styles.circuitControlLabel, { color: theme.text }]}>Repos entre les tours</Text>
-              <View style={styles.circuitStepperCenter}>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                  onPress={() => setRestBetweenRoundsSeconds((prev) => Math.max(0, prev - 15))}
-                >
-                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>-15s</Text>
-                </TouchableOpacity>
-                <Text style={[styles.circuitValueText, { color: theme.accent }]}>
-                  {restBetweenRoundsSeconds}s
-                </Text>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                  onPress={() => setRestBetweenRoundsSeconds((prev) => prev + 15)}
-                >
-                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>+15s</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* Temps de repos par défaut de la séance */}
         <View style={[styles.defaultRestCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -360,11 +702,11 @@ export default function TemplateEditorScreen() {
           </View>
 
           <Text style={[styles.defaultRestHint, { color: theme.textMuted }]}>
-            Ce temps sera attribué par défaut aux nouveaux exercices ajoutés.
+            Ce temps sera attribué par défaut aux nouveaux exercices individuels.
           </Text>
         </View>
 
-        {/* Estimation de la durée de la séance */}
+        {/* Durée estimée */}
         <View style={[styles.estimatedBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Clock size={18} color={theme.accent} style={{ marginRight: 8 }} />
           <Text style={[styles.estimatedText, { color: theme.text }]}>
@@ -372,16 +714,202 @@ export default function TemplateEditorScreen() {
           </Text>
         </View>
 
-        {/* Liste des exercices ajoutés */}
-        <Text style={[styles.label, { color: theme.text, marginTop: 16 }]}>
-          Exercices de la séance ({selectedExercises.length})
+        {/* En-tête des Blocs */}
+        <Text style={[styles.label, { color: theme.text, marginTop: 18, marginBottom: 8 }]}>
+          Structure de la séance ({selectedBlocks.length} bloc{selectedBlocks.length > 1 ? 's' : ''})
         </Text>
 
-        {selectedExercises.map((ex, exIdx) => {
+        {/* LISTE SÉQUENTIELLE DES BLOCS */}
+        {selectedBlocks.map((block, blockIdx) => {
+          // --- CASE 1: CARTE CONTENEUR CIRCUIT (STYLE VIOLET EPILOG) ---
+          if (block.type === 'circuit') {
+            return (
+              <View
+                key={block.id}
+                style={[
+                  styles.circuitContainer,
+                  { backgroundColor: purpleBg, borderColor: purpleBorder },
+                ]}
+              >
+                {/* En-tête du Circuit */}
+                <View style={styles.circuitHeaderRow}>
+                  <View style={styles.rowAlign}>
+                    {/* Badge 'C' */}
+                    <View style={[styles.circuitBadgeC, { backgroundColor: purpleBadgeBg }]}>
+                      <Text style={styles.circuitBadgeCText}>C</Text>
+                    </View>
+
+                    {/* Titre Round · X tours + Steppers */}
+                    <Text style={[styles.circuitTitleText, { color: purpleHeader }]}>
+                      Round · {block.rounds} tour{block.rounds > 1 ? 's' : ''}
+                    </Text>
+                    <View style={styles.circuitSteppersBox}>
+                      <TouchableOpacity
+                        style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                        onPress={() => handleAdjustCircuitRounds(block.id, -1)}
+                      >
+                        <Text style={[styles.smallStepperText, { color: theme.text }]}>-1</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.smallStepperBtn,
+                          { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                        ]}
+                        onPress={() => handleAdjustCircuitRounds(block.id, 1)}
+                      >
+                        <Text style={[styles.smallStepperText, { color: theme.text }]}>+1</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Bouton Options ... pour le circuit */}
+                  <TouchableOpacity
+                    style={styles.moreOptionsBtn}
+                    onPress={() =>
+                      setActiveBlockOptions({
+                        type: 'circuit',
+                        blockId: block.id,
+                      })
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MoreVertical size={20} color={purpleHeader} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Repos entre les tours · M:SS avec Steppers -15s / +15s */}
+                <View
+                  style={[
+                    styles.circuitRestRow,
+                    { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE' },
+                  ]}
+                >
+                  <View style={styles.rowAlign}>
+                    <Timer size={14} color={purpleSubText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                      Repos entre les tours ·{' '}
+                      <Text style={{ fontWeight: '900' }}>
+                        {formatMinutesSeconds(block.restBetweenRoundsSeconds)}
+                      </Text>
+                    </Text>
+                  </View>
+                  <View style={styles.rowAlign}>
+                    <TouchableOpacity
+                      style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                      onPress={() => handleAdjustCircuitRest(block.id, -15)}
+                    >
+                      <Text style={[styles.smallStepperText, { color: theme.text }]}>-15s</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.smallStepperBtn,
+                        { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                      ]}
+                      onPress={() => handleAdjustCircuitRest(block.id, 15)}
+                    >
+                      <Text style={[styles.smallStepperText, { color: theme.text }]}>+15s</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Liste compacte des exercices du circuit */}
+                <View style={styles.circuitItemsContainer}>
+                  {block.exercises.map((item, itemIdx) => {
+                    const letter = String.fromCharCode(65 + itemIdx);
+                    return (
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.circuitItemCard,
+                          { backgroundColor: purpleItemBg, borderColor: purpleItemBorder },
+                        ]}
+                      >
+                        {/* Badge Lettre A, B, C... */}
+                        <View style={[styles.letterBadge, { backgroundColor: purpleBadgeBg }]}>
+                          <Text style={styles.letterBadgeText}>{letter}</Text>
+                        </View>
+
+                        {/* Nom de l'exercice */}
+                        <Text style={[styles.circuitItemName, { color: theme.text }]} numberOfLines={1}>
+                          {item.exerciseName}
+                        </Text>
+
+                        {/* Champ numérique targetValue */}
+                        <TextInput
+                          style={[
+                            styles.targetValueInput,
+                            { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border },
+                          ]}
+                          keyboardType="numeric"
+                          value={String(item.targetValue)}
+                          onChangeText={(val) => handleUpdateCircuitItemValue(block.id, item.id, val)}
+                        />
+
+                        {/* Basculeur [reps] / [s] */}
+                        <TouchableOpacity
+                          style={[
+                            styles.targetTypeToggle,
+                            {
+                              backgroundColor:
+                                item.targetType === 'reps' ? '#618764' : '#D97706',
+                            },
+                          ]}
+                          onPress={() => handleToggleCircuitItemType(block.id, item.id)}
+                        >
+                          <Text style={styles.targetTypeToggleText}>
+                            {item.targetType === 'reps' ? 'reps' : 's'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Bouton Options ... pour cet exercice du circuit */}
+                        <TouchableOpacity
+                          style={styles.moreOptionsBtn}
+                          onPress={() =>
+                            setActiveBlockOptions({
+                              type: 'circuit_exercise',
+                              blockId: block.id,
+                              exIdx: itemIdx,
+                            })
+                          }
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MoreVertical size={18} color={theme.textMuted} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Bouton [+ Ajouter un exercice au circuit] */}
+                <TouchableOpacity
+                  style={[
+                    styles.addCircuitExerciseBtn,
+                    {
+                      borderColor: purpleBorder,
+                      backgroundColor: isDark ? '#2D1F42' : '#EDE9FE',
+                    },
+                  ]}
+                  onPress={() => {
+                    setTargetCircuitBlockId(block.id);
+                    setShowPickerModal(true);
+                  }}
+                >
+                  <Plus size={16} color={purpleHeader} style={{ marginRight: 6 }} />
+                  <Text style={[styles.addCircuitExerciseBtnText, { color: purpleHeader }]}>
+                    + Ajouter un exercice au circuit
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // --- CASE 2: CARTE EXERCICE INDIVIDUEL (SingleExerciseBlock) ---
+          const ex = block.exercise;
           const exRest = ex.restSeconds ?? defaultRestSeconds;
+
           return (
             <View
-              key={ex.id}
+              key={block.id}
               style={[
                 styles.exCard,
                 { backgroundColor: theme.cardBg, borderColor: theme.border },
@@ -396,31 +924,54 @@ export default function TemplateEditorScreen() {
                 </View>
               )}
 
-              {/* En-tête de l'exercice */}
+              {/* En-tête de l'exercice individuel */}
               <View style={styles.exHeader}>
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={[styles.exName, { color: theme.text }]}>{ex.exerciseName}</Text>
                   <Text style={[styles.exMuscle, { color: theme.textMuted }]}>{ex.primaryMuscle}</Text>
                 </View>
+
                 <View style={styles.exHeaderActions}>
+                  {/* Bouton [Inclure dans le circuit] si au moins un bloc circuit existe */}
+                  {circuitBlocks.length > 0 && (
+                    <TouchableOpacity
+                      style={[
+                        styles.includeCircuitBtn,
+                        { borderColor: purpleBorder, backgroundColor: isDark ? '#372056' : '#EDE9FE' },
+                      ]}
+                      onPress={() => handleIncludeInCircuit(block.id)}
+                    >
+                      <Zap size={13} color="#8B5CF6" />
+                      <Text style={styles.includeCircuitBtnText}>+ Circuit</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Bouton Superset */}
                   <TouchableOpacity
                     style={styles.headerActionBtn}
-                    onPress={() => setSupersetModalExIdx(exIdx)}
+                    onPress={() => setSupersetModalBlockId(block.id)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <Layers size={18} color={ex.supersetGroup ? theme.supersetTag : theme.textMuted} />
                   </TouchableOpacity>
+
+                  {/* Bouton Options ... pour exercice individuel */}
                   <TouchableOpacity
                     style={styles.headerActionBtn}
-                    onPress={() => handleRemoveExercise(exIdx)}
+                    onPress={() =>
+                      setActiveBlockOptions({
+                        type: 'single',
+                        blockId: block.id,
+                      })
+                    }
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Trash2 size={18} color={theme.danger} />
+                    <MoreVertical size={18} color={theme.textMuted} />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Reglage du temps de repos spécifique de l'exercice */}
+              {/* Réglage du temps de repos spécifique */}
               <View style={[styles.exRestRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <View style={styles.rowAlign}>
                   <Timer size={14} color={theme.textMuted} style={{ marginRight: 4 }} />
@@ -429,14 +980,14 @@ export default function TemplateEditorScreen() {
                 <View style={styles.rowAlign}>
                   <TouchableOpacity
                     style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                    onPress={() => handleAdjustExerciseRest(exIdx, -15)}
+                    onPress={() => handleAdjustExerciseRest(block.id, -15)}
                   >
                     <Text style={[styles.smallStepperText, { color: theme.text }]}>-15s</Text>
                   </TouchableOpacity>
                   <Text style={[styles.exRestValue, { color: theme.accent }]}>{exRest}s</Text>
                   <TouchableOpacity
                     style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                    onPress={() => handleAdjustExerciseRest(exIdx, 15)}
+                    onPress={() => handleAdjustExerciseRest(block.id, 15)}
                   >
                     <Text style={[styles.smallStepperText, { color: theme.text }]}>+15s</Text>
                   </TouchableOpacity>
@@ -444,7 +995,7 @@ export default function TemplateEditorScreen() {
                   {exRest !== defaultRestSeconds && (
                     <TouchableOpacity
                       style={styles.resetRestBtn}
-                      onPress={() => handleResetExerciseRest(exIdx)}
+                      onPress={() => handleResetExerciseRest(block.id)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                       <RotateCcw size={14} color={theme.textMuted} />
@@ -453,7 +1004,7 @@ export default function TemplateEditorScreen() {
                 </View>
               </View>
 
-              {/* Liste des Séries pour l'exercice */}
+              {/* Liste des Séries */}
               <View style={styles.setsContainer}>
                 <View style={styles.setsHeaderRow}>
                   <Text style={[styles.setsTitle, { color: theme.text }]}>
@@ -467,10 +1018,7 @@ export default function TemplateEditorScreen() {
                 {ex.sets.map((set, setIdx) => {
                   const setTypeInfo = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
                   return (
-                    <View
-                      key={set.id}
-                      style={[styles.setDetailRow, { borderBottomColor: theme.border }]}
-                    >
+                    <View key={set.id} style={[styles.setDetailRow, { borderBottomColor: theme.border }]}>
                       <Text style={[styles.setIndexText, { color: theme.text }]}>
                         Série {set.setNumber}
                       </Text>
@@ -479,7 +1027,7 @@ export default function TemplateEditorScreen() {
                       <TouchableOpacity
                         activeOpacity={0.7}
                         style={[styles.typeBadge, { backgroundColor: setTypeInfo.color }]}
-                        onPress={() => setActiveSetTarget({ exIdx, setIdx })}
+                        onPress={() => setActiveSetTarget({ blockId: block.id, setIdx })}
                       >
                         <Text style={styles.typeBadgeCode}>{setTypeInfo.code}</Text>
                         <Text style={styles.typeBadgeLabel}>{setTypeInfo.label}</Text>
@@ -489,7 +1037,7 @@ export default function TemplateEditorScreen() {
                       {ex.sets.length > 1 ? (
                         <TouchableOpacity
                           style={styles.deleteSetBtn}
-                          onPress={() => handleRemoveSet(exIdx, setIdx)}
+                          onPress={() => handleRemoveSetFromSingle(block.id, setIdx)}
                         >
                           <Trash2 size={15} color={theme.danger} />
                         </TouchableOpacity>
@@ -503,7 +1051,7 @@ export default function TemplateEditorScreen() {
                 {/* Bouton Ajouter une série */}
                 <TouchableOpacity
                   style={[styles.addSetBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}
-                  onPress={() => handleAddSet(exIdx)}
+                  onPress={() => handleAddSetToSingle(block.id)}
                 >
                   <Plus size={14} color={theme.accent} style={{ marginRight: 4 }} />
                   <Text style={[styles.addSetBtnText, { color: theme.accent }]}>Ajouter une série</Text>
@@ -513,24 +1061,255 @@ export default function TemplateEditorScreen() {
           );
         })}
 
-        <Button
-          title="Ajouter un exercice depuis la base"
-          variant="outline"
-          onPress={() => setShowPickerModal(true)}
-          icon={<Plus size={16} color={theme.accent} />}
-          style={{ marginTop: 12 }}
-        />
+        {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE (FIDÈLE À EPILOG) */}
+        <View style={styles.twinButtonsRow}>
+          {/* [+ Exercice] (Contour vert/accent pointillé) */}
+          <TouchableOpacity
+            style={[
+              styles.twinBtn,
+              {
+                borderColor: theme.accent,
+                backgroundColor: isDark ? 'rgba(156, 176, 128, 0.08)' : 'rgba(235, 125, 0, 0.08)',
+              },
+            ]}
+            onPress={() => {
+              setTargetCircuitBlockId(null);
+              setShowPickerModal(true);
+            }}
+          >
+            <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.twinBtnText, { color: theme.accent }]}>+ Exercice</Text>
+          </TouchableOpacity>
 
+          {/* [+ Circuit] (Contour violet pointillé) */}
+          <TouchableOpacity
+            style={[
+              styles.twinBtn,
+              {
+                borderColor: '#8B5CF6',
+                backgroundColor: isDark ? 'rgba(139, 92, 246, 0.08)' : 'rgba(124, 58, 237, 0.08)',
+              },
+            ]}
+            onPress={handleAddCircuitContainer}
+          >
+            <Zap size={16} color="#8B5CF6" style={{ marginRight: 6 }} />
+            <Text style={[styles.twinBtnText, { color: '#8B5CF6' }]}>+ Circuit</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bouton Enregistrer */}
         <Button
           title="Enregistrer le programme"
           variant="primary"
           onPress={handleSave}
-          disabled={!title || selectedExercises.length === 0}
-          style={{ marginTop: 24 }}
+          disabled={!title.trim() || selectedBlocks.length === 0}
+          style={{ marginTop: 24, marginBottom: 40 }}
         />
       </ScrollView>
 
-      {/* Modal / Volet de Sélection du Type de Série */}
+      {/* --- MODAL / SHEET DES OPTIONS DE BLOC (...) --- */}
+      <Modal
+        visible={activeBlockOptions !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveBlockOptions(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActiveBlockOptions(null)}
+        >
+          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.text, textAlign: 'center', marginBottom: 12 }]}>
+              Options
+            </Text>
+
+            {activeBlockOptions?.type === 'circuit' && (
+              <>
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'up')}
+                >
+                  <ArrowUp size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Monter le circuit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'down')}
+                >
+                  <ArrowDown size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre le circuit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleDuplicateCircuitBlock(activeBlockOptions.blockId)}
+                >
+                  <Copy size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Dupliquer le circuit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomWidth: 0, marginTop: 4 }]}
+                  onPress={() => handleDeleteCircuitBlock(activeBlockOptions.blockId)}
+                >
+                  <Trash2 size={16} color={theme.danger} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.danger }]}>Supprimer le circuit</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {activeBlockOptions?.type === 'circuit_exercise' &&
+              activeBlockOptions.exIdx !== undefined && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                    onPress={() =>
+                      handleMoveCircuitExercise(
+                        activeBlockOptions.blockId,
+                        activeBlockOptions.exIdx!,
+                        'up'
+                      )
+                    }
+                  >
+                    <ChevronUp size={16} color={theme.text} style={{ marginRight: 8 }} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Monter dans le circuit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                    onPress={() =>
+                      handleMoveCircuitExercise(
+                        activeBlockOptions.blockId,
+                        activeBlockOptions.exIdx!,
+                        'down'
+                      )
+                    }
+                  >
+                    <ChevronDown size={16} color={theme.text} style={{ marginRight: 8 }} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre dans le circuit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                    onPress={() =>
+                      handleDuplicateCircuitExercise(
+                        activeBlockOptions.blockId,
+                        activeBlockOptions.exIdx!
+                      )
+                    }
+                  >
+                    <Copy size={16} color={theme.text} style={{ marginRight: 8 }} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Dupliquer l'exercice</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                    onPress={() =>
+                      handleConvertCircuitExToSingle(
+                        activeBlockOptions.blockId,
+                        activeBlockOptions.exIdx!
+                      )
+                    }
+                  >
+                    <Layers size={16} color={theme.accent} style={{ marginRight: 8 }} />
+                    <Text style={[styles.menuItemText, { color: theme.accent }]}>
+                      Extraire en Exercice Individuel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.menuItem, { borderBottomWidth: 0, marginTop: 4 }]}
+                    onPress={() =>
+                      handleDeleteCircuitExercise(
+                        activeBlockOptions.blockId,
+                        activeBlockOptions.exIdx!
+                      )
+                    }
+                  >
+                    <Trash2 size={16} color={theme.danger} style={{ marginRight: 8 }} />
+                    <Text style={[styles.menuItemText, { color: theme.danger }]}>Supprimer de ce circuit</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+            {activeBlockOptions?.type === 'single' && (
+              <>
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'up')}
+                >
+                  <ArrowUp size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Monter l'exercice</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'down')}
+                >
+                  <ArrowDown size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre l'exercice</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleDuplicateSingleBlock(activeBlockOptions.blockId)}
+                >
+                  <Copy size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Dupliquer l'exercice</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomWidth: 0, marginTop: 4 }]}
+                  onPress={() => handleRemoveSingleBlock(activeBlockOptions.blockId)}
+                >
+                  <Trash2 size={16} color={theme.danger} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.danger }]}>Supprimer l'exercice</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- MODAL SÉLECTION DU CIRCUIT POUR "INCLURE DANS LE CIRCUIT" (si multi-circuits) --- */}
+      <Modal
+        visible={targetIncludeSingleBlockId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTargetIncludeSingleBlockId(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setTargetIncludeSingleBlockId(null)}
+        >
+          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.text, textAlign: 'center', marginBottom: 12 }]}>
+              Choisir le circuit destination
+            </Text>
+
+            {circuitBlocks.map((circ, idx) => (
+              <TouchableOpacity
+                key={circ.id}
+                style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                onPress={() =>
+                  targetIncludeSingleBlockId &&
+                  handleIncludeInCircuit(targetIncludeSingleBlockId, circ.id)
+                }
+              >
+                <Zap size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>
+                  {circ.title || `Circuit ${idx + 1}`} ({circ.rounds} tours)
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- MODAL DE SÉLECTION DU TYPE DE SÉRIE --- */}
       <Modal
         visible={activeSetTarget !== null}
         transparent
@@ -552,7 +1331,11 @@ export default function TemplateEditorScreen() {
 
             {activeSetTarget &&
               Object.values(SET_TYPES_CONFIG).map((cfg) => {
-                const currentSet = selectedExercises[activeSetTarget.exIdx]?.sets[activeSetTarget.setIdx];
+                const block = selectedBlocks.find((b) => b.id === activeSetTarget.blockId);
+                const currentSet =
+                  block && block.type === 'single'
+                    ? block.exercise.sets[activeSetTarget.setIdx]
+                    : undefined;
                 const isSelected = currentSet?.type === cfg.type;
 
                 return (
@@ -563,7 +1346,7 @@ export default function TemplateEditorScreen() {
                       { borderBottomColor: theme.border },
                       isSelected && { backgroundColor: theme.surface },
                     ]}
-                    onPress={() => handleUpdateSetType(activeSetTarget.exIdx, activeSetTarget.setIdx, cfg.type)}
+                    onPress={() => handleUpdateSetType(activeSetTarget.blockId, activeSetTarget.setIdx, cfg.type)}
                   >
                     <View style={[styles.typeBadgeCircle, { backgroundColor: cfg.color }]}>
                       <Text style={styles.typeBadgeText}>{cfg.code}</Text>
@@ -582,25 +1365,28 @@ export default function TemplateEditorScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Modal / Volet de Sélection du Groupe Superset */}
+      {/* --- MODAL GROUPE SUPERSET --- */}
       <Modal
-        visible={supersetModalExIdx !== null}
+        visible={supersetModalBlockId !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setSupersetModalExIdx(null)}
+        onRequestClose={() => setSupersetModalBlockId(null)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setSupersetModalExIdx(null)}
+          onPress={() => setSupersetModalBlockId(null)}
         >
           <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <Text style={[styles.modalTitle, { color: theme.text, textAlign: 'center', marginBottom: 12 }]}>
               Groupe Superset
             </Text>
             {['Superset A', 'Superset B', 'Superset C'].map((group) => {
+              const currentBlock = selectedBlocks.find((b) => b.id === supersetModalBlockId);
               const currentGroup =
-                supersetModalExIdx !== null ? selectedExercises[supersetModalExIdx]?.supersetGroup : undefined;
+                currentBlock && currentBlock.type === 'single'
+                  ? currentBlock.exercise.supersetGroup
+                  : undefined;
               const isSelected = currentGroup === group;
               return (
                 <TouchableOpacity
@@ -610,7 +1396,7 @@ export default function TemplateEditorScreen() {
                     { borderBottomColor: theme.border },
                     isSelected && { backgroundColor: theme.surface },
                   ]}
-                  onPress={() => supersetModalExIdx !== null && handleSetSupersetGroup(supersetModalExIdx, group)}
+                  onPress={() => supersetModalBlockId && handleSetSupersetGroup(supersetModalBlockId, group)}
                 >
                   <Text style={[styles.menuItemText, { color: theme.text }]}>{group}</Text>
                   {isSelected && <Check size={16} color={theme.accent} />}
@@ -618,29 +1404,38 @@ export default function TemplateEditorScreen() {
               );
             })}
 
-            {supersetModalExIdx !== null && selectedExercises[supersetModalExIdx]?.supersetGroup && (
-              <TouchableOpacity
-                style={[styles.menuItem, { marginTop: 6, borderBottomWidth: 0 }]}
-                onPress={() => handleSetSupersetGroup(supersetModalExIdx, undefined)}
-              >
-                <Text style={[styles.menuItemText, { color: theme.danger }]}>Retirer du Superset</Text>
-              </TouchableOpacity>
-            )}
+            {supersetModalBlockId !== null &&
+              selectedBlocks.find((b) => b.id === supersetModalBlockId)?.type === 'single' &&
+              (selectedBlocks.find((b) => b.id === supersetModalBlockId) as SingleExerciseBlock).exercise
+                .supersetGroup && (
+                <TouchableOpacity
+                  style={[styles.menuItem, { marginTop: 6, borderBottomWidth: 0 }]}
+                  onPress={() => handleSetSupersetGroup(supersetModalBlockId, undefined)}
+                >
+                  <Text style={[styles.menuItemText, { color: theme.danger }]}>Retirer du Superset</Text>
+                </TouchableOpacity>
+              )}
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Modal Sélection d'Exercice avec Barre de Recherche */}
+      {/* --- MODAL BASE DE DONNÉES D'EXERCICES --- */}
       <Modal
         visible={showPickerModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowPickerModal(false)}
+        onRequestClose={() => {
+          setShowPickerModal(false);
+          setTargetCircuitBlockId(null);
+        }}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowPickerModal(false)}
+          onPress={() => {
+            setShowPickerModal(false);
+            setTargetCircuitBlockId(null);
+          }}
         >
           <View
             style={[
@@ -648,9 +1443,11 @@ export default function TemplateEditorScreen() {
               { backgroundColor: theme.cardBg, borderColor: theme.border },
             ]}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Base de Données d'Exercices</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              {targetCircuitBlockId ? 'Ajouter au Circuit' : "Base de Données d'Exercices"}
+            </Text>
 
-            {/* Barre de Recherche Clavier */}
+            {/* Barre de Recherche */}
             <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <Search size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
               <TextInput
@@ -782,6 +1579,125 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+
+  // --- CARTE CONTENEUR CIRCUIT (STYLE VIOLET EPILOG) ---
+  circuitContainer: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 14,
+  },
+  circuitHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  circuitBadgeC: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  circuitBadgeCText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 15,
+  },
+  circuitTitleText: {
+    fontSize: 15,
+    fontWeight: '900',
+    marginRight: 8,
+  },
+  circuitSteppersBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circuitRestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  circuitRestLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  circuitItemsContainer: {
+    marginBottom: 10,
+  },
+  circuitItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  letterBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  letterBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  circuitItemName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    marginRight: 6,
+  },
+  targetValueInput: {
+    width: 44,
+    height: 32,
+    borderWidth: 1,
+    borderRadius: 6,
+    textAlign: 'center',
+    fontWeight: '800',
+    fontSize: 13,
+    paddingVertical: 0,
+    marginRight: 6,
+  },
+  targetTypeToggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 4,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  targetTypeToggleText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+    textTransform: 'lowercase',
+  },
+  addCircuitExerciseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  addCircuitExerciseBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // --- CARTE EXERCICE INDIVIDUEL ---
   exCard: {
     padding: 12,
     borderRadius: 12,
@@ -816,7 +1732,22 @@ const styles = StyleSheet.create({
   },
   headerActionBtn: {
     padding: 4,
-    marginLeft: 8,
+    marginLeft: 6,
+  },
+  includeCircuitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginRight: 4,
+  },
+  includeCircuitBtnText: {
+    color: '#8B5CF6',
+    fontWeight: '800',
+    fontSize: 11,
+    marginLeft: 4,
   },
   exName: {
     fontSize: 15,
@@ -919,6 +1850,34 @@ const styles = StyleSheet.create({
   addSetBtnText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // --- BOUTONS JUMEAUX AU BAS DE LA SÉANCE ---
+  twinButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    gap: 10,
+  },
+  twinBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  twinBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  // --- MODAUX ---
+  moreOptionsBtn: {
+    padding: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -1033,62 +1992,5 @@ const styles = StyleSheet.create({
   },
   dbItemMuscle: {
     fontSize: 11,
-  },
-  modeSelectorContainer: {
-    flexDirection: 'row',
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 3,
-    marginBottom: 12,
-  },
-  modeOption: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modeOptionActive: {
-    // Dynamiquement coloré avec theme.accent
-  },
-  modeOptionText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  circuitCard: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  circuitCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  circuitControlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  circuitControlLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  circuitStepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  circuitStepperCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circuitValueText: {
-    fontSize: 15,
-    fontWeight: '800',
-    marginHorizontal: 10,
-    minWidth: 50,
-    textAlign: 'center',
   },
 });
