@@ -252,9 +252,6 @@ export default function LiveWorkoutScreen() {
 
     if (resolvedCount >= totalEx) {
       // Round completed!
-      const restTime = block.restBetweenRoundsSeconds || 90;
-      startRestTimer(`Tour ${currentState.currentRound} terminé`, restTime);
-
       if (block.circuitType === 'amrap') {
         updateCircuitState(block.id, (prev) => ({
           ...prev,
@@ -265,22 +262,27 @@ export default function LiveWorkoutScreen() {
           expandedMap: {},
         }));
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      } else if (currentState.currentRound < block.rounds) {
-        updateCircuitState(block.id, (prev) => ({
-          ...prev,
-          currentRound: prev.currentRound + 1,
-          completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
-          activeExerciseIdx: 0,
-          roundStatusMap: {},
-          expandedMap: {},
-        }));
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       } else {
-        updateCircuitState(block.id, (prev) => ({
-          ...prev,
-          completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
-          roundStatusMap: nextStatusMap,
-        }));
+        const restTime = block.restBetweenRoundsSeconds || 90;
+        startRestTimer(`Tour ${currentState.currentRound} terminé`, restTime);
+
+        if (currentState.currentRound < block.rounds) {
+          updateCircuitState(block.id, (prev) => ({
+            ...prev,
+            currentRound: prev.currentRound + 1,
+            completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
+            activeExerciseIdx: 0,
+            roundStatusMap: {},
+            expandedMap: {},
+          }));
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        } else {
+          updateCircuitState(block.id, (prev) => ({
+            ...prev,
+            completedRoundsCount: (prev.completedRoundsCount || 0) + 1,
+            roundStatusMap: nextStatusMap,
+          }));
+        }
       }
     } else {
       let nextIdx = (currentState.activeExerciseIdx + 1) % totalEx;

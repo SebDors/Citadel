@@ -889,40 +889,42 @@ export default function TemplateEditorScreen() {
                   )}
                 </View>
 
-                {/* Repos entre les tours · M:SS avec Steppers -15s / +15s */}
-                <View
-                  style={[
-                    styles.circuitRestRow,
-                    { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE' },
-                  ]}
-                >
-                  <View style={styles.rowAlign}>
-                    <Timer size={14} color={purpleSubText} style={{ marginRight: 6 }} />
-                    <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
-                      Repos entre les tours ·{' '}
-                      <Text style={{ fontWeight: '900' }}>
-                        {formatMinutesSeconds(block.restBetweenRoundsSeconds)}
+                {/* Repos entre les tours · M:SS avec Steppers -15s / +15s (Masqué si AMRAP) */}
+                {block.circuitType !== 'amrap' && (
+                  <View
+                    style={[
+                      styles.circuitRestRow,
+                      { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE' },
+                    ]}
+                  >
+                    <View style={styles.rowAlign}>
+                      <Timer size={14} color={purpleSubText} style={{ marginRight: 6 }} />
+                      <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                        Repos entre les tours ·{' '}
+                        <Text style={{ fontWeight: '900' }}>
+                          {formatMinutesSeconds(block.restBetweenRoundsSeconds)}
+                        </Text>
                       </Text>
-                    </Text>
+                    </View>
+                    <View style={styles.rowAlign}>
+                      <TouchableOpacity
+                        style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                        onPress={() => handleAdjustCircuitRest(block.id, -15)}
+                      >
+                        <Text style={[styles.smallStepperText, { color: theme.text }]}>-15s</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.smallStepperBtn,
+                          { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                        ]}
+                        onPress={() => handleAdjustCircuitRest(block.id, 15)}
+                      >
+                        <Text style={[styles.smallStepperText, { color: theme.text }]}>+15s</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.rowAlign}>
-                    <TouchableOpacity
-                      style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
-                      onPress={() => handleAdjustCircuitRest(block.id, -15)}
-                    >
-                      <Text style={[styles.smallStepperText, { color: theme.text }]}>-15s</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.smallStepperBtn,
-                        { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
-                      ]}
-                      onPress={() => handleAdjustCircuitRest(block.id, 15)}
-                    >
-                      <Text style={[styles.smallStepperText, { color: theme.text }]}>+15s</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                )}
 
                 {/* Liste compacte des exercices du circuit */}
                 <View style={styles.circuitItemsContainer}>
