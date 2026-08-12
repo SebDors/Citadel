@@ -1414,7 +1414,7 @@ export default function TemplateEditorScreen() {
               >
                 <Zap size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
                 <Text style={[styles.menuItemText, { color: theme.text }]}>
-                  {circ.title || `Circuit ${idx + 1}`} ({circ.rounds} tours)
+                  {circ.title || `Circuit ${idx + 1}`} ({circ.circuitType === 'amrap' ? `${circ.amrapDurationMinutes || 12} min` : `${circ.rounds} tour${circ.rounds > 1 ? 's' : ''}`})
                 </Text>
               </TouchableOpacity>
             ))}

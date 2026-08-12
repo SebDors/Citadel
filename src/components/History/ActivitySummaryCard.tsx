@@ -59,7 +59,7 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
       : (session.isCircuit && session.title?.toLowerCase().includes('amrap'));
 
     const isCircuitRound = !isAMRAP && (circuitBlock !== undefined || session.isCircuit === true);
-    const circuitRounds = circuitBlock ? circuitBlock.rounds : (session.circuitRounds || 0);
+    const circuitRounds = session.completedRoundsCount || session.circuitRounds || (circuitBlock?.rounds) || 0;
 
     const blockSummaries: string[] = [];
     const targetMusclesSet = new Set<string>();
@@ -72,10 +72,13 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
         if (b.exercise.primaryMuscle) targetMusclesSet.add(b.exercise.primaryMuscle);
         if (b.exercise.targetMuscles) b.exercise.targetMuscles.forEach((m) => targetMusclesSet.add(m));
       } else if (b.type === 'circuit') {
-        const title = b.title || 'Circuit';
-        const roundsText = `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
+        const isAmrap = b.circuitType === 'amrap';
+        const title = isAmrap ? 'Circuit AMRAP' : 'Circuit';
+        const roundsOrDurationText = isAmrap
+          ? `${b.amrapDurationMinutes || 20} min`
+          : `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
         const exosText = `${b.exercises.length} exo${b.exercises.length > 1 ? 's' : ''}`;
-        blockSummaries.push(`${title} (${roundsText} · ${exosText})`);
+        blockSummaries.push(`${title} (${roundsOrDurationText} · ${exosText})`);
 
         b.exercises.forEach((ex) => {
           if (ex.primaryMuscle) targetMusclesSet.add(ex.primaryMuscle);

@@ -262,6 +262,15 @@ export default function LiveWorkoutScreen() {
   }
 
   const handleFinish = async () => {
+    const totalCompletedRounds = Object.values(circuitStates).reduce(
+      (sum, state) => sum + (state.completedRoundsCount || 0),
+      0
+    );
+
+    if (activeSession) {
+      activeSession.completedRoundsCount = totalCompletedRounds;
+    }
+
     await finishWorkout();
     router.replace('/(tabs)/history');
   };

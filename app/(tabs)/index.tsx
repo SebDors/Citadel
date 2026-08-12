@@ -193,10 +193,13 @@ export default function WorkoutTab() {
       } else if (block.type === 'circuit') {
         hasCircuit = true;
         totalExercises += block.exercises.length;
-        const title = block.title || 'Circuit';
-        const roundsText = `${block.rounds} tour${block.rounds > 1 ? 's' : ''}`;
+        const isAmrap = block.circuitType === 'amrap';
+        const title = isAmrap ? 'Circuit AMRAP' : 'Circuit';
+        const roundsOrDurationText = isAmrap
+          ? `${block.amrapDurationMinutes || 20} min`
+          : `${block.rounds} tour${block.rounds > 1 ? 's' : ''}`;
         const exosText = `${block.exercises.length} exo${block.exercises.length > 1 ? 's' : ''}`;
-        blockSummaries.push(`${title} (${roundsText} · ${exosText})`);
+        blockSummaries.push(`${title} (${roundsOrDurationText} · ${exosText})`);
       }
     });
 

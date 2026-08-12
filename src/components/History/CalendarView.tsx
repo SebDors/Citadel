@@ -251,7 +251,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                     : (session.isCircuit && session.title?.toLowerCase().includes('amrap'));
 
                   const isCircuitRound = !isAMRAP && (circuitBlock !== undefined || session.isCircuit === true);
-                  const circuitRounds = circuitBlock ? circuitBlock.rounds : (session.circuitRounds || 0);
+                  const circuitRounds = session.completedRoundsCount || session.circuitRounds || (circuitBlock?.rounds) || 0;
 
                   const fallbackSetsCount = blocks.reduce((sum, b) => {
                     if (b.type === 'single') return sum + (b.exercise.sets?.length || 0);
@@ -268,10 +268,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                     if (b.type === 'single') {
                       return b.exercise.exerciseName;
                     } else if (b.type === 'circuit') {
-                      const title = b.title || 'Circuit';
-                      const roundsText = `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
+                      const isAmrap = b.circuitType === 'amrap';
+                      const title = isAmrap ? 'Circuit AMRAP' : 'Circuit';
+                      const roundsOrDurationText = isAmrap
+                        ? `${b.amrapDurationMinutes || 20} min`
+                        : `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
                       const exosText = `${b.exercises.length} exo${b.exercises.length > 1 ? 's' : ''}`;
-                      return `${title} (${roundsText} · ${exosText})`;
+                      return `${title} (${roundsOrDurationText} · ${exosText})`;
                     }
                     return '';
                   }).filter(Boolean);
