@@ -19,7 +19,35 @@ import { RestTimerBar } from '../src/components/Workout/RestTimerBar';
 import { Button } from '../src/components/UI/Button';
 import { useRouter } from 'expo-router';
 import { EXERCISE_DATABASE, SharedExercise } from '../src/constants/exerciseDatabase';
-import { Plus, ArrowLeft, Check, Layers, Play, Zap, Repeat, Search, SkipForward, ChevronDown, ChevronUp } from 'lucide-react-native';
+import {
+  getSessionBlocks,
+  WorkoutBlock,
+  CircuitBlock,
+  SingleExerciseBlock,
+  CircuitExerciseItem,
+} from '../src/types';
+import {
+  Plus,
+  ArrowLeft,
+  Check,
+  Repeat,
+  Search,
+  SkipForward,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react-native';
+
+const EPILOG_PURPLE = '#8B5CF6';
+const EPILOG_PURPLE_BG = 'rgba(139, 92, 246, 0.12)';
+const EPILOG_PURPLE_BORDER = 'rgba(139, 92, 246, 0.4)';
+
+interface CircuitState {
+  currentRound: number;
+  activeExerciseIdx: number;
+  roundStatusMap: Record<string, 'pending' | 'validated' | 'skipped'>;
+  expandedMap: Record<string, boolean>;
+  customValues: Record<string, number>;
+}
 
 export default function LiveWorkoutScreen() {
   const {
@@ -43,39 +71,70 @@ export default function LiveWorkoutScreen() {
 
   const [showAddExModal, setShowAddExModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCircuitRound, setActiveCircuitRound] = useState(1);
-  const [currentCircuitIdx, setCurrentCircuitIdx] = useState(0);
 
-  // Status for each exercise in the current circuit round: 'pending' | 'validated' | 'skipped'
-  const [roundStatusMap, setRoundStatusMap] = useState<Record<string, 'pending' | 'validated' | 'skipped'>>({});
-  // Set of exercise IDs manually expanded when collapsed
-  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
+  // Local state per CircuitBlock ID
+  const [circuitStates, setCircuitStates] = useState<Record<string, CircuitState>>({});
 
-  const totalRounds = activeSession?.circuitRounds || 3;
+  // Extract blocks sequentially (mixed single exercises & circuits)
+  const blocks = useMemo(() => {
+    if (!activeSession) return [];
+    return getSessionBlocks(activeSession);
+  }, [activeSession]);
 
-  // Check if all sets/rounds in the session are finished
-  const isAllCompleted = useMemo(() => {
-    const sessionExercises = activeSession?.exercises || [];
-    if (!activeSession || sessionExercises.length === 0) return false;
-
-    if (activeSession.isCircuit) {
-      const totalEx = sessionExercises.length;
-      const resolvedCount = sessionExercises.filter((ex) => {
-        const status = roundStatusMap[ex.id];
-        return status === 'validated' || status === 'skipped';
-      }).length;
-      const allSetsCompleted = sessionExercises.every(
-        (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
-      );
-      return (activeCircuitRound >= totalRounds && resolvedCount >= totalEx) || allSetsCompleted;
-    }
-
-    return sessionExercises.every(
-      (ex) => ex.sets.length > 0 && ex.sets.every((s) => s.completed)
+  // Helper to get state of a specific CircuitBlock
+  const getCircuitState = (blockId: string): CircuitState => {
+    return (
+      circuitStates[blockId] || {
+        currentRound: 1,
+        activeExerciseIdx: 0,
+        roundStatusMap: {},
+        expandedMap: {},
+        customValues: {},
+      }
     );
-  }, [activeSession, activeCircuitRound, totalRounds, roundStatusMap]);
+  };
 
-  // Filter 52 exercises for search modal
+  const updateCircuitState = (
+    blockId: string,
+    updater: (prev: CircuitState) => CircuitState
+  ) => {
+    setCircuitStates((prev) => {
+      const current = prev[blockId] || {
+        currentRound: 1,
+        activeExerciseIdx: 0,
+        roundStatusMap: {},
+        expandedMap: {},
+        customValues: {},
+      };
+      return {
+        ...prev,
+        [blockId]: updater(current),
+      };
+    });
+  };
+
+  // Check if all blocks (single exercises and circuits) are completed
+  const isAllCompleted = useMemo(() => {
+    if (!activeSession || blocks.length === 0) return false;
+
+    return blocks.every((block) => {
+      if (block.type === 'single') {
+        const sets = block.exercise.sets || [];
+        return sets.length > 0 && sets.every((s) => s.completed);
+      } else if (block.type === 'circuit') {
+        const cState = getCircuitState(block.id);
+        const totalEx = block.exercises.length;
+        const resolvedCount = block.exercises.filter((ex) => {
+          const st = cState.roundStatusMap[ex.id];
+          return st === 'validated' || st === 'skipped';
+        }).length;
+        return cState.currentRound >= block.rounds && resolvedCount >= totalEx;
+      }
+      return false;
+    });
+  }, [activeSession, blocks, circuitStates]);
+
+  // Filter exercises database for search modal
   const filteredDatabase = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return EXERCISE_DATABASE;
@@ -90,7 +149,15 @@ export default function LiveWorkoutScreen() {
 
   if (!activeSession) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0 }]}>
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: theme.background,
+            paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
+          },
+        ]}
+      >
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune séance en cours</Text>
           <Button title="Retour à l'accueil" variant="primary" onPress={() => router.replace('/(tabs)')} />
@@ -115,88 +182,114 @@ export default function LiveWorkoutScreen() {
     setSearchQuery('');
   };
 
-  // Helper to check round completion and advance
-  const advanceCircuitAfterAction = (
+  // Advance logic for CircuitBlock after an exercise action (Validate / Pass)
+  const advanceCircuitBlock = (
+    block: CircuitBlock,
     nextStatusMap: Record<string, 'pending' | 'validated' | 'skipped'>,
-    currentIdx: number
+    currentState: CircuitState
   ) => {
-    if (!activeSession) return;
-    const sessionExercises = activeSession.exercises || [];
-    const totalEx = sessionExercises.length;
-    // Count how many exercises are resolved (validated or skipped)
-    const resolvedCount = sessionExercises.filter((ex) => {
-      const status = nextStatusMap[ex.id];
-      return status === 'validated' || status === 'skipped';
+    const totalEx = block.exercises.length;
+    const resolvedCount = block.exercises.filter((ex) => {
+      const st = nextStatusMap[ex.id];
+      return st === 'validated' || st === 'skipped';
     }).length;
 
     if (resolvedCount >= totalEx) {
-      // TOUR DE CIRCUIT TERMINÉ !
-      const restTime = activeSession.restBetweenRoundsSeconds || 105;
-      startRestTimer(`Tour ${activeCircuitRound} terminé`, restTime);
+      // Round completed!
+      const restTime = block.restBetweenRoundsSeconds || 120;
+      startRestTimer(`Tour ${currentState.currentRound} terminé`, restTime);
 
-      if (activeCircuitRound < totalRounds) {
-        // Pass to next round, reset statuses, reset index, auto-scroll to top!
-        setActiveCircuitRound((prev) => prev + 1);
-        setRoundStatusMap({});
-        setExpandedMap({});
-        setCurrentCircuitIdx(0);
+      if (currentState.currentRound < block.rounds) {
+        // Advance to next round
+        updateCircuitState(block.id, (prev) => ({
+          ...prev,
+          currentRound: prev.currentRound + 1,
+          activeExerciseIdx: 0,
+          roundStatusMap: {},
+          expandedMap: {},
+        }));
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       } else {
         // Circuit fully complete
-        setRoundStatusMap(nextStatusMap);
+        updateCircuitState(block.id, (prev) => ({
+          ...prev,
+          roundStatusMap: nextStatusMap,
+        }));
       }
     } else {
       // Find next pending exercise
-      let nextIdx = (currentIdx + 1) % totalEx;
+      let nextIdx = (currentState.activeExerciseIdx + 1) % totalEx;
       let count = 0;
       while (
-        (nextStatusMap[sessionExercises[nextIdx]?.id] === 'validated' ||
-          nextStatusMap[sessionExercises[nextIdx]?.id] === 'skipped') &&
+        (nextStatusMap[block.exercises[nextIdx]?.id] === 'validated' ||
+          nextStatusMap[block.exercises[nextIdx]?.id] === 'skipped') &&
         count < totalEx
       ) {
         nextIdx = (nextIdx + 1) % totalEx;
         count++;
       }
-      setCurrentCircuitIdx(nextIdx);
+      updateCircuitState(block.id, (prev) => ({
+        ...prev,
+        activeExerciseIdx: nextIdx,
+        roundStatusMap: nextStatusMap,
+      }));
     }
   };
 
-  const handleValidateCircuitExercise = (exId: string, setId: string, idx: number) => {
-    // 1. Toggle set completion
-    toggleSetComplete(exId, setId);
-
-    // 2. Mark exercise as validated in current round
-    const nextStatus = { ...roundStatusMap, [exId]: 'validated' as const };
-    setRoundStatusMap(nextStatus);
-
-    // 3. Advance to next pending exercise or next round with auto scroll to top
-    advanceCircuitAfterAction(nextStatus, idx);
+  const handleValidateCircuitExercise = (block: CircuitBlock, exId: string) => {
+    const currentState = getCircuitState(block.id);
+    const nextStatus = { ...currentState.roundStatusMap, [exId]: 'validated' as const };
+    advanceCircuitBlock(block, nextStatus, currentState);
   };
 
-  const handlePassCircuitExercise = (exId: string, idx: number) => {
-    // Mark exercise as skipped for this round
-    const nextStatus = { ...roundStatusMap, [exId]: 'skipped' as const };
-    setRoundStatusMap(nextStatus);
-
-    // Advance to next pending exercise or next round with auto scroll to top
-    advanceCircuitAfterAction(nextStatus, idx);
+  const handlePassCircuitExercise = (block: CircuitBlock, exId: string) => {
+    const currentState = getCircuitState(block.id);
+    const nextStatus = { ...currentState.roundStatusMap, [exId]: 'skipped' as const };
+    advanceCircuitBlock(block, nextStatus, currentState);
   };
 
-  const handleUnvalidateCircuitExercise = (exId: string, setId: string, idx: number) => {
-    toggleSetComplete(exId, setId);
-    setRoundStatusMap((prev) => ({ ...prev, [exId]: 'pending' }));
-    setCurrentCircuitIdx(idx);
-    setExpandedMap((prev) => ({ ...prev, [exId]: false }));
+  const handleUnvalidateCircuitExercise = (block: CircuitBlock, exId: string, idx: number) => {
+    updateCircuitState(block.id, (prev) => ({
+      ...prev,
+      activeExerciseIdx: idx,
+      roundStatusMap: { ...prev.roundStatusMap, [exId]: 'pending' },
+      expandedMap: { ...prev.expandedMap, [exId]: false },
+    }));
   };
 
-  const handleUnpassCircuitExercise = (exId: string, idx: number) => {
-    setRoundStatusMap((prev) => ({ ...prev, [exId]: 'pending' }));
-    setCurrentCircuitIdx(idx);
-    setExpandedMap((prev) => ({ ...prev, [exId]: false }));
+  const handleUnpassCircuitExercise = (block: CircuitBlock, exId: string, idx: number) => {
+    updateCircuitState(block.id, (prev) => ({
+      ...prev,
+      activeExerciseIdx: idx,
+      roundStatusMap: { ...prev.roundStatusMap, [exId]: 'pending' },
+      expandedMap: { ...prev.expandedMap, [exId]: false },
+    }));
+  };
+
+  const handleToggleExpandCircuitExercise = (blockId: string, exId: string) => {
+    updateCircuitState(blockId, (prev) => ({
+      ...prev,
+      expandedMap: { ...prev.expandedMap, [exId]: !prev.expandedMap[exId] },
+    }));
+  };
+
+  const handleUpdateCustomValue = (blockId: string, exId: string, value: number) => {
+    updateCircuitState(blockId, (prev) => ({
+      ...prev,
+      customValues: { ...prev.customValues, [exId]: value },
+    }));
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0 }]}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.background,
+          paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
+        },
+      ]}
+    >
       {/* Top Bar Navigation */}
       <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -211,226 +304,297 @@ export default function LiveWorkoutScreen() {
         {/* 1. Carte d'En-tête de Séance (Fixe en haut) */}
         <LiveWorkoutHeader session={activeSession} onFinish={handleFinish} onCancel={handleCancel} />
 
-        {/* MODE CIRCUIT (Couleurs Sauge/Accent, no violet) */}
-        {activeSession.isCircuit ? (
-          <View style={[styles.circuitContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <View style={[styles.circuitBadgeHeader, { backgroundColor: `${theme.accent}20` }]}>
-              <Repeat size={14} color={theme.accent} />
-              <Text style={[styles.circuitBadgeText, { color: theme.accent }]}>⚡ CIRCUIT</Text>
-            </View>
+        {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
+        {blocks.map((block, blockIdx) => {
+          if (block.type === 'single') {
+            // Rendu Exercice Individuel Standard (SingleExerciseBlock)
+            const ex = block.exercise;
+            return (
+              <ExerciseCard
+                key={block.id || `single_${ex.id}_${blockIdx}`}
+                exercise={ex}
+                onUpdateSet={(setId, field, val) => updateSet(ex.id, setId, field, val)}
+                onToggleSetComplete={(setId) => toggleSetComplete(ex.id, setId)}
+                onAddSet={() => addSet(ex.id)}
+                onRemoveSet={(setId) => removeSet(ex.id, setId)}
+                onDuplicateExercise={() => duplicateExercise(ex.id)}
+                onRemoveExercise={() => removeExercise(ex.id)}
+                onUpdateRestTime={(newRest) => updateExerciseRestTime(ex.id, newRest)}
+                onSetSupersetGroup={(grp) => setExerciseSupersetGroup(ex.id, grp)}
+              />
+            );
+          } else if (block.type === 'circuit') {
+            // Rendu Bloc Circuit (CircuitBlock) - Moteur Violet Epilog
+            const circuitState = getCircuitState(block.id);
+            const { currentRound, activeExerciseIdx, roundStatusMap, expandedMap, customValues } =
+              circuitState;
+            const totalRounds = block.rounds || 3;
 
-            <Text style={[styles.circuitTitle, { color: theme.text }]}>{activeSession.title}</Text>
-            <Text style={[styles.circuitSub, { color: theme.textMuted }]}>
-              {(activeSession.exercises || []).length} EXOS · {totalRounds} TOURS
-            </Text>
-
-            {/* Tour en cours et bar de progression */}
-            <View style={[styles.roundProgressBox, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.roundLabel, { color: theme.accent }]}>
-                TOUR EN COURS : {activeCircuitRound} / {totalRounds}
-              </Text>
-              <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    { backgroundColor: theme.accent, width: `${(activeCircuitRound / totalRounds) * 100}%` },
-                  ]}
-                />
-              </View>
-            </View>
-
-            {/* Liste des exercices du circuit */}
-            {(activeSession.exercises || []).map((ex, idx) => {
-              const currentSet = ex.sets[activeCircuitRound - 1] || ex.sets[0];
-              const status = roundStatusMap[ex.id] || 'pending';
-              const isCurrentActive = idx === currentCircuitIdx && status === 'pending';
-              const isResolved = status === 'validated' || status === 'skipped';
-              const isForceExpanded = !!expandedMap[ex.id];
-
-              // Réduction de carte de ~50% quand l'exercice est validé ou passé
-              if (isResolved && !isForceExpanded) {
-                return (
-                  <TouchableOpacity
-                    key={ex.id}
-                    activeOpacity={0.7}
-                    style={[
-                      styles.circuitItemCollapsedCard,
-                      { backgroundColor: theme.surface, borderColor: status === 'validated' ? theme.accent : theme.border },
-                    ]}
-                    onPress={() => setExpandedMap((prev) => ({ ...prev, [ex.id]: true }))}
-                  >
-                    <View style={styles.collapsedLeft}>
-                      <View style={[styles.numberCircle, { backgroundColor: status === 'validated' ? theme.accent : theme.border }]}>
-                        <Text style={[styles.numberText, { color: status === 'validated' ? '#FFFFFF' : theme.text }]}>
-                          {idx + 1}
-                        </Text>
-                      </View>
-                      <View style={{ marginLeft: 10 }}>
-                        <Text style={[styles.collapsedExName, { color: theme.text }]} numberOfLines={1}>
-                          {ex.exerciseName}
-                        </Text>
-                        <Text style={[styles.collapsedSub, { color: theme.textMuted }]}>
-                          {currentSet?.reps !== undefined ? `${currentSet.reps} reps` : '10 reps'} · {ex.primaryMuscle}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.collapsedRight}>
-                      {status === 'validated' ? (
-                        <View style={[styles.statusBadge, { backgroundColor: theme.accent }]}>
-                          <Check size={12} color="#FFFFFF" />
-                          <Text style={styles.statusBadgeText}>Validé</Text>
-                        </View>
-                      ) : (
-                        <View style={[styles.statusBadge, { backgroundColor: theme.border }]}>
-                          <SkipForward size={12} color={theme.textMuted} />
-                          <Text style={[styles.statusBadgeText, { color: theme.textMuted }]}>Passé</Text>
-                        </View>
-                      )}
-                      <ChevronDown size={16} color={theme.textMuted} style={{ marginLeft: 6 }} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              }
-
-              return (
-                <View
-                  key={ex.id}
-                  style={[
-                    styles.circuitItemCard,
-                    { backgroundColor: theme.surface, borderColor: isCurrentActive ? theme.accent : theme.border },
-                    isCurrentActive && { borderWidth: 2.5 },
-                  ]}
-                >
-                  <View style={styles.circuitItemTop}>
-                    <View style={[styles.numberCircle, { backgroundColor: isCurrentActive ? theme.accent : theme.cardBg }]}>
-                      <Text style={[styles.numberText, { color: isCurrentActive ? '#FFFFFF' : theme.text }]}>
-                        {idx + 1}
-                      </Text>
-                    </View>
-
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={[styles.circuitExName, { color: theme.text }]}>{ex.exerciseName}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                        <TextInput
-                          style={[styles.repsInput, { color: theme.text, borderColor: theme.border }]}
-                          keyboardType="numeric"
-                          value={currentSet?.reps !== undefined ? String(currentSet.reps) : ''}
-                          onChangeText={(val) => updateSet(ex.id, currentSet.id, 'reps', parseInt(val, 10) || 0)}
-                          placeholder="10"
-                          placeholderTextColor={theme.textMuted}
-                        />
-                        <Text style={[styles.circuitExSub, { color: theme.textMuted, marginLeft: 6 }]}>
-                          reps · {ex.primaryMuscle}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Round status dots */}
-                    <View style={styles.dotsRow}>
-                      {Array.from({ length: totalRounds }).map((_, rIdx) => (
-                        <View
-                          key={rIdx}
-                          style={[
-                            styles.roundDot,
-                            { backgroundColor: ex.sets[rIdx]?.completed ? theme.accent : theme.border },
-                          ]}
-                        />
-                      ))}
-                    </View>
-
-                    {isResolved && (
-                      <TouchableOpacity
-                        style={{ padding: 4, marginLeft: 4 }}
-                        onPress={() => setExpandedMap((prev) => ({ ...prev, [ex.id]: false }))}
-                      >
-                        <ChevronUp size={16} color={theme.textMuted} />
-                      </TouchableOpacity>
-                    )}
+            return (
+              <View
+                key={block.id || `circuit_${blockIdx}`}
+                style={[
+                  styles.circuitContainer,
+                  { backgroundColor: theme.cardBg, borderColor: EPILOG_PURPLE_BORDER },
+                ]}
+              >
+                {/* En-tête Moteur Violet Epilog avec Badge C */}
+                <View style={styles.epilogHeaderRow}>
+                  <View style={styles.epilogBadge}>
+                    <Text style={styles.epilogBadgeText}>C</Text>
                   </View>
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={[styles.epilogTag, { color: EPILOG_PURPLE }]}>CIRCUIT EPILOG</Text>
+                  </View>
+                </View>
 
-                  {/* Action Buttons: [Valider] et [Passer] pour l'exercice en cours */}
-                  {isCurrentActive && (
-                    <View style={styles.circuitActionsRow}>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={[
-                          styles.circuitDoneBtn,
-                          { flex: 1, backgroundColor: theme.accent, marginRight: 6 },
-                        ]}
-                        onPress={() => handleValidateCircuitExercise(ex.id, currentSet.id, idx)}
-                      >
-                        <Check size={16} color="#FFFFFF" />
-                        <Text style={styles.circuitDoneBtnText}>Valider</Text>
-                      </TouchableOpacity>
+                <Text style={[styles.circuitTitle, { color: theme.text }]}>{block.title}</Text>
+                <Text style={[styles.circuitSub, { color: theme.textMuted }]}>
+                  {block.exercises.length} EXOS · {totalRounds} TOURS
+                </Text>
 
+                {/* Tour en cours et barre de progression */}
+                <View style={[styles.roundProgressBox, { backgroundColor: EPILOG_PURPLE_BG }]}>
+                  <Text style={[styles.roundLabel, { color: EPILOG_PURPLE }]}>
+                    TOUR EN COURS : {currentRound} / {totalRounds}
+                  </Text>
+                  <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        {
+                          backgroundColor: EPILOG_PURPLE,
+                          width: `${(currentRound / totalRounds) * 100}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Liste des exercices du circuit */}
+                {block.exercises.map((ex: CircuitExerciseItem, idx: number) => {
+                  const status = roundStatusMap[ex.id] || 'pending';
+                  const isCurrentActive = idx === activeExerciseIdx && status === 'pending';
+                  const isResolved = status === 'validated' || status === 'skipped';
+                  const isForceExpanded = !!expandedMap[ex.id];
+
+                  const targetVal = customValues[ex.id] ?? ex.targetValue ?? 10;
+                  const valLabel = ex.targetType === 'time' ? `${targetVal}s` : `${targetVal} reps`;
+
+                  // Carte réduite / compacte (~50% de hauteur) quand l'exercice est validé ou passé (et non force-déplié)
+                  if (isResolved && !isForceExpanded) {
+                    return (
                       <TouchableOpacity
+                        key={ex.id}
                         activeOpacity={0.7}
                         style={[
-                          styles.circuitPassBtn,
-                          { borderColor: theme.border, backgroundColor: theme.cardBg },
+                          styles.circuitItemCollapsedCard,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: status === 'validated' ? EPILOG_PURPLE : theme.border,
+                          },
                         ]}
-                        onPress={() => handlePassCircuitExercise(ex.id, idx)}
+                        onPress={() => handleToggleExpandCircuitExercise(block.id, ex.id)}
                       >
-                        <SkipForward size={14} color={theme.textMuted} />
-                        <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passer</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                        <View style={styles.collapsedLeft}>
+                          <View
+                            style={[
+                              styles.numberCircle,
+                              { backgroundColor: status === 'validated' ? EPILOG_PURPLE : theme.border },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.numberText,
+                                { color: status === 'validated' ? '#FFFFFF' : theme.text },
+                              ]}
+                            >
+                              {idx + 1}
+                            </Text>
+                          </View>
+                          <View style={{ marginLeft: 10 }}>
+                            <Text style={[styles.collapsedExName, { color: theme.text }]} numberOfLines={1}>
+                              {ex.exerciseName}
+                            </Text>
+                            <Text style={[styles.collapsedSub, { color: theme.textMuted }]}>
+                              {valLabel} · {ex.primaryMuscle}
+                            </Text>
+                          </View>
+                        </View>
 
-                  {/* Carte ré-expansée (isForceExpanded && isResolved) */}
-                  {isForceExpanded && isResolved && !isCurrentActive && (
-                    <View style={styles.circuitActionsRow}>
-                      {status === 'validated' ? (
-                        <TouchableOpacity
-                          activeOpacity={0.8}
+                        <View style={styles.collapsedRight}>
+                          {status === 'validated' ? (
+                            <View style={[styles.statusBadge, { backgroundColor: EPILOG_PURPLE }]}>
+                              <Check size={12} color="#FFFFFF" />
+                              <Text style={styles.statusBadgeText}>Validé</Text>
+                            </View>
+                          ) : (
+                            <View style={[styles.statusBadge, { backgroundColor: theme.border }]}>
+                              <SkipForward size={12} color={theme.textMuted} />
+                              <Text style={[styles.statusBadgeText, { color: theme.textMuted }]}>
+                                Passé
+                              </Text>
+                            </View>
+                          )}
+                          <ChevronDown size={16} color={theme.textMuted} style={{ marginLeft: 6 }} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  // Carte d'exercice complète (Actif ou Ré-expansée)
+                  return (
+                    <View
+                      key={ex.id}
+                      style={[
+                        styles.circuitItemCard,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: isCurrentActive ? EPILOG_PURPLE : theme.border,
+                        },
+                        isCurrentActive && { borderWidth: 2.5 },
+                      ]}
+                    >
+                      <View style={styles.circuitItemTop}>
+                        <View
                           style={[
-                            styles.circuitDoneBtn,
-                            { flex: 1, backgroundColor: theme.accent },
+                            styles.numberCircle,
+                            { backgroundColor: isCurrentActive ? EPILOG_PURPLE : theme.cardBg },
                           ]}
-                          onPress={() => handleUnvalidateCircuitExercise(ex.id, currentSet.id, idx)}
                         >
-                          <Check size={16} color="#FFFFFF" />
-                          <Text style={styles.circuitDoneBtnText}>Validé</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          style={[
-                            styles.circuitPassBtn,
-                            { flex: 1, borderColor: theme.border, backgroundColor: theme.cardBg },
-                          ]}
-                          onPress={() => handleUnpassCircuitExercise(ex.id, idx)}
-                        >
-                          <SkipForward size={14} color={theme.textMuted} />
-                          <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>Passé</Text>
-                        </TouchableOpacity>
+                          <Text
+                            style={[
+                              styles.numberText,
+                              { color: isCurrentActive ? '#FFFFFF' : theme.text },
+                            ]}
+                          >
+                            {idx + 1}
+                          </Text>
+                        </View>
+
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={[styles.circuitExName, { color: theme.text }]}>
+                            {ex.exerciseName}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <TextInput
+                              style={[styles.repsInput, { color: theme.text, borderColor: theme.border }]}
+                              keyboardType="numeric"
+                              value={String(targetVal)}
+                              onChangeText={(val) =>
+                                handleUpdateCustomValue(block.id, ex.id, parseInt(val, 10) || 0)
+                              }
+                              placeholder="10"
+                              placeholderTextColor={theme.textMuted}
+                            />
+                            <Text style={[styles.circuitExSub, { color: theme.textMuted, marginLeft: 6 }]}>
+                              {ex.targetType === 'time' ? 'sec' : 'reps'} · {ex.primaryMuscle}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Round status dots */}
+                        <View style={styles.dotsRow}>
+                          {Array.from({ length: totalRounds }).map((_, rIdx) => (
+                            <View
+                              key={rIdx}
+                              style={[
+                                styles.roundDot,
+                                {
+                                  backgroundColor:
+                                    rIdx + 1 < currentRound ||
+                                    (rIdx + 1 === currentRound && status === 'validated')
+                                      ? EPILOG_PURPLE
+                                      : theme.border,
+                                },
+                              ]}
+                            />
+                          ))}
+                        </View>
+
+                        {isResolved && isForceExpanded && (
+                          <TouchableOpacity
+                            style={{ padding: 4, marginLeft: 4 }}
+                            onPress={() => handleToggleExpandCircuitExercise(block.id, ex.id)}
+                          >
+                            <ChevronUp size={16} color={theme.textMuted} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Action Buttons: [Valider] et [Passer] pour l'exercice actif */}
+                      {isCurrentActive && (
+                        <View style={styles.circuitActionsRow}>
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            style={[
+                              styles.circuitDoneBtn,
+                              { flex: 1, backgroundColor: EPILOG_PURPLE, marginRight: 6 },
+                            ]}
+                            onPress={() => handleValidateCircuitExercise(block, ex.id)}
+                          >
+                            <Check size={16} color="#FFFFFF" />
+                            <Text style={styles.circuitDoneBtnText}>Valider</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            style={[
+                              styles.circuitPassBtn,
+                              { borderColor: theme.border, backgroundColor: theme.cardBg },
+                            ]}
+                            onPress={() => handlePassCircuitExercise(block, ex.id)}
+                          >
+                            <SkipForward size={14} color={theme.textMuted} />
+                            <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>
+                              Passer
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {/* Carte ré-expansée pour corriger / décocher une erreur */}
+                      {isForceExpanded && isResolved && !isCurrentActive && (
+                        <View style={styles.circuitActionsRow}>
+                          {status === 'validated' ? (
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              style={[
+                                styles.circuitDoneBtn,
+                                { flex: 1, backgroundColor: EPILOG_PURPLE },
+                              ]}
+                              onPress={() => handleUnvalidateCircuitExercise(block, ex.id, idx)}
+                            >
+                              <Check size={16} color="#FFFFFF" />
+                              <Text style={styles.circuitDoneBtnText}>Validé (Cliquer pour annuler)</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              style={[
+                                styles.circuitPassBtn,
+                                { flex: 1, borderColor: theme.border, backgroundColor: theme.cardBg },
+                              ]}
+                              onPress={() => handleUnpassCircuitExercise(block, ex.id, idx)}
+                            >
+                              <SkipForward size={14} color={theme.textMuted} />
+                              <Text style={[styles.circuitPassBtnText, { color: theme.textMuted }]}>
+                                Passé (Cliquer pour reprendre)
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       )}
                     </View>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          /* SÉANCE NORMALE OU LIBRE */
-          (activeSession.exercises || []).map((ex) => (
-            <ExerciseCard
-              key={ex.id}
-              exercise={ex}
-              onUpdateSet={(setId, field, val) => updateSet(ex.id, setId, field, val)}
-              onToggleSetComplete={(setId) => toggleSetComplete(ex.id, setId)}
-              onAddSet={() => addSet(ex.id)}
-              onRemoveSet={(setId) => removeSet(ex.id, setId)}
-              onDuplicateExercise={() => duplicateExercise(ex.id)}
-              onRemoveExercise={() => removeExercise(ex.id)}
-              onUpdateRestTime={(newRest) => updateExerciseRestTime(ex.id, newRest)}
-              onSetSupersetGroup={(grp) => setExerciseSupersetGroup(ex.id, grp)}
-            />
-          ))
-        )}
+                  );
+                })}
+              </View>
+            );
+          }
+          return null;
+        })}
 
-        {/* Bouton Ajouter un exercice */}
+        {/* Bouton Ajouter un exercice à la séance */}
         <Button
           title="Ajouter un exercice à la séance"
           variant="outline"
@@ -439,7 +603,7 @@ export default function LiveWorkoutScreen() {
           style={{ marginTop: 14 }}
         />
 
-        {/* Bouton Terminer l'entraînement */}
+        {/* Bouton Terminer l'entraînement (Cliquable à tout moment, vert/accent si tous les blocs sont complétés) */}
         <Button
           title="Terminer l'entraînement"
           variant={isAllCompleted ? 'primary' : 'outline'}
@@ -450,7 +614,12 @@ export default function LiveWorkoutScreen() {
       </ScrollView>
 
       {/* Modal Ajout d'Exercice avec Barre de Recherche */}
-      <Modal visible={showAddExModal} transparent animationType="slide" onRequestClose={() => setShowAddExModal(false)}>
+      <Modal
+        visible={showAddExModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddExModal(false)}
+      >
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAddExModal(false)}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Sélectionner un exercice</Text>
@@ -542,22 +711,31 @@ const styles = StyleSheet.create({
   circuitContainer: {
     padding: 14,
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 1.5,
     marginBottom: 16,
   },
-  circuitBadgeHeader: {
+  epilogHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  circuitBadgeText: {
+  epilogBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: EPILOG_PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  epilogBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  epilogTag: {
     fontSize: 11,
     fontWeight: '900',
-    marginLeft: 4,
+    letterSpacing: 0.5,
   },
   circuitTitle: {
     fontSize: 20,
@@ -759,3 +937,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 });
+
