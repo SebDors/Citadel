@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { WorkoutSession, CircuitBlock, getSessionBlocks } from '../../types';
+import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
@@ -268,13 +268,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                     if (b.type === 'single') {
                       return b.exercise.exerciseName;
                     } else if (b.type === 'circuit') {
-                      const isAmrap = b.circuitType === 'amrap';
-                      const title = isAmrap ? 'Circuit AMRAP' : 'Circuit';
-                      const roundsOrDurationText = isAmrap
-                        ? `${b.amrapDurationMinutes || 20} min`
-                        : `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
-                      const exosText = `${b.exercises.length} exo${b.exercises.length > 1 ? 's' : ''}`;
-                      return `${title} (${roundsOrDurationText} · ${exosText})`;
+                      return formatCircuitSummary(b);
                     }
                     return '';
                   }).filter(Boolean);

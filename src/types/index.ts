@@ -303,3 +303,33 @@ export function calculateEstimatedWorkoutMinutes(items: WorkoutExercise[] | Work
 
   return Math.ceil(totalSeconds / 60);
 }
+
+/**
+ * Formate le texte résumé d'un bloc circuit.
+ * Ex: "Circuit AMRAP (20 min · 3 exos)", "Circuit Round (3 tours · 3 exos)"
+ * Titre personnalisé: "Abdos Round (3 tours · 3 exos)"
+ */
+export function formatCircuitSummary(block: CircuitBlock): string {
+  const isAmrap = block.circuitType === 'amrap';
+  const typeSuffix = isAmrap ? 'AMRAP' : 'Round';
+
+  let baseTitle = block.title ? block.title.trim() : '';
+  baseTitle = baseTitle.replace(/\s*\(?(AMRAP|Round)\)?$/i, '').trim();
+
+  if (!baseTitle || baseTitle.toLowerCase() === 'circuit') {
+    baseTitle = 'Circuit';
+  }
+
+  const title = `${baseTitle} ${typeSuffix}`;
+
+  const roundsCount = block.rounds || 1;
+  const roundsOrDurationText = isAmrap
+    ? `${block.amrapDurationMinutes || 20} min`
+    : `${roundsCount} tour${roundsCount > 1 ? 's' : ''}`;
+
+  const exosCount = block.exercises?.length || 0;
+  const exosText = `${exosCount} exo${exosCount > 1 ? 's' : ''}`;
+
+  return `${title} (${roundsOrDurationText} · ${exosText})`;
+}
+
