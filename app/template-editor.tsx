@@ -25,7 +25,6 @@ import {
 } from '../src/types';
 import {
   ArrowLeft,
-  Save,
   Plus,
   Clock,
   Trash2,
@@ -212,9 +211,7 @@ export default function TemplateEditorScreen() {
         <Text style={[styles.topBarTitle, { color: theme.text }]}>
           {templateIdParam ? 'Modifier la séance' : 'Créer une séance'}
         </Text>
-        <TouchableOpacity onPress={handleSave}>
-          <Save size={20} color={theme.accent} />
-        </TouchableOpacity>
+        <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
