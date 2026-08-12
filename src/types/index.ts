@@ -316,7 +316,7 @@ export function formatCircuitSummary(block: CircuitBlock): string {
   let baseTitle = block.title ? block.title.trim() : '';
   baseTitle = baseTitle.replace(/\s*\(?(AMRAP|Round)\)?$/i, '').trim();
 
-  if (!baseTitle || baseTitle.toLowerCase() === 'circuit') {
+  if (!baseTitle || /^circuit(\s*#?\s*\d+)?$/i.test(baseTitle)) {
     baseTitle = 'Circuit';
   }
 
