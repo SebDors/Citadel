@@ -36,7 +36,7 @@ import {
   X,
   Tag,
 } from 'lucide-react-native';
-import { WorkoutTemplate, WorkoutFolder, getRealLastWorkoutDate } from '../../src/types';
+import { WorkoutTemplate, WorkoutFolder, getRealLastWorkoutDate, getTemplateBlocks } from '../../src/types';
 import { JsonExportService } from '../../src/services/jsonExport';
 
 export default function WorkoutTab() {
@@ -131,8 +131,30 @@ export default function WorkoutTab() {
   // Render a Workout Template Card (High Density layout)
   const renderTemplateCard = (tpl: WorkoutTemplate) => {
     const isCompact = !!collapsedCards[tpl.id];
-    const templateExercises = tpl.exercises || [];
-    const inlineExercisesText = templateExercises.map((ex) => ex.exerciseName).join(', ');
+    const blocks = getTemplateBlocks(tpl);
+
+    let totalExercises = 0;
+    let hasCircuit = false;
+
+    const blockSummaries: string[] = [];
+
+    blocks.forEach((block) => {
+      if (block.type === 'single') {
+        totalExercises += 1;
+        if (block.exercise.exerciseName) {
+          blockSummaries.push(block.exercise.exerciseName);
+        }
+      } else if (block.type === 'circuit') {
+        hasCircuit = true;
+        totalExercises += block.exercises.length;
+        const title = block.title || 'Circuit';
+        const roundsText = `${block.rounds} tour${block.rounds > 1 ? 's' : ''}`;
+        const exosText = `${block.exercises.length} exo${block.exercises.length > 1 ? 's' : ''}`;
+        blockSummaries.push(`${title} (${roundsText} · ${exosText})`);
+      }
+    });
+
+    const inlineExercisesText = blockSummaries.join(' · ') || 'Aucun exercice';
     const realLast = getRealLastWorkoutDate(data?.history || [], tpl.title);
 
     if (isCompact) {
@@ -144,7 +166,7 @@ export default function WorkoutTab() {
                 {tpl.title}
               </Text>
               <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-                {templateExercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
+                {totalExercises} exos {hasCircuit ? '· ⚡ CIRCUIT' : ''}
               </Text>
             </View>
 
@@ -179,7 +201,7 @@ export default function WorkoutTab() {
               {tpl.title}
             </Text>
             <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-              {templateExercises.length} exos {tpl.isCircuit ? '· ⚡ CIRCUIT' : ''}
+              {totalExercises} exos {hasCircuit ? '· ⚡ CIRCUIT' : ''}
             </Text>
           </View>
 

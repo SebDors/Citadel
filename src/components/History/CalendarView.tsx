@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { WorkoutSession } from '../../types';
+import { WorkoutSession, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
@@ -242,11 +242,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                 </View>
               ) : (
                 daySessions.map((session) => {
+                  const blocks = getSessionBlocks(session);
+                  const fallbackSetsCount = blocks.reduce((sum, b) => {
+                    if (b.type === 'single') return sum + (b.exercise.sets?.length || 0);
+                    if (b.type === 'circuit') return sum + (b.rounds * b.exercises.length);
+                    return sum;
+                  }, 0);
+
                   const setsCount =
                     session.completedSetsCount ??
                     session.totalSetsCount ??
-                    session.exercises?.reduce((sum, e) => sum + e.sets.length, 0) ??
-                    0;
+                    fallbackSetsCount;
+
+                  const blockSummaries = blocks.map((b) => {
+                    if (b.type === 'single') {
+                      return b.exercise.exerciseName;
+                    } else if (b.type === 'circuit') {
+                      const title = b.title || 'Circuit';
+                      const roundsText = `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
+                      const exosText = `${b.exercises.length} exo${b.exercises.length > 1 ? 's' : ''}`;
+                      return `${title} (${roundsText} · ${exosText})`;
+                    }
+                    return '';
+                  }).filter(Boolean);
+
+                  const summaryStr = blockSummaries.join(' · ');
 
                   return (
                     <View
@@ -285,6 +305,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                               </Text>
                             </View>
                           </View>
+
+                          {summaryStr ? (
+                            <Text style={[styles.modalExercisesText, { color: theme.textMuted }]} numberOfLines={2}>
+                              {summaryStr}
+                            </Text>
+                          ) : null}
                         </View>
 
                         <TouchableOpacity
@@ -452,5 +478,11 @@ const styles = StyleSheet.create({
   deleteIconButton: {
     padding: 10,
     borderRadius: 10,
+  },
+  modalExercisesText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 8,
+    lineHeight: 16,
   },
 });

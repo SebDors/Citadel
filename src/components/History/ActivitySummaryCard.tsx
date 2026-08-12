@@ -52,24 +52,30 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
     });
 
     const blocks = getSessionBlocks(session);
-    const exerciseNames: string[] = [];
+    const blockSummaries: string[] = [];
     const targetMusclesSet = new Set<string>();
 
     blocks.forEach((b) => {
       if (b.type === 'single') {
-        exerciseNames.push(b.exercise.exerciseName);
+        if (b.exercise.exerciseName) {
+          blockSummaries.push(b.exercise.exerciseName);
+        }
         if (b.exercise.primaryMuscle) targetMusclesSet.add(b.exercise.primaryMuscle);
         if (b.exercise.targetMuscles) b.exercise.targetMuscles.forEach((m) => targetMusclesSet.add(m));
       } else if (b.type === 'circuit') {
+        const title = b.title || 'Circuit';
+        const roundsText = `${b.rounds} tour${b.rounds > 1 ? 's' : ''}`;
+        const exosText = `${b.exercises.length} exo${b.exercises.length > 1 ? 's' : ''}`;
+        blockSummaries.push(`${title} (${roundsText} · ${exosText})`);
+
         b.exercises.forEach((ex) => {
-          exerciseNames.push(ex.exerciseName);
           if (ex.primaryMuscle) targetMusclesSet.add(ex.primaryMuscle);
           if (ex.targetMuscles) ex.targetMuscles.forEach((m) => targetMusclesSet.add(m));
         });
       }
     });
 
-    const exercisesStr = exerciseNames.join(', ');
+    const exercisesStr = blockSummaries.join(' · ');
     const targetMusclesList = Array.from(targetMusclesSet);
 
     return (
