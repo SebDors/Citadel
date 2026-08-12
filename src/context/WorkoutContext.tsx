@@ -12,6 +12,7 @@ import {
   WorkoutBlock,
   SingleExerciseBlock,
   CircuitBlock,
+  CircuitExerciseItem,
   getTemplateBlocks,
   getSessionBlocks,
 } from '../types';
@@ -34,6 +35,7 @@ interface WorkoutContextType {
   updateExerciseRestTime: (exerciseId: string, newRestSeconds: number) => void;
   setExerciseSupersetGroup: (exerciseId: string, supersetGroup?: string) => void;
   updateActiveSessionCircuitStates: (states: Record<string, any>) => void;
+  addExerciseToCircuit: (blockId: string, exerciseName: string, primaryMuscle: string, targetMuscles?: string[]) => void;
   addMeasurement: (measurement: BodyMeasurement) => Promise<void>;
   deleteMeasurement: (id: string) => Promise<void>;
   updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
@@ -717,6 +719,52 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const addExerciseToCircuit = (
+    blockId: string,
+    exerciseName: string,
+    primaryMuscle: string,
+    targetMuscles?: string[]
+  ) => {
+    if (!activeSession || !activeSession.blocks) return;
+
+    const newExerciseItem: CircuitExerciseItem = {
+      id: `circ_ex_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      exerciseName,
+      primaryMuscle,
+      targetMuscles,
+      targetValue: 10,
+      targetType: 'reps',
+    };
+
+    const updatedBlocks = activeSession.blocks.map((block) => {
+      if (block.id === blockId && block.type === 'circuit') {
+        return {
+          ...block,
+          exercises: [...block.exercises, newExerciseItem],
+        };
+      }
+      return block;
+    });
+
+    let totalSets = 0;
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        totalSets += b.exercise.sets.length;
+      } else if (b.type === 'circuit') {
+        totalSets += b.rounds * b.exercises.length;
+      }
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+      totalSetsCount: totalSets,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
   const finishWorkout = async () => {
     if (!activeSession) return;
 
@@ -907,6 +955,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateExerciseRestTime,
         setExerciseSupersetGroup,
         updateActiveSessionCircuitStates,
+        addExerciseToCircuit,
         addMeasurement,
         deleteMeasurement,
         updateUserProfile,
