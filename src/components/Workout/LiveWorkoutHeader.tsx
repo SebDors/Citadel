@@ -33,8 +33,10 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   return (
     <View style={[styles.headerContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <View style={styles.topRow}>
-        <View>
-          <Text style={[styles.title, { color: theme.text }]}>{session.title}</Text>
+        <View style={styles.titleBox}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+            {session.title}
+          </Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
             {session.isCircuit ? `Circuit (${session.circuitRounds} tours)` : 'Séance en cours'}
           </Text>
@@ -89,6 +91,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  titleBox: {
+    flex: 1,
+    marginRight: 8,
+  },
   title: {
     fontSize: 18,
     fontWeight: '800',
@@ -102,8 +108,8 @@ const styles = StyleSheet.create({
   },
   btnSmall: {
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginLeft: 6,
+    paddingHorizontal: 8,
+    marginLeft: 4,
   },
   statsRow: {
     flexDirection: 'row',

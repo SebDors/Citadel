@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { WorkoutSession, getSessionBlocks } from '../../types';
+import { WorkoutSession, CircuitBlock, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
@@ -20,6 +20,7 @@ import {
   Clock,
   Dumbbell,
   Layers,
+  RotateCw,
 } from 'lucide-react-native';
 
 interface CalendarViewProps {
@@ -243,6 +244,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
               ) : (
                 daySessions.map((session) => {
                   const blocks = getSessionBlocks(session);
+                  const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
+
+                  const isAMRAP = circuitBlock
+                    ? (circuitBlock.circuitType === 'amrap' || circuitBlock.title?.toLowerCase().includes('amrap') || session.title?.toLowerCase().includes('amrap'))
+                    : (session.isCircuit && session.title?.toLowerCase().includes('amrap'));
+
+                  const isCircuitRound = !isAMRAP && (circuitBlock !== undefined || session.isCircuit === true);
+                  const circuitRounds = circuitBlock ? circuitBlock.rounds : (session.circuitRounds || 0);
+
                   const fallbackSetsCount = blocks.reduce((sum, b) => {
                     if (b.type === 'single') return sum + (b.exercise.sets?.length || 0);
                     if (b.type === 'circuit') return sum + (b.rounds * b.exercises.length);
@@ -299,9 +309,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                             </View>
 
                             <View style={styles.statBadge}>
-                              <Layers size={14} color={theme.primary} />
+                              {isAMRAP || isCircuitRound ? (
+                                <RotateCw size={14} color={theme.primary} />
+                              ) : (
+                                <Layers size={14} color={theme.primary} />
+                              )}
                               <Text style={[styles.statBadgeText, { color: theme.text }]}>
-                                {setsCount} {setsCount > 1 ? 'séries' : 'série'}
+                                {isAMRAP || isCircuitRound
+                                  ? `${circuitRounds} tour${circuitRounds > 1 ? 's' : ''}`
+                                  : `${setsCount} ${setsCount > 1 ? 'séries' : 'série'}`}
                               </Text>
                             </View>
                           </View>

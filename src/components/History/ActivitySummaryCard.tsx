@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { WorkoutSession, getSessionBlocks } from '../../types';
+import { WorkoutSession, CircuitBlock, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
-import { Trash2, Clock, Dumbbell, Award, CheckCircle2 } from 'lucide-react-native';
+import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw } from 'lucide-react-native';
 
 interface ActivitySummaryCardProps {
   session?: WorkoutSession;
@@ -52,6 +52,15 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
     });
 
     const blocks = getSessionBlocks(session);
+    const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
+
+    const isAMRAP = circuitBlock
+      ? (circuitBlock.circuitType === 'amrap' || circuitBlock.title?.toLowerCase().includes('amrap') || session.title?.toLowerCase().includes('amrap'))
+      : (session.isCircuit && session.title?.toLowerCase().includes('amrap'));
+
+    const isCircuitRound = !isAMRAP && (circuitBlock !== undefined || session.isCircuit === true);
+    const circuitRounds = circuitBlock ? circuitBlock.rounds : (session.circuitRounds || 0);
+
     const blockSummaries: string[] = [];
     const targetMusclesSet = new Set<string>();
 
@@ -118,9 +127,15 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
           </View>
 
           <View style={styles.statItem}>
-            <CheckCircle2 size={12} color={theme.primary} />
+            {isAMRAP || isCircuitRound ? (
+              <RotateCw size={12} color={theme.primary} />
+            ) : (
+              <CheckCircle2 size={12} color={theme.primary} />
+            )}
             <Text style={[styles.statValue, { color: theme.text }]}>
-              {session.completedSetsCount} séries
+              {isAMRAP || isCircuitRound
+                ? `${circuitRounds} tour${circuitRounds > 1 ? 's' : ''}`
+                : `${session.completedSetsCount} série${session.completedSetsCount > 1 ? 's' : ''}`}
             </Text>
           </View>
         </View>
