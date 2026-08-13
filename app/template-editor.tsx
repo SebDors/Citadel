@@ -1004,7 +1004,7 @@ export default function TemplateEditorScreen() {
                 >
                   <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
                   <Text style={[styles.addCircuitExerciseBtnText, { color: theme.accent }]}>
-                    + Ajouter un exercice au circuit
+                    Ajouter un exercice au circuit
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1049,8 +1049,9 @@ export default function TemplateEditorScreen() {
                       ]}
                       onPress={() => handleIncludeInCircuit(block.id)}
                     >
-                      <Zap size={13} color={theme.accent} />
-                      <Text style={[styles.includeCircuitBtnText, { color: theme.accent }]}>+ Circuit</Text>
+                      <Plus size={14} color={theme.accent} style={{ marginRight: 3 }} />
+                      <Zap size={13} color={theme.accent} style={{ marginRight: 4 }} />
+                      <Text style={[styles.includeCircuitBtnText, { color: theme.accent }]}>Circuit</Text>
                     </TouchableOpacity>
                   )}
 
@@ -1171,7 +1172,7 @@ export default function TemplateEditorScreen() {
 
         {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE (FIDÈLE À EPILOG) */}
         <View style={styles.twinButtonsRow}>
-          {/* [+ Exercice] (Contour vert/accent pointillé) */}
+          {/* [Exercice] (Contour vert/accent pointillé) */}
           <TouchableOpacity
             style={[
               styles.twinBtn,
@@ -1186,10 +1187,10 @@ export default function TemplateEditorScreen() {
             }}
           >
             <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
-            <Text style={[styles.twinBtnText, { color: theme.accent }]}>+ Exercice</Text>
+            <Text style={[styles.twinBtnText, { color: theme.accent }]}>Exercice</Text>
           </TouchableOpacity>
 
-          {/* [+ Circuit] (Contour accent pointillé) */}
+          {/* [Circuit] (Contour accent pointillé) */}
           <TouchableOpacity
             style={[
               styles.twinBtn,
@@ -1200,8 +1201,9 @@ export default function TemplateEditorScreen() {
             ]}
             onPress={handleAddCircuitContainer}
           >
+            <Plus size={16} color={theme.accent} style={{ marginRight: 4 }} />
             <Zap size={16} color={theme.accent} style={{ marginRight: 6 }} />
-            <Text style={[styles.twinBtnText, { color: theme.accent }]}>+ Circuit</Text>
+            <Text style={[styles.twinBtnText, { color: theme.accent }]}>Circuit</Text>
           </TouchableOpacity>
         </View>
 
