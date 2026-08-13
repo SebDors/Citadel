@@ -669,14 +669,6 @@ export default function TemplateEditorScreen() {
     );
   });
 
-  // Styles Thème Violet Epilog pour cartes conteneurs Circuit
-  const purpleBg = isDark ? '#231735' : '#F5F3FF';
-  const purpleBorder = isDark ? '#8B5CF6' : '#7C3AED';
-  const purpleHeader = isDark ? '#E9D5FF' : '#4C1D95';
-  const purpleSubText = isDark ? '#C4B5FD' : '#6D28D9';
-  const purpleBadgeBg = '#7C3AED';
-  const purpleItemBg = isDark ? '#1C122B' : '#FFFFFF';
-  const purpleItemBorder = isDark ? '#4C1D95' : '#DDD6FE';
 
   return (
     <SafeAreaView
@@ -766,30 +758,30 @@ export default function TemplateEditorScreen() {
                 key={block.id}
                 style={[
                   styles.circuitContainer,
-                  { backgroundColor: purpleBg, borderColor: purpleBorder },
+                  { backgroundColor: theme.surface, borderColor: theme.border },
                 ]}
               >
                 {/* En-tête du Circuit */}
                 <View style={styles.circuitHeaderRow}>
                   <View style={styles.rowAlign}>
                     {/* Badge 'C' */}
-                    <View style={[styles.circuitBadgeC, { backgroundColor: purpleBadgeBg }]}>
+                    <View style={[styles.circuitBadgeC, { backgroundColor: theme.accent }]}>
                       <Text style={styles.circuitBadgeCText}>C</Text>
                     </View>
 
                     {/* Switcher Round vs AMRAP */}
-                    <View style={[styles.typeToggleContainer, { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE', marginLeft: 8 }]}>
+                    <View style={[styles.typeToggleContainer, { backgroundColor: theme.surface, marginLeft: 8 }]}>
                       <TouchableOpacity
                         style={[
                           styles.typeToggleBtn,
-                          (block.circuitType !== 'amrap') && { backgroundColor: purpleBadgeBg },
+                          (block.circuitType !== 'amrap') && { backgroundColor: theme.accent },
                         ]}
                         onPress={() => handleSetCircuitType(block.id, 'rounds')}
                       >
                         <Text
                           style={[
                             styles.typeToggleText,
-                            { color: block.circuitType !== 'amrap' ? '#FFFFFF' : purpleSubText },
+                            { color: block.circuitType !== 'amrap' ? '#FFFFFF' : theme.textMuted },
                           ]}
                         >
                           Round
@@ -799,14 +791,14 @@ export default function TemplateEditorScreen() {
                       <TouchableOpacity
                         style={[
                           styles.typeToggleBtn,
-                          block.circuitType === 'amrap' && { backgroundColor: purpleBadgeBg },
+                          block.circuitType === 'amrap' && { backgroundColor: theme.accent },
                         ]}
                         onPress={() => handleSetCircuitType(block.id, 'amrap')}
                       >
                         <Text
                           style={[
                             styles.typeToggleText,
-                            { color: block.circuitType === 'amrap' ? '#FFFFFF' : purpleSubText },
+                            { color: block.circuitType === 'amrap' ? '#FFFFFF' : theme.textMuted },
                           ]}
                         >
                           AMRAP
@@ -826,24 +818,24 @@ export default function TemplateEditorScreen() {
                     }
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <MoreVertical size={20} color={purpleHeader} />
+                    <MoreVertical size={20} color={theme.text} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Réglage du nombre de tours (Round) ou de la durée (AMRAP) */}
-                <View style={[styles.circuitRestRow, { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE', marginBottom: 6 }]}>
+                <View style={[styles.circuitRestRow, { backgroundColor: theme.surface, marginBottom: 6 }]}>
                   {block.circuitType === 'amrap' ? (
                     <>
                       <View style={styles.rowAlign}>
-                        <Clock size={14} color={purpleSubText} style={{ marginRight: 6 }} />
-                        <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                        <Clock size={14} color={theme.textMuted} style={{ marginRight: 6 }} />
+                        <Text style={[styles.circuitRestLabel, { color: theme.textMuted }]}>
                           Durée AMRAP ·{' '}
                           <Text style={{ fontWeight: '900' }}>{block.amrapDurationMinutes || 12} min</Text>
                         </Text>
                       </View>
                       <View style={styles.rowAlign}>
                         <TouchableOpacity
-                          style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                          style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
                           onPress={() => handleAdjustCircuitAmrapDuration(block.id, -1)}
                         >
                           <Text style={[styles.smallStepperText, { color: theme.text }]}>-1 min</Text>
@@ -851,7 +843,7 @@ export default function TemplateEditorScreen() {
                         <TouchableOpacity
                           style={[
                             styles.smallStepperBtn,
-                            { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                            { backgroundColor: theme.cardBg, borderColor: theme.border, marginLeft: 4 },
                           ]}
                           onPress={() => handleAdjustCircuitAmrapDuration(block.id, 1)}
                         >
@@ -862,15 +854,15 @@ export default function TemplateEditorScreen() {
                   ) : (
                     <>
                       <View style={styles.rowAlign}>
-                        <Repeat size={14} color={purpleSubText} style={{ marginRight: 6 }} />
-                        <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                        <Repeat size={14} color={theme.textMuted} style={{ marginRight: 6 }} />
+                        <Text style={[styles.circuitRestLabel, { color: theme.textMuted }]}>
                           Tours ·{' '}
                           <Text style={{ fontWeight: '900' }}>{block.rounds} tour{block.rounds > 1 ? 's' : ''}</Text>
                         </Text>
                       </View>
                       <View style={styles.rowAlign}>
                         <TouchableOpacity
-                          style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                          style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
                           onPress={() => handleAdjustCircuitRounds(block.id, -1)}
                         >
                           <Text style={[styles.smallStepperText, { color: theme.text }]}>-1</Text>
@@ -878,7 +870,7 @@ export default function TemplateEditorScreen() {
                         <TouchableOpacity
                           style={[
                             styles.smallStepperBtn,
-                            { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                            { backgroundColor: theme.cardBg, borderColor: theme.border, marginLeft: 4 },
                           ]}
                           onPress={() => handleAdjustCircuitRounds(block.id, 1)}
                         >
@@ -894,12 +886,12 @@ export default function TemplateEditorScreen() {
                   <View
                     style={[
                       styles.circuitRestRow,
-                      { backgroundColor: isDark ? '#2E1D45' : '#EDE9FE' },
+                      { backgroundColor: theme.surface },
                     ]}
                   >
                     <View style={styles.rowAlign}>
-                      <Timer size={14} color={purpleSubText} style={{ marginRight: 6 }} />
-                      <Text style={[styles.circuitRestLabel, { color: purpleSubText }]}>
+                      <Timer size={14} color={theme.textMuted} style={{ marginRight: 6 }} />
+                      <Text style={[styles.circuitRestLabel, { color: theme.textMuted }]}>
                         Repos entre les tours ·{' '}
                         <Text style={{ fontWeight: '900' }}>
                           {formatMinutesSeconds(block.restBetweenRoundsSeconds)}
@@ -908,7 +900,7 @@ export default function TemplateEditorScreen() {
                     </View>
                     <View style={styles.rowAlign}>
                       <TouchableOpacity
-                        style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: purpleBorder }]}
+                        style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
                         onPress={() => handleAdjustCircuitRest(block.id, -15)}
                       >
                         <Text style={[styles.smallStepperText, { color: theme.text }]}>-15s</Text>
@@ -916,7 +908,7 @@ export default function TemplateEditorScreen() {
                       <TouchableOpacity
                         style={[
                           styles.smallStepperBtn,
-                          { backgroundColor: theme.cardBg, borderColor: purpleBorder, marginLeft: 4 },
+                          { backgroundColor: theme.cardBg, borderColor: theme.border, marginLeft: 4 },
                         ]}
                         onPress={() => handleAdjustCircuitRest(block.id, 15)}
                       >
@@ -935,11 +927,11 @@ export default function TemplateEditorScreen() {
                         key={item.id}
                         style={[
                           styles.circuitItemCard,
-                          { backgroundColor: purpleItemBg, borderColor: purpleItemBorder },
+                          { backgroundColor: theme.cardBg, borderColor: theme.border },
                         ]}
                       >
                         {/* Badge Lettre A, B, C... */}
-                        <View style={[styles.letterBadge, { backgroundColor: purpleBadgeBg }]}>
+                        <View style={[styles.letterBadge, { backgroundColor: theme.accent }]}>
                           <Text style={styles.letterBadgeText}>{letter}</Text>
                         </View>
 
@@ -999,8 +991,8 @@ export default function TemplateEditorScreen() {
                   style={[
                     styles.addCircuitExerciseBtn,
                     {
-                      borderColor: purpleBorder,
-                      backgroundColor: isDark ? '#2D1F42' : '#EDE9FE',
+                      borderColor: theme.border,
+                      backgroundColor: theme.surface,
                     },
                   ]}
                   onPress={() => {
@@ -1008,8 +1000,8 @@ export default function TemplateEditorScreen() {
                     setShowPickerModal(true);
                   }}
                 >
-                  <Plus size={16} color={purpleHeader} style={{ marginRight: 6 }} />
-                  <Text style={[styles.addCircuitExerciseBtnText, { color: purpleHeader }]}>
+                  <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
+                  <Text style={[styles.addCircuitExerciseBtnText, { color: theme.accent }]}>
                     + Ajouter un exercice au circuit
                   </Text>
                 </TouchableOpacity>
@@ -1051,12 +1043,12 @@ export default function TemplateEditorScreen() {
                     <TouchableOpacity
                       style={[
                         styles.includeCircuitBtn,
-                        { borderColor: purpleBorder, backgroundColor: isDark ? '#372056' : '#EDE9FE' },
+                        { borderColor: theme.border, backgroundColor: theme.surface },
                       ]}
                       onPress={() => handleIncludeInCircuit(block.id)}
                     >
-                      <Zap size={13} color="#8B5CF6" />
-                      <Text style={styles.includeCircuitBtnText}>+ Circuit</Text>
+                      <Zap size={13} color={theme.accent} />
+                      <Text style={[styles.includeCircuitBtnText, { color: theme.accent }]}>+ Circuit</Text>
                     </TouchableOpacity>
                   )}
 
@@ -1195,19 +1187,19 @@ export default function TemplateEditorScreen() {
             <Text style={[styles.twinBtnText, { color: theme.accent }]}>+ Exercice</Text>
           </TouchableOpacity>
 
-          {/* [+ Circuit] (Contour violet pointillé) */}
+          {/* [+ Circuit] (Contour accent pointillé) */}
           <TouchableOpacity
             style={[
               styles.twinBtn,
               {
-                borderColor: '#8B5CF6',
-                backgroundColor: isDark ? 'rgba(139, 92, 246, 0.08)' : 'rgba(124, 58, 237, 0.08)',
+                borderColor: theme.accent,
+                backgroundColor: theme.surface,
               },
             ]}
             onPress={handleAddCircuitContainer}
           >
-            <Zap size={16} color="#8B5CF6" style={{ marginRight: 6 }} />
-            <Text style={[styles.twinBtnText, { color: '#8B5CF6' }]}>+ Circuit</Text>
+            <Zap size={16} color={theme.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.twinBtnText, { color: theme.accent }]}>+ Circuit</Text>
           </TouchableOpacity>
         </View>
 
@@ -1412,7 +1404,7 @@ export default function TemplateEditorScreen() {
                   handleIncludeInCircuit(targetIncludeSingleBlockId, circ.id)
                 }
               >
-                <Zap size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
+                <Zap size={16} color={theme.accent} style={{ marginRight: 8 }} />
                 <Text style={[styles.menuItemText, { color: theme.text }]}>
                   {circ.title || `Circuit ${idx + 1}`} ({circ.circuitType === 'amrap' ? `${circ.amrapDurationMinutes || 12} min` : `${circ.rounds} tour${circ.rounds > 1 ? 's' : ''}`})
                 </Text>
@@ -1871,7 +1863,6 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   includeCircuitBtnText: {
-    color: '#8B5CF6',
     fontWeight: '800',
     fontSize: 11,
     marginLeft: 4,

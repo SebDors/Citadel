@@ -39,9 +39,6 @@ import {
   Clock,
 } from 'lucide-react-native';
 
-const EPILOG_PURPLE = '#8B5CF6';
-const EPILOG_PURPLE_BG = 'rgba(139, 92, 246, 0.12)';
-const EPILOG_PURPLE_BORDER = 'rgba(139, 92, 246, 0.4)';
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -479,22 +476,21 @@ export default function LiveWorkoutScreen() {
             } = circuitState;
             const totalRounds = block.rounds || 3;
             const isAmrap = block.circuitType === 'amrap';
-
             return (
               <View
                 key={block.id || `circuit_${blockIdx}`}
                 style={[
                   styles.circuitContainer,
-                  { backgroundColor: theme.cardBg, borderColor: EPILOG_PURPLE_BORDER },
+                  { backgroundColor: theme.cardBg, borderColor: theme.border },
                 ]}
               >
                 {/* En-tête Moteur Violet avec Badge C */}
                 <View style={styles.epilogHeaderRow}>
-                  <View style={styles.epilogBadge}>
+                  <View style={[styles.epilogBadge, { backgroundColor: theme.accent }]}>
                     <Text style={styles.epilogBadgeText}>C</Text>
                   </View>
                   <View style={{ marginLeft: 8 }}>
-                    <Text style={[styles.epilogTag, { color: EPILOG_PURPLE }]}>CIRCUIT</Text>
+                    <Text style={[styles.epilogTag, { color: theme.accent }]}>CIRCUIT</Text>
                   </View>
                 </View>
 
@@ -506,14 +502,14 @@ export default function LiveWorkoutScreen() {
                 {/* Bouton [Commencer le circuit] ou Progression & Chrono AMRAP */}
                 {!started ? (
                   <View style={styles.startCircuitContainer}>
-                    <View style={[styles.roundProgressBox, { backgroundColor: EPILOG_PURPLE_BG, marginBottom: 10 }]}>
-                      <Text style={[styles.roundLabel, { color: EPILOG_PURPLE }]}>
+                    <View style={[styles.roundProgressBox, { backgroundColor: theme.surface, marginBottom: 10 }]}>
+                      <Text style={[styles.roundLabel, { color: theme.accent }]}>
                         TOUR EN COURS : Tour 0 / {isAmrap ? '∞' : totalRounds} (Non démarré)
                       </Text>
                     </View>
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      style={[styles.startCircuitBtn, { backgroundColor: EPILOG_PURPLE }]}
+                      style={[styles.startCircuitBtn, { backgroundColor: theme.accent }]}
                       onPress={() => handleStartCircuit(block)}
                     >
                       <Play size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
@@ -521,22 +517,22 @@ export default function LiveWorkoutScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={[styles.roundProgressBox, { backgroundColor: EPILOG_PURPLE_BG }]}>
+                  <View style={[styles.roundProgressBox, { backgroundColor: theme.surface }]}>
                     {isAmrap ? (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
-                          <Text style={[styles.roundLabel, { color: EPILOG_PURPLE, marginBottom: 2 }]}>
+                          <Text style={[styles.roundLabel, { color: theme.accent, marginBottom: 2 }]}>
                             AMRAP · TOUR {currentRound} ({completedRoundsCount || 0} tour(s) complété(s))
                           </Text>
                         </View>
-                        <View style={[styles.amrapTimerBadge, { backgroundColor: EPILOG_PURPLE }]}>
+                        <View style={[styles.amrapTimerBadge, { backgroundColor: theme.accent }]}>
                           <Clock size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
                           <Text style={styles.amrapTimerText}>{formatMinutesSeconds(amrapSecondsLeft ?? 0)}</Text>
                         </View>
                       </View>
                     ) : (
                       <>
-                        <Text style={[styles.roundLabel, { color: EPILOG_PURPLE }]}>
+                        <Text style={[styles.roundLabel, { color: theme.accent }]}>
                           TOUR EN COURS : {currentRound} / {totalRounds}
                         </Text>
                         <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
@@ -544,7 +540,7 @@ export default function LiveWorkoutScreen() {
                             style={[
                               styles.progressBarFill,
                               {
-                                backgroundColor: EPILOG_PURPLE,
+                                backgroundColor: theme.accent,
                                 width: `${(currentRound / totalRounds) * 100}%`,
                               },
                             ]}
@@ -574,7 +570,7 @@ export default function LiveWorkoutScreen() {
                           styles.circuitItemCollapsedCard,
                           {
                             backgroundColor: theme.surface,
-                            borderColor: status === 'validated' ? EPILOG_PURPLE : theme.border,
+                            borderColor: status === 'validated' ? theme.accent : theme.border,
                           },
                         ]}
                         onPress={() => handleToggleExpandCircuitExercise(block.id, ex.id)}
@@ -583,7 +579,7 @@ export default function LiveWorkoutScreen() {
                           <View
                             style={[
                               styles.numberCircle,
-                              { backgroundColor: status === 'validated' ? EPILOG_PURPLE : theme.border },
+                              { backgroundColor: status === 'validated' ? theme.accent : theme.border },
                             ]}
                           >
                             <Text
@@ -607,7 +603,7 @@ export default function LiveWorkoutScreen() {
 
                         <View style={styles.collapsedRight}>
                           {status === 'validated' ? (
-                            <View style={[styles.statusBadge, { backgroundColor: EPILOG_PURPLE }]}>
+                            <View style={[styles.statusBadge, { backgroundColor: theme.accent }]}>
                               <Check size={12} color="#FFFFFF" />
                               <Text style={styles.statusBadgeText}>Validé</Text>
                             </View>
@@ -615,7 +611,7 @@ export default function LiveWorkoutScreen() {
                             <View style={[styles.statusBadge, { backgroundColor: theme.border }]}>
                               <SkipForward size={12} color={theme.textMuted} />
                               <Text style={[styles.statusBadgeText, { color: theme.textMuted }]}>
-                                Passé
+                                Passer
                               </Text>
                             </View>
                           )}
@@ -632,7 +628,7 @@ export default function LiveWorkoutScreen() {
                         styles.circuitItemCard,
                         {
                           backgroundColor: theme.surface,
-                          borderColor: isCurrentActive ? EPILOG_PURPLE : theme.border,
+                          borderColor: isCurrentActive ? theme.accent : theme.border,
                         },
                         isCurrentActive && { borderWidth: 2.5 },
                       ]}
@@ -641,7 +637,7 @@ export default function LiveWorkoutScreen() {
                         <View
                           style={[
                             styles.numberCircle,
-                            { backgroundColor: isCurrentActive ? EPILOG_PURPLE : theme.cardBg },
+                            { backgroundColor: isCurrentActive ? theme.accent : theme.cardBg },
                           ]}
                         >
                           <Text
@@ -686,7 +682,7 @@ export default function LiveWorkoutScreen() {
                                   backgroundColor:
                                     rIdx + 1 < currentRound ||
                                     (rIdx + 1 === currentRound && status === 'validated')
-                                      ? EPILOG_PURPLE
+                                      ? theme.accent
                                       : theme.border,
                                 },
                               ]}
@@ -714,7 +710,7 @@ export default function LiveWorkoutScreen() {
                               styles.circuitDoneBtn,
                               {
                                 flex: 1,
-                                backgroundColor: started ? EPILOG_PURPLE : theme.border,
+                                backgroundColor: started ? theme.accent : theme.border,
                                 marginRight: 6,
                                 opacity: started ? 1 : 0.6,
                               },
@@ -750,7 +746,7 @@ export default function LiveWorkoutScreen() {
                               activeOpacity={0.8}
                               style={[
                                 styles.circuitDoneBtn,
-                                { flex: 1, backgroundColor: EPILOG_PURPLE },
+                                { flex: 1, backgroundColor: theme.accent },
                               ]}
                               onPress={() => handleUnvalidateCircuitExercise(block, ex.id, idx)}
                             >
@@ -781,14 +777,17 @@ export default function LiveWorkoutScreen() {
                 {/* Bouton [+ Ajouter un exercice au circuit] */}
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  style={styles.addCircuitExBtn}
+                  style={[
+                    styles.addCircuitExBtn,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                  ]}
                   onPress={() => {
                     setTargetCircuitBlockId(block.id);
                     setShowAddExModal(true);
                   }}
                 >
-                  <Plus size={16} color={EPILOG_PURPLE} style={{ marginRight: 6 }} />
-                  <Text style={styles.addCircuitExBtnText}>
+                  <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
+                  <Text style={[styles.addCircuitExBtnText, { color: theme.accent }]}>
                     Ajouter un exercice au circuit
                   </Text>
                 </TouchableOpacity>
@@ -932,7 +931,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: EPILOG_PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1179,12 +1177,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: EPILOG_PURPLE_BORDER,
-    backgroundColor: EPILOG_PURPLE_BG,
     marginTop: 6,
   },
   addCircuitExBtnText: {
-    color: EPILOG_PURPLE,
     fontSize: 13,
     fontWeight: '800',
   },

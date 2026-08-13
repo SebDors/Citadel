@@ -112,7 +112,7 @@ export default function WorkoutAnalyticsScreen() {
 
         <View style={[styles.cardBox, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
           <View style={styles.prSummaryRow}>
-            <Award size={18} color="#8B5CF6" />
+            <Award size={18} color={theme.accent} />
             <Text style={[styles.prSummaryText, { color: theme.text }]}>
               7 records battus dans {template?.title || 'Upper B'}
             </Text>
@@ -121,8 +121,8 @@ export default function WorkoutAnalyticsScreen() {
           {(template?.exercises || []).map((ex, idx) => (
             <View key={idx} style={[styles.prRow, { borderTopColor: theme.border }]}>
               <View style={styles.prLeft}>
-                <View style={styles.starCircle}>
-                  <Star size={12} color="#8B5CF6" fill="#8B5CF6" />
+                <View style={[styles.starCircle, { backgroundColor: theme.surface }]}>
+                  <Star size={12} color={theme.accent} fill={theme.accent} />
                 </View>
                 <View style={{ marginLeft: 8 }}>
                   <Text style={[styles.prExName, { color: theme.text }]}>{ex.exerciseName}</Text>
@@ -326,7 +326,6 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#F3E8FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
