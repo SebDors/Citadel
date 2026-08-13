@@ -13,7 +13,7 @@ interface SetTableRowProps {
   onDelete: () => void;
 }
 
-export const SetTableRow: React.FC<SetTableRowProps> = React.memo(({
+const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   set,
   onUpdate,
   onToggleComplete,
@@ -257,9 +257,12 @@ export const SetTableRow: React.FC<SetTableRowProps> = React.memo(({
       </Modal>
     </View>
   );
-});
+};
 
-SetTableRow.displayName = 'SetTableRow';
+SetTableRowComponent.displayName = 'SetTableRowComponent';
+
+export const SetTableRow = React.memo(SetTableRowComponent);
+export default SetTableRow;
 
 const styles = StyleSheet.create({
   row: {
