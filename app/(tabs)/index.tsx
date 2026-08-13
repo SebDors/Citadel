@@ -311,7 +311,7 @@ export default function WorkoutTab() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header Title */}
         <View style={styles.pageHeader}>
-          <Text style={[styles.appTitle, { color: theme.text }]}>Séances</Text>
+          <Text style={[styles.appTitle, { color: theme.text }]}>Entraînement</Text>
         </View>
 
         {/* Active Workout Banner */}

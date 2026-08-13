@@ -19,7 +19,7 @@ export default function ProfileTab() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>Performances & Profil</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Profil</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
             Progression 1RM, Mensurations et Sauvegardes JSON
           </Text>
