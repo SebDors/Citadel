@@ -1,24 +1,25 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// Guard : expo-notifications est limité dans Expo Go - ne pas crasher
+// Guard : expo-notifications crashe au chargement dans Expo Go.
+// On n'importe JAMAIS le module statiquement — uniquement en dynamic import conditionnel.
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// Configuration de la gestion des notifications au premier plan (uniquement hors Expo Go)
-if (!isExpoGo) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-}
-
 let activeNotificationId: string | null = null;
+let notificationsInitialized = false;
+
+/**
+ * Charge expo-notifications dynamiquement (uniquement hors Expo Go).
+ * Retourne null dans Expo Go ou en cas d'erreur.
+ */
+async function getNotifications() {
+  if (isExpoGo) return null;
+  try {
+    return await import('expo-notifications');
+  } catch {
+    return null;
+  }
+}
 
 export const NotificationService = {
   /**
@@ -27,13 +28,31 @@ export const NotificationService = {
    */
   async init(): Promise<boolean> {
     if (isExpoGo) {
-      console.info('[NotificationService] Expo Go détecté – notifications désactivées. Utilisez un Development Build pour les activer.');
+      console.info('[NotificationService] Expo Go détecté – notifications désactivées. Utilisez un APK / Development Build.');
       return false;
     }
+
+    const Notifications = await getNotifications();
+    if (!Notifications) return false;
+
     try {
+      // Configuration du handler de notifications au premier plan (une seule fois)
+      if (!notificationsInitialized) {
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }),
+        });
+        notificationsInitialized = true;
+      }
+
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('rest-timer', {
-          name: 'Timer de Repos WarriorFit',
+          name: 'Timer de Repos Citadel',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#618764',
@@ -51,7 +70,7 @@ export const NotificationService = {
 
       return finalStatus === 'granted';
     } catch (e) {
-      console.warn('Notification init error:', e);
+      console.warn('[NotificationService] init error:', e);
       return false;
     }
   },
@@ -61,10 +80,11 @@ export const NotificationService = {
    * No-op silencieux dans Expo Go.
    */
   async scheduleTimerExpirationNotification(seconds: number, exerciseName?: string): Promise<void> {
-    if (isExpoGo) return;
+    const Notifications = await getNotifications();
+    if (!Notifications) return;
+
     try {
       await this.cancelScheduledNotification();
-
       if (seconds <= 0) return;
 
       const title = '⏱️ Repos Terminé !';
@@ -85,7 +105,7 @@ export const NotificationService = {
         },
       });
     } catch (e) {
-      console.warn('Failed to schedule timer notification:', e);
+      console.warn('[NotificationService] scheduleTimerExpirationNotification error:', e);
     }
   },
 
@@ -94,7 +114,9 @@ export const NotificationService = {
    * No-op silencieux dans Expo Go.
    */
   async cancelScheduledNotification(): Promise<void> {
-    if (isExpoGo) return;
+    const Notifications = await getNotifications();
+    if (!Notifications) return;
+
     try {
       if (activeNotificationId) {
         await Notifications.dismissNotificationAsync(activeNotificationId);
@@ -103,14 +125,14 @@ export const NotificationService = {
       }
       await Notifications.cancelAllScheduledNotificationsAsync();
     } catch (e) {
-      console.warn('Failed to cancel timer notification:', e);
+      console.warn('[NotificationService] cancelScheduledNotification error:', e);
     }
   },
 
   /**
    * Joue un son d'alerte sonore pour la fin du timer de repos.
    * Utilise expo-audio (SDK 54+).
-   * Fonctionne dans Expo Go et dans un Development Build.
+   * Fonctionne dans Expo Go et dans un APK / Development Build.
    */
   async playTimerEndSound(): Promise<void> {
     try {
@@ -129,7 +151,7 @@ export const NotificationService = {
         try { player.remove(); } catch (_) {}
       }, 5000);
     } catch (e) {
-      console.warn('Audio play error:', e);
+      console.warn('[NotificationService] Audio play error:', e);
     }
   },
 };
