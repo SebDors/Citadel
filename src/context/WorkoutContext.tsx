@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { AppState } from 'react-native';
 import {
   FitTrackerData,
   WorkoutSession,
@@ -17,6 +18,7 @@ import {
   getSessionBlocks,
 } from '../types';
 import { StorageService } from '../services/storage';
+import { NotificationService } from '../services/notificationService';
 
 interface WorkoutContextType {
   data: FitTrackerData | null;
@@ -92,21 +94,30 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       targetEndTime: targetEnd,
       secondsRemaining: seconds,
     });
+    NotificationService.scheduleTimerExpirationNotification(seconds, exerciseName);
   };
 
   const dismissRestTimer = () => {
+    NotificationService.cancelScheduledNotification();
     setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
   };
 
   const adjustRestTimer = (deltaSeconds: number) => {
-    if (!restTimer.targetEndTime) return;
+    if (!restTimer.targetEndTime || !restTimer.active) return;
     const newTarget = restTimer.targetEndTime + deltaSeconds * 1000;
     const newRemaining = Math.max(0, Math.ceil((newTarget - Date.now()) / 1000));
-    setRestTimer((prev) => ({
-      ...prev,
-      targetEndTime: newTarget,
-      secondsRemaining: newRemaining,
-    }));
+    if (newRemaining <= 0) {
+      NotificationService.playTimerEndSound();
+      NotificationService.cancelScheduledNotification();
+      setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+    } else {
+      setRestTimer((prev) => ({
+        ...prev,
+        targetEndTime: newTarget,
+        secondsRemaining: newRemaining,
+      }));
+      NotificationService.scheduleTimerExpirationNotification(newRemaining, restTimer.exerciseName);
+    }
   };
 
   const reloadAllData = async () => {
@@ -121,6 +132,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     reloadAllData();
+    NotificationService.init();
   }, []);
 
   // Décompte du Minuteur de Repos
@@ -130,7 +142,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.ceil((restTimer.targetEndTime! - Date.now()) / 1000));
       if (remaining <= 0) {
-        setRestTimer((prev) => ({ ...prev, active: false, secondsRemaining: 0, targetEndTime: null }));
+        NotificationService.playTimerEndSound();
+        NotificationService.cancelScheduledNotification();
+        setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
         clearInterval(interval);
       } else {
         setRestTimer((prev) => ({ ...prev, secondsRemaining: remaining }));
@@ -138,6 +152,29 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, 500);
 
     return () => clearInterval(interval);
+  }, [restTimer.active, restTimer.targetEndTime]);
+
+  // Gestion du Cycle de Vie AppState (Arrière-plan -> Premier plan)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        if (restTimer.active && restTimer.targetEndTime) {
+          const remainingMs = restTimer.targetEndTime - Date.now();
+          if (remainingMs <= 0) {
+            NotificationService.playTimerEndSound();
+            NotificationService.cancelScheduledNotification();
+            setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+          } else {
+            const remainingSec = Math.ceil(remainingMs / 1000);
+            setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
+          }
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [restTimer.active, restTimer.targetEndTime]);
 
   // Durée de la séance en cours
@@ -780,13 +817,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updatedData = await StorageService.saveWorkoutSession(completedSession);
     setData(updatedData);
     setActiveSession(null);
-    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+    dismissRestTimer();
   };
 
   const cancelWorkout = () => {
     setActiveSession(null);
     StorageService.saveCurrentWorkout(null);
-    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+    dismissRestTimer();
   };
 
   const addMeasurement = async (measurement: BodyMeasurement) => {
