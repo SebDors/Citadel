@@ -32,7 +32,6 @@ import {
   Edit2,
   Copy,
   Trash2,
-  Share2,
   X,
   Tag,
   Check,
@@ -47,7 +46,6 @@ import {
   getSessionBlocks,
   formatCircuitSummary,
 } from '../../src/types';
-import { JsonExportService } from '../../src/services/jsonExport';
 import { StorageService } from '../../src/services/storage';
 
 function getActiveBannerSubtitle(session: WorkoutSession): string {
@@ -181,11 +179,6 @@ export default function WorkoutTab() {
       setShowRenameFolderModal(false);
       setSelectedFolder(null);
     }
-  };
-
-  const handleExportTemplateJson = async (tpl: WorkoutTemplate) => {
-    setShowTemplateMenuModal(false);
-    await JsonExportService.shareBlankTemplateJson(tpl);
   };
 
   // Group templates by folder
@@ -545,18 +538,7 @@ export default function WorkoutTab() {
               <Text style={[styles.menuOptionText, { color: theme.text }]}>Déplacer dans un dossier</Text>
             </TouchableOpacity>
 
-            {/* 5. Exporter JSON (Séance vierge) */}
-            <TouchableOpacity
-              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
-              onPress={() => {
-                if (selectedTemplate) handleExportTemplateJson(selectedTemplate);
-              }}
-            >
-              <Share2 size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>Exporter JSON (Séance vierge)</Text>
-            </TouchableOpacity>
-
-            {/* 6. Supprimer */}
+            {/* Supprimer */}
             <TouchableOpacity
               style={styles.menuOptionRow}
               onPress={() => {

@@ -6,10 +6,9 @@ import { ProfileHeaderCard } from '../../src/components/Profile/ProfileHeaderCar
 import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { ModularMeasurementChartCard } from '../../src/components/Profile/ModularMeasurementChartCard';
 import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
-import { JsonActionsCard } from '../../src/components/Profile/JsonActionsCard';
 
 export default function ProfileTab() {
-  const { data, addMeasurement, deleteMeasurement, updateUserProfile, reloadAllData } = useWorkout();
+  const { data, addMeasurement, deleteMeasurement, updateUserProfile } = useWorkout();
   const { theme } = useTheme();
 
   if (!data) return null;
@@ -21,7 +20,7 @@ export default function ProfileTab() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Profil</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            Progression 1RM, Mensurations et Sauvegardes JSON
+            Progression 1RM et Suivi des Mensurations
           </Text>
         </View>
 
@@ -40,9 +39,6 @@ export default function ProfileTab() {
           onAddMeasurement={addMeasurement}
           onDeleteMeasurement={deleteMeasurement}
         />
-
-        {/* 5. Zone Réglages & Données JSON */}
-        <JsonActionsCard data={data} onImportSuccess={reloadAllData} />
       </ScrollView>
     </SafeAreaView>
   );

@@ -119,13 +119,6 @@ export const StorageService = {
   },
 
   /**
-   * Remplace intégralement les données par un objet importé depuis un JSON.
-   */
-  async importFullData(data: FitTrackerData): Promise<void> {
-    await this.saveData(data);
-  },
-
-  /**
    * Supprime une séance complète de l'historique par ID.
    */
   async deleteWorkoutSession(sessionId: string): Promise<FitTrackerData> {

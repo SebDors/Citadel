@@ -43,10 +43,6 @@
 - Track body weight (kg), body fat percentage (%), chest, waist, thigh, and biceps measurements over time.
 - Interactive progress charts visualizing measurement evolution.
 
-### 💾 6. Data Backup & Portability
-- **Full JSON Export/Import**: Export complete workout history, profile data, and templates to a JSON file.
-- **Blank Template Export**: Share individual workout templates via JSON for friends or coaches.
-
 ---
 
 ## 🛠️ Tech Stack
@@ -116,7 +112,7 @@ WarriorFit/
 │   ├── components/           # UI Components (ExerciseCard, SetTable, CalendarView, etc.)
 │   ├── constants/            # 52-Exercise Database & Configuration
 │   ├── context/              # ThemeContext & WorkoutContext (Global State & Storage)
-│   ├── services/             # StorageService, JsonExportService, MockData
+│   ├── services/             # StorageService, MockData
 │   └── types/                # TypeScript Interfaces & Helpers
 └── assets/                   # App Icons & Visual Assets
 ```
