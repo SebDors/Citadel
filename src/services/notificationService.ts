@@ -5,6 +5,10 @@ import Constants from 'expo-constants';
 // On n'importe JAMAIS le module statiquement — uniquement en dynamic import conditionnel.
 const isExpoGo = Constants.appOwnership === 'expo';
 
+// Son local embarqué dans les assets (WAV 44100 Hz, bip double 880 Hz + 1100 Hz)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const TIMER_SOUND = require('../../assets/timer_end.wav');
+
 let activeNotificationId: string | null = null;
 let notificationsInitialized = false;
 
@@ -130,26 +134,22 @@ export const NotificationService = {
   },
 
   /**
-   * Joue un son d'alerte sonore pour la fin du timer de repos.
+   * Joue un son d'alerte sonore local (bip double 880 Hz + 1100 Hz) pour la fin du timer de repos.
    * Utilise expo-audio (SDK 54+).
-   * Fonctionne dans Expo Go et dans un APK / Development Build.
+   * Fonctionne dans Expo Go ET dans un APK / Development Build.
    */
   async playTimerEndSound(): Promise<void> {
     try {
-      const { createAudioPlayer, setIsAudioActiveAsync } = await import('expo-audio');
+      const { createAudioPlayer } = await import('expo-audio');
 
-      await setIsAudioActiveAsync(true);
-
-      const player = createAudioPlayer(
-        { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' }
-      );
+      const player = createAudioPlayer(TIMER_SOUND);
       player.volume = 1.0;
       player.play();
 
-      // Nettoyage après 5s
+      // Nettoyage après 3s (durée du bip ~0.4s)
       setTimeout(() => {
         try { player.remove(); } catch (_) {}
-      }, 5000);
+      }, 3000);
     } catch (e) {
       console.warn('[NotificationService] Audio play error:', e);
     }
