@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../src/context/ThemeContext';
 import { useWorkout } from '../src/context/WorkoutContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ export default function WorkoutAnalyticsScreen() {
   const { data } = useWorkout();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const templateId = (params.id as string) || 'tpl_upper_b';
   const template = data?.templates.find((t) => t.id === templateId) || data?.templates[0];
@@ -243,19 +245,20 @@ export default function WorkoutAnalyticsScreen() {
   }, [allExercises, historySessions]);
 
   return (
-    <SafeAreaView
-      style={[
-        styles.safeArea,
-        {
-          backgroundColor: theme.background,
-          paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
-        },
-      ]}
-    >
+    <View style={[styles.safeArea, { backgroundColor: theme.background }]}>
       {/* Top Header Navigation */}
-      <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            borderBottomColor: theme.border,
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 16) + 8,
+          },
+        ]}
+      >
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={20} color={theme.text} />
+          <Text style={[styles.backText, { color: theme.text }]}>Retour</Text>
         </TouchableOpacity>
         <View style={styles.titleBox}>
           <Text style={[styles.topTitle, { color: theme.text }]}>{template?.title || 'Upper B'}</Text>
@@ -263,7 +266,7 @@ export default function WorkoutAnalyticsScreen() {
             {historySessions.length} entraînement{historySessions.length > 1 ? 's' : ''}
           </Text>
         </View>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -488,7 +491,7 @@ export default function WorkoutAnalyticsScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -500,11 +503,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingBottom: 14,
     borderBottomWidth: 1,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 4,
+  },
+  backText: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   titleBox: {
     flex: 1,
