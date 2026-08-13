@@ -168,9 +168,9 @@ export default function TemplateEditorScreen() {
         targetMuscles: ex.targetMuscles,
         restSeconds: defaultRestSeconds || ex.defaultRestSeconds || 75,
         sets: [
-          { id: `s1_${Date.now()}`, setNumber: 1, type: 'normal', rir: 2, completed: false },
-          { id: `s2_${Date.now()}`, setNumber: 2, type: 'normal', rir: 2, completed: false },
-          { id: `s3_${Date.now()}`, setNumber: 3, type: 'normal', rir: 2, completed: false },
+          { id: `s1_${Date.now()}`, setNumber: 1, type: 'normal', rir: undefined, completed: false },
+          { id: `s2_${Date.now()}`, setNumber: 2, type: 'normal', rir: undefined, completed: false },
+          { id: `s3_${Date.now()}`, setNumber: 3, type: 'normal', rir: undefined, completed: false },
         ],
       };
 
@@ -458,7 +458,7 @@ export default function TemplateEditorScreen() {
           type: 'normal',
           reps: item.targetType === 'reps' ? item.targetValue : undefined,
           durationSeconds: item.targetType === 'time' ? item.targetValue : undefined,
-          rir: 2,
+          rir: undefined,
           completed: false,
         },
       ],
@@ -576,7 +576,7 @@ export default function TemplateEditorScreen() {
             id: `s_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
             setNumber: newSetNumber,
             type: 'normal' as SetType,
-            rir: 2,
+            rir: undefined,
             completed: false,
           };
           return {

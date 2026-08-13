@@ -400,7 +400,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         type: lastSet ? lastSet.type : 'normal',
         weightKg: undefined,
         reps: undefined,
-        rir: lastSet ? lastSet.rir : undefined,
+        rir: undefined,
         completed: false,
         previous: lastSet?.previous || undefined,
       };
@@ -418,7 +418,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               type: lastSet ? lastSet.type : 'normal',
               weightKg: undefined,
               reps: undefined,
-              rir: lastSet ? lastSet.rir : undefined,
+              rir: undefined,
               completed: false,
               previous: lastSet?.previous || undefined,
             };

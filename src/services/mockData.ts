@@ -22,10 +22,10 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           targetMuscles: ['Pectoraux (Bas)', 'Triceps', 'Deltoïde antérieur'],
           restSeconds: 90,
           sets: [
-            { id: 's1', setNumber: 1, type: 'normal', weightKg: 0, reps: 12, rir: 2, completed: false, previous: 'Poids de corps x 12' },
-            { id: 's2', setNumber: 2, type: 'normal', weightKg: 10, reps: 10, rir: 1, completed: false, previous: '+10kg x 10' },
-            { id: 's3', setNumber: 3, type: 'normal', weightKg: 10, reps: 9, rir: 1, completed: false, previous: '+10kg x 9' },
-            { id: 's4', setNumber: 4, type: 'normal', weightKg: 10, reps: 8, rir: 0, completed: false, previous: '+10kg x 8' },
+            { id: 's1', setNumber: 1, type: 'normal', weightKg: 0, reps: 12, rir: undefined, completed: false, previous: 'Poids de corps x 12' },
+            { id: 's2', setNumber: 2, type: 'normal', weightKg: 10, reps: 10, rir: undefined, completed: false, previous: '+10kg x 10' },
+            { id: 's3', setNumber: 3, type: 'normal', weightKg: 10, reps: 9, rir: undefined, completed: false, previous: '+10kg x 9' },
+            { id: 's4', setNumber: 4, type: 'normal', weightKg: 10, reps: 8, rir: undefined, completed: false, previous: '+10kg x 8' },
           ],
         },
         {
@@ -36,9 +36,9 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           targetMuscles: ['Pectoraux (Haut & Médian)'],
           restSeconds: 75,
           sets: [
-            { id: 's5', setNumber: 1, type: 'normal', weightKg: 12.5, reps: 12, rir: 2, completed: false, previous: '12.5kg x 12' },
-            { id: 's6', setNumber: 2, type: 'normal', weightKg: 15, reps: 10, rir: 1, completed: false, previous: '15kg x 10' },
-            { id: 's7', setNumber: 3, type: 'normal', weightKg: 15, reps: 10, rir: 0, completed: false, previous: '15kg x 10' },
+            { id: 's5', setNumber: 1, type: 'normal', weightKg: 12.5, reps: 12, rir: undefined, completed: false, previous: '12.5kg x 12' },
+            { id: 's6', setNumber: 2, type: 'normal', weightKg: 15, reps: 10, rir: undefined, completed: false, previous: '15kg x 10' },
+            { id: 's7', setNumber: 3, type: 'normal', weightKg: 15, reps: 10, rir: undefined, completed: false, previous: '15kg x 10' },
           ],
         },
         {
@@ -49,9 +49,9 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           targetMuscles: ['Grand Dorsal', 'Trapèzes moyens', 'Biceps'],
           restSeconds: 90,
           sets: [
-            { id: 's8', setNumber: 1, type: 'normal', weightKg: 35, reps: 10, rir: 2, completed: false, previous: '35kg x 10' },
-            { id: 's9', setNumber: 2, type: 'normal', weightKg: 40, reps: 9, rir: 1, completed: false, previous: '40kg x 9' },
-            { id: 's10', setNumber: 3, type: 'normal', weightKg: 40, reps: 8, rir: 0, completed: false, previous: '40kg x 8' },
+            { id: 's8', setNumber: 1, type: 'normal', weightKg: 35, reps: 10, rir: undefined, completed: false, previous: '35kg x 10' },
+            { id: 's9', setNumber: 2, type: 'normal', weightKg: 40, reps: 9, rir: undefined, completed: false, previous: '40kg x 9' },
+            { id: 's10', setNumber: 3, type: 'normal', weightKg: 40, reps: 8, rir: undefined, completed: false, previous: '40kg x 8' },
           ],
         },
         {
@@ -63,10 +63,10 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           restSeconds: 60,
           supersetGroup: 'Superset A',
           sets: [
-            { id: 's11', setNumber: 1, type: 'normal', weightKg: 7.5, reps: 15, rir: 2, completed: false, previous: '7.5kg x 15' },
-            { id: 's12', setNumber: 2, type: 'normal', weightKg: 10, reps: 12, rir: 1, completed: false, previous: '10kg x 12' },
-            { id: 's13', setNumber: 3, type: 'normal', weightKg: 10, reps: 12, rir: 1, completed: false, previous: '10kg x 12' },
-            { id: 's14', setNumber: 4, type: 'normal', weightKg: 10, reps: 10, rir: 0, completed: false, previous: '10kg x 10' },
+            { id: 's11', setNumber: 1, type: 'normal', weightKg: 7.5, reps: 15, rir: undefined, completed: false, previous: '7.5kg x 15' },
+            { id: 's12', setNumber: 2, type: 'normal', weightKg: 10, reps: 12, rir: undefined, completed: false, previous: '10kg x 12' },
+            { id: 's13', setNumber: 3, type: 'normal', weightKg: 10, reps: 12, rir: undefined, completed: false, previous: '10kg x 12' },
+            { id: 's14', setNumber: 4, type: 'normal', weightKg: 10, reps: 10, rir: undefined, completed: false, previous: '10kg x 10' },
           ],
         },
         {
@@ -78,9 +78,9 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           restSeconds: 60,
           supersetGroup: 'Superset A',
           sets: [
-            { id: 's15', setNumber: 1, type: 'normal', weightKg: 7.5, reps: 14, rir: 2, completed: false, previous: '7.5kg x 14' },
-            { id: 's16', setNumber: 2, type: 'normal', weightKg: 10, reps: 12, rir: 1, completed: false, previous: '10kg x 12' },
-            { id: 's17', setNumber: 3, type: 'normal', weightKg: 10, reps: 11, rir: 0, completed: false, previous: '10kg x 11' },
+            { id: 's15', setNumber: 1, type: 'normal', weightKg: 7.5, reps: 14, rir: undefined, completed: false, previous: '7.5kg x 14' },
+            { id: 's16', setNumber: 2, type: 'normal', weightKg: 10, reps: 12, rir: undefined, completed: false, previous: '10kg x 12' },
+            { id: 's17', setNumber: 3, type: 'normal', weightKg: 10, reps: 11, rir: undefined, completed: false, previous: '10kg x 11' },
           ],
         },
         {
@@ -91,9 +91,9 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           targetMuscles: ['Triceps (Chef long)', 'Deltoïdes'],
           restSeconds: 75,
           sets: [
-            { id: 's18', setNumber: 1, type: 'normal', weightKg: 20, reps: 12, rir: 2, completed: false, previous: '20kg x 12' },
-            { id: 's19', setNumber: 2, type: 'normal', weightKg: 24, reps: 10, rir: 1, completed: false, previous: '24kg x 10' },
-            { id: 's20', setNumber: 3, type: 'normal', weightKg: 24, reps: 9, rir: 0, completed: false, previous: '24kg x 9' },
+            { id: 's18', setNumber: 1, type: 'normal', weightKg: 20, reps: 12, rir: undefined, completed: false, previous: '20kg x 12' },
+            { id: 's19', setNumber: 2, type: 'normal', weightKg: 24, reps: 10, rir: undefined, completed: false, previous: '24kg x 10' },
+            { id: 's20', setNumber: 3, type: 'normal', weightKg: 24, reps: 9, rir: undefined, completed: false, previous: '24kg x 9' },
           ],
         },
         {
@@ -104,8 +104,8 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
           targetMuscles: ['Biceps brachial', 'Brachial antérieur'],
           restSeconds: 90,
           sets: [
-            { id: 's21', setNumber: 1, type: 'failure', weightKg: 14, reps: 10, rir: 0, completed: false, previous: '14kg x 10 (Échec)' },
-            { id: 's22', setNumber: 2, type: 'failure', weightKg: 14, reps: 8, rir: 0, completed: false, previous: '14kg x 8 (Échec)' },
+            { id: 's21', setNumber: 1, type: 'failure', weightKg: 14, reps: 10, rir: undefined, completed: false, previous: '14kg x 10 (Échec)' },
+            { id: 's22', setNumber: 2, type: 'failure', weightKg: 14, reps: 8, rir: undefined, completed: false, previous: '14kg x 8 (Échec)' },
           ],
         },
       ],
@@ -190,7 +190,7 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
                 type: 'normal',
                 weightKg: 0,
                 reps: 10,
-                rir: 2,
+                rir: undefined,
                 completed: false,
                 previous: '10 reps',
               },
