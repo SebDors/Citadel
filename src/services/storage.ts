@@ -3,6 +3,7 @@ import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, Worko
 import { INITIAL_MOCK_DATA } from './mockData';
 
 const STORAGE_KEY = '@warriorfit_app_data_v1';
+const COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
 
 export const StorageService = {
   /**
@@ -288,6 +289,34 @@ export const StorageService = {
     };
     await this.saveData(updatedData);
     return updatedData;
+  },
+
+  /**
+   * Charge l'état de réduction/extension des cartes de séances.
+   */
+  async loadCollapsedCards(): Promise<Record<string, boolean>> {
+    try {
+      const jsonValue = await AsyncStorage.getItem(COLLAPSED_CARDS_KEY);
+      if (jsonValue !== null) {
+        return JSON.parse(jsonValue) as Record<string, boolean>;
+      }
+      return {};
+    } catch (e) {
+      console.error('Erreur lors du chargement de collapsedCards:', e);
+      return {};
+    }
+  },
+
+  /**
+   * Sauvegarde l'état de réduction/extension des cartes de séances.
+   */
+  async saveCollapsedCards(collapsedMap: Record<string, boolean>): Promise<void> {
+    try {
+      const jsonValue = JSON.stringify(collapsedMap);
+      await AsyncStorage.setItem(COLLAPSED_CARDS_KEY, jsonValue);
+    } catch (e) {
+      console.error('Erreur lors de la sauvegarde de collapsedCards:', e);
+    }
   },
 };
 

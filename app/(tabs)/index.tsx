@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -47,6 +47,7 @@ import {
   formatCircuitSummary,
 } from '../../src/types';
 import { JsonExportService } from '../../src/services/jsonExport';
+import { StorageService } from '../../src/services/storage';
 
 function getActiveBannerSubtitle(session: WorkoutSession): string {
   const blocks = getSessionBlocks(session);
@@ -119,8 +120,22 @@ export default function WorkoutTab() {
   // Compact cards state
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    const loadCollapsedState = async () => {
+      const saved = await StorageService.loadCollapsedCards();
+      if (saved) {
+        setCollapsedCards(saved);
+      }
+    };
+    loadCollapsedState();
+  }, []);
+
   const toggleCardCollapse = (id: string) => {
-    setCollapsedCards((prev) => ({ ...prev, [id]: !prev[id] }));
+    setCollapsedCards((prev) => {
+      const nextState = { ...prev, [id]: !prev[id] };
+      StorageService.saveCollapsedCards(nextState);
+      return nextState;
+    });
   };
 
   const handleStartFreestyle = () => {
