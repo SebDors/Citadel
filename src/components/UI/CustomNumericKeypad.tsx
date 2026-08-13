@@ -33,6 +33,29 @@ interface KeyButtonProps {
   textStyle?: any;
 }
 
+export const computeNextValue = (
+  prevVal: string,
+  key: string,
+  activeField: NumericFieldType | null
+): string => {
+  if (key === 'backspace') {
+    return prevVal.length > 0 ? prevVal.slice(0, -1) : '';
+  }
+  if (key === '.') {
+    if (activeField === 'reps') return prevVal; // Les reps sont toujours des entiers
+    if (prevVal.includes('.')) return prevVal;
+    return prevVal === '' ? '0.' : prevVal + '.';
+  }
+  // Chiffres 0-9
+  if (prevVal === '0') {
+    return key;
+  }
+  if (prevVal.length < 6) {
+    return prevVal + key;
+  }
+  return prevVal;
+};
+
 // Sous-composant KeyButton mémoïsé avec React.memo pour des performances optimales (< 16ms)
 const KeyButton = React.memo<KeyButtonProps>(({
   value,
@@ -100,28 +123,12 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   // Gestion des clics du pavé numérique (0-9, ., backspace)
   const handleKeyPress = useCallback((key: string) => {
-    setLocalValue((prevVal) => {
-      let nextVal = prevVal;
-      if (key === 'backspace') {
-        nextVal = prevVal.length > 0 ? prevVal.slice(0, -1) : '';
-      } else if (key === '.') {
-        if (activeField === 'reps') return prevVal; // Les reps sont toujours des entiers
-        if (prevVal.includes('.')) return prevVal;
-        nextVal = prevVal === '' ? '0.' : prevVal + '.';
-      } else {
-        // Chiffres 0-9
-        if (prevVal === '0') {
-          nextVal = key;
-        } else if (prevVal.length < 6) {
-          nextVal = prevVal + key;
-        }
-      }
-      if (onChangeValue) {
-        onChangeValue(nextVal);
-      }
-      return nextVal;
-    });
-  }, [activeField, onChangeValue]);
+    const nextVal = computeNextValue(localValue, key, activeField);
+    setLocalValue(nextVal);
+    if (onChangeValue) {
+      onChangeValue(nextVal);
+    }
+  }, [localValue, activeField, onChangeValue]);
 
   // Gestion des boutons de choix rapide RIR (1, 2, 3, 4, 5+)
   const handleRirPress = useCallback((key: string) => {
