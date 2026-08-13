@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,49 @@ export interface CustomNumericKeypadProps {
   setNumber: number;
   activeField: NumericFieldType;
   value: string;
-  onChangeValue: (val: string) => void;
-  onNextField?: () => void;
-  onValidate?: () => void;
+  onChangeValue?: (val: string) => void;
+  onNextField?: (currentVal: string) => void;
+  onValidate?: (finalVal: string) => void;
   onClear?: () => void;
 }
+
+interface KeyButtonProps {
+  value: string;
+  label?: string;
+  icon?: React.ReactNode;
+  onPress: (val: string) => void;
+  disabled?: boolean;
+  style?: any;
+  textStyle?: any;
+}
+
+// Sous-composant KeyButton mémoïsé avec React.memo pour des performances optimales (< 16ms)
+const KeyButton = React.memo<KeyButtonProps>(({
+  value,
+  label,
+  icon,
+  onPress,
+  disabled,
+  style,
+  textStyle,
+}) => {
+  const handlePress = useCallback(() => {
+    onPress(value);
+  }, [onPress, value]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.6}
+      onPress={handlePress}
+      disabled={disabled}
+      style={style}
+    >
+      {icon ? icon : <Text style={textStyle}>{label || value}</Text>}
+    </TouchableOpacity>
+  );
+});
+
+KeyButton.displayName = 'KeyButton';
 
 export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   visible,
@@ -36,8 +74,16 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 }) => {
   const { theme } = useTheme();
 
+  // État local de la saisie pour éviter de ré-exécuter le rendu du composant parent SetTableRow à chaque touche tapée
+  const [localValue, setLocalValue] = useState<string>(value);
+
+  // Synchronisation de l'état local lors du changement de prop value ou activeField
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value, activeField, visible]);
+
   // Titre et unité de l'en-tête selon le champ actif
-  const getFieldHeaderInfo = () => {
+  const getFieldHeaderInfo = useCallback(() => {
     switch (activeField) {
       case 'weightKg':
         return { title: `Série ${setNumber} · Poids`, unit: 'KG' };
@@ -48,52 +94,71 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
       default:
         return { title: `Série ${setNumber}`, unit: '' };
     }
-  };
+  }, [activeField, setNumber]);
 
   const { title, unit } = getFieldHeaderInfo();
 
-  // Gestion des clics sur les touches numériques
-  const handleKeyPress = (key: string) => {
-    if (key === 'backspace') {
-      if (value.length > 0) {
-        onChangeValue(value.slice(0, -1));
+  // Gestion des clics du pavé numérique (0-9, ., backspace)
+  const handleKeyPress = useCallback((key: string) => {
+    setLocalValue((prevVal) => {
+      let nextVal = prevVal;
+      if (key === 'backspace') {
+        nextVal = prevVal.length > 0 ? prevVal.slice(0, -1) : '';
+      } else if (key === '.') {
+        if (activeField === 'reps') return prevVal; // Les reps sont toujours des entiers
+        if (prevVal.includes('.')) return prevVal;
+        nextVal = prevVal === '' ? '0.' : prevVal + '.';
+      } else {
+        // Chiffres 0-9
+        if (prevVal === '0') {
+          nextVal = key;
+        } else if (prevVal.length < 6) {
+          nextVal = prevVal + key;
+        }
       }
-      return;
-    }
-
-    if (key === '.') {
-      // Ignorer si déjà un point decimal
-      if (value.includes('.')) return;
-      // Si la valeur est vide, ajouter "0."
-      if (value === '') {
-        onChangeValue('0.');
-        return;
+      if (onChangeValue) {
+        onChangeValue(nextVal);
       }
-      onChangeValue(value + '.');
-      return;
-    }
+      return nextVal;
+    });
+  }, [activeField, onChangeValue]);
 
-    // Pour les chiffres '0'..'9'
-    if (value === '0') {
-      // Si on tape un chiffre alors que c'était '0', le remplacer sauf si c'est '0'
+  // Gestion des boutons de choix rapide RIR (1, 2, 3, 4, 5+)
+  const handleRirPress = useCallback((key: string) => {
+    setLocalValue(key);
+    if (onChangeValue) {
       onChangeValue(key);
-      return;
     }
+  }, [onChangeValue]);
 
-    // Limiter la longueur max (ex: 6 caractères)
-    if (value.length >= 6) return;
-
-    onChangeValue(value + key);
-  };
-
-  const handleClear = () => {
-    onChangeValue('');
+  // Réinitialisation de la valeur saisie
+  const handleClear = useCallback(() => {
+    setLocalValue('');
+    if (onChangeValue) {
+      onChangeValue('');
+    }
     if (onClear) {
       onClear();
     }
-  };
+  }, [onChangeValue, onClear]);
 
-  // Clés du pavé numérique 4x3
+  // Action Suivant (passer au champ suivant en transmettant la valeur locale)
+  const handleNext = useCallback(() => {
+    if (onNextField) {
+      onNextField(localValue);
+    }
+  }, [onNextField, localValue]);
+
+  // Action Valider (valider et fermer en transmettant la valeur locale)
+  const handleValidate = useCallback(() => {
+    if (onValidate) {
+      onValidate(localValue);
+    }
+  }, [onValidate, localValue]);
+
+  const isLastField = activeField === 'rir';
+
+  // Pavé numérique standard 4x3 pour KG et REPS
   const keypadRows = [
     ['1', '2', '3'],
     ['4', '5', '6'],
@@ -101,7 +166,8 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     ['.', '0', 'backspace'],
   ];
 
-  const isLastField = activeField === 'rir';
+  // Choix rapides RIR dédiés
+  const rirOptions = ['1', '2', '3', '4', '5+'];
 
   return (
     <Modal
@@ -125,15 +191,20 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             },
           ]}
         >
-          {/* Header du Clavier */}
+          {/* En-tête du Clavier */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerTitleContainer}>
               <Text style={[styles.headerSubTitle, { color: theme.textMuted }]}>
                 {title}
               </Text>
               <View style={styles.valueDisplayRow}>
-                <Text style={[styles.headerValue, { color: theme.text }]}>
-                  {value || '0'}
+                <Text
+                  style={[
+                    styles.headerValue,
+                    { color: localValue ? theme.text : theme.textMuted },
+                  ]}
+                >
+                  {localValue || '-'}
                 </Text>
                 <Text style={[styles.headerUnit, { color: theme.accent }]}>
                   {unit}
@@ -150,35 +221,73 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Grille Numérique 4x3 */}
-          <View style={styles.gridContainer}>
-            {keypadRows.map((row, rowIndex) => (
-              <View key={rowIndex} style={styles.gridRow}>
-                {row.map((key) => (
-                  <TouchableOpacity
-                    key={key}
-                    activeOpacity={0.6}
-                    onPress={() => handleKeyPress(key)}
+          {/* Affichage du mode de saisie selon le champ actif */}
+          {activeField === 'rir' ? (
+            /* Mode RIR : Rangée exclusive de boutons de choix rapide (1, 2, 3, 4, 5+) */
+            <View style={styles.rirContainer}>
+              {rirOptions.map((option) => {
+                const isSelected =
+                  localValue === option || (option === '5+' && localValue === '5');
+                return (
+                  <KeyButton
+                    key={option}
+                    value={option}
+                    label={option}
+                    onPress={handleRirPress}
                     style={[
-                      styles.keypadBtn,
+                      styles.rirBtn,
                       {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.border,
+                        backgroundColor: isSelected
+                          ? theme.accent
+                          : theme.surface,
+                        borderColor: isSelected
+                          ? theme.accent
+                          : theme.border,
                       },
                     ]}
-                  >
-                    {key === 'backspace' ? (
-                      <Delete size={22} color={theme.text} />
-                    ) : (
-                      <Text style={[styles.keypadText, { color: theme.text }]}>
-                        {key}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-          </View>
+                    textStyle={[
+                      styles.rirBtnText,
+                      { color: isSelected ? '#FFFFFF' : theme.text },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          ) : (
+            /* Mode Standard (KG / REPS) : Grille Numérique 4x3 */
+            <View style={styles.gridContainer}>
+              {keypadRows.map((row, rowIndex) => (
+                <View key={rowIndex} style={styles.gridRow}>
+                  {row.map((key) => {
+                    const isDotDisabled = key === '.' && activeField === 'reps';
+                    return (
+                      <KeyButton
+                        key={key}
+                        value={key}
+                        label={key}
+                        disabled={isDotDisabled}
+                        icon={
+                          key === 'backspace' ? (
+                            <Delete size={22} color={theme.text} />
+                          ) : undefined
+                        }
+                        onPress={handleKeyPress}
+                        style={[
+                          styles.keypadBtn,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.border,
+                            opacity: isDotDisabled ? 0.35 : 1,
+                          },
+                        ]}
+                        textStyle={[styles.keypadText, { color: theme.text }]}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Barre d'action inférieure */}
           <View style={styles.buttonBar}>
@@ -195,7 +304,11 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                 },
               ]}
             >
-              <RotateCcw size={16} color={theme.textMuted} style={{ marginRight: 6 }} />
+              <RotateCcw
+                size={16}
+                color={theme.textMuted}
+                style={{ marginRight: 6 }}
+              />
               <Text style={[styles.clearBtnText, { color: theme.text }]}>
                 Effacer
               </Text>
@@ -205,7 +318,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             {isLastField ? (
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={onValidate}
+                onPress={handleValidate}
                 style={[
                   styles.actionBtn,
                   styles.validateBtn,
@@ -220,7 +333,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             ) : (
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={onNextField}
+                onPress={handleNext}
                 style={[
                   styles.actionBtn,
                   styles.nextBtn,
@@ -298,6 +411,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 12,
   },
+  /* Mode RIR : Rangée unique de choix rapide */
+  rirContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: 6,
+  },
+  rirBtn: {
+    flex: 1,
+    height: 56,
+    marginHorizontal: 3,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rirBtnText: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  /* Mode Standard : Pavé 4x3 */
   gridContainer: {
     marginBottom: 16,
   },

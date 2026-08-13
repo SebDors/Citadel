@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -13,7 +13,7 @@ interface SetTableRowProps {
   onDelete: () => void;
 }
 
-export const SetTableRow: React.FC<SetTableRowProps> = ({
+export const SetTableRow: React.FC<SetTableRowProps> = React.memo(({
   set,
   onUpdate,
   onToggleComplete,
@@ -26,7 +26,8 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
 
-  const handleOpenKeypad = (field: NumericFieldType) => {
+  // Ouverture du clavier numérique sur le champ spécifié
+  const handleOpenKeypad = useCallback((field: NumericFieldType) => {
     setActiveKeypadField(field);
     let valStr = '';
     if (field === 'weightKg') {
@@ -34,48 +35,53 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
     } else if (field === 'reps') {
       valStr = set.reps !== undefined && set.reps !== null ? String(set.reps) : '';
     } else if (field === 'rir') {
-      valStr = set.rir !== undefined && set.rir !== null ? String(set.rir) : '';
+      valStr = set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '';
     }
     setTempValue(valStr);
-  };
+  }, [set.weightKg, set.reps, set.rir]);
 
-  const handleKeypadChange = (newVal: string) => {
-    setTempValue(newVal);
-    if (!activeKeypadField) return;
-
-    if (activeKeypadField === 'weightKg') {
-      const num = newVal === '' || newVal === '.' ? undefined : parseFloat(newVal);
+  // Validation et mise à jour de la valeur saisie
+  const commitFieldValue = useCallback((field: NumericFieldType, valStr: string) => {
+    if (field === 'weightKg') {
+      const num = valStr === '' || valStr === '.' ? undefined : parseFloat(valStr);
       onUpdate('weightKg', num !== undefined && !isNaN(num) ? num : undefined);
-    } else if (activeKeypadField === 'reps') {
-      const num = newVal === '' ? undefined : parseInt(newVal, 10);
+    } else if (field === 'reps') {
+      const num = valStr === '' ? undefined : parseInt(valStr, 10);
       onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
-    } else if (activeKeypadField === 'rir') {
-      const num = newVal === '' ? 0 : parseInt(newVal, 10);
-      onUpdate('rir', !isNaN(num) ? num : 0);
+    } else if (field === 'rir') {
+      const num = valStr === '' ? undefined : parseInt(valStr, 10);
+      onUpdate('rir', num !== undefined && !isNaN(num) ? num : undefined);
     }
-  };
+  }, [onUpdate]);
 
-  const handleKeypadNext = () => {
+  // Passage au champ suivant (KG ➔ REPS ➔ RIR)
+  const handleKeypadNext = useCallback((currentVal?: string) => {
+    if (!activeKeypadField) return;
+    const valToCommit = currentVal !== undefined ? currentVal : tempValue;
+    commitFieldValue(activeKeypadField, valToCommit);
+
     if (activeKeypadField === 'weightKg') {
       handleOpenKeypad('reps');
     } else if (activeKeypadField === 'reps') {
       handleOpenKeypad('rir');
     }
-  };
+  }, [activeKeypadField, tempValue, commitFieldValue, handleOpenKeypad]);
 
-  const handleKeypadValidate = () => {
-    const num = tempValue === '' ? 0 : parseInt(tempValue, 10);
-    onUpdate('rir', !isNaN(num) ? num : 0);
+  // Validation finale
+  const handleKeypadValidate = useCallback((finalVal?: string) => {
+    if (!activeKeypadField) return;
+    const valToCommit = finalVal !== undefined ? finalVal : tempValue;
+    commitFieldValue(activeKeypadField, valToCommit);
 
     if (!set.completed) {
       onToggleComplete();
     }
     setActiveKeypadField(null);
-  };
+  }, [activeKeypadField, tempValue, commitFieldValue, set.completed, onToggleComplete]);
 
-  const handleKeypadClose = () => {
+  const handleKeypadClose = useCallback(() => {
     setActiveKeypadField(null);
-  };
+  }, []);
 
   return (
     <View
@@ -87,7 +93,7 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         },
       ]}
     >
-      {/* Set # / Type Selector */}
+      {/* Sélecteur de type de série */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => setShowTypeModal(true)}
@@ -96,14 +102,14 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         <Text style={styles.typeText}>{currentTypeConfig.code}</Text>
       </TouchableOpacity>
 
-      {/* Previous Performance */}
+      {/* Performance précédente */}
       <View style={styles.colPrevious}>
         <Text style={[styles.previousText, { color: theme.textMuted }]}>
           {set.previous || '-'}
         </Text>
       </View>
 
-      {/* Weight (Kg) Touch Cell */}
+      {/* Saisie Poids (Kg) */}
       <View style={styles.colInput}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -128,7 +134,7 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Reps Touch Cell */}
+      {/* Saisie Reps */}
       <View style={styles.colInput}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -153,7 +159,7 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* RIR Touch Cell */}
+      {/* Saisie RIR (S'il n'a pas été saisi, affiche '-' en couleur muette theme.textMuted) */}
       <View style={styles.colInput}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -173,12 +179,12 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
               { color: set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted },
             ]}
           >
-            {set.rir !== undefined && set.rir !== null ? String(set.rir) : '0'}
+            {set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '-'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Validation Checkbox */}
+      {/* Checkbox de complétion */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onToggleComplete}
@@ -193,7 +199,7 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
       </TouchableOpacity>
 
-      {/* Delete Set */}
+      {/* Suppression de la série */}
       <TouchableOpacity activeOpacity={0.7} onPress={onDelete} style={styles.deleteButton}>
         <Trash2 size={16} color={theme.danger} />
       </TouchableOpacity>
@@ -206,14 +212,13 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
           setNumber={set.setNumber}
           activeField={activeKeypadField}
           value={tempValue}
-          onChangeValue={handleKeypadChange}
           onNextField={handleKeypadNext}
           onValidate={handleKeypadValidate}
-          onClear={() => handleKeypadChange('')}
+          onClear={() => commitFieldValue(activeKeypadField, '')}
         />
       )}
 
-      {/* Modal / Volet de sélection du type de série */}
+      {/* Modal de sélection du type de série */}
       <Modal visible={showTypeModal} transparent animationType="slide" onRequestClose={() => setShowTypeModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowTypeModal(false)}>
           <View style={[styles.modalSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
@@ -252,7 +257,9 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
       </Modal>
     </View>
   );
-};
+});
+
+SetTableRow.displayName = 'SetTableRow';
 
 const styles = StyleSheet.create({
   row: {
