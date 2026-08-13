@@ -107,6 +107,8 @@ export default function TemplateEditorScreen() {
   // Durée estimée de la séance
   const estimatedMinutes = calculateEstimatedWorkoutMinutes(selectedBlocks);
 
+  const isSaveDisabled = !title.trim() || selectedBlocks.length === 0;
+
   // Liste des blocs circuits actuellement dans la séance
   const circuitBlocks = selectedBlocks.filter((b): b is CircuitBlock => b.type === 'circuit');
 
@@ -1208,6 +1210,7 @@ export default function TemplateEditorScreen() {
           title="Enregistrer le programme"
           variant="primary"
           onPress={handleSave}
+          disabled={isSaveDisabled}
           style={{ marginTop: 24, marginBottom: 40 }}
         />
       </ScrollView>
@@ -1602,7 +1605,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? 14 : 16,
+    paddingBottom: 14,
+    marginTop: Platform.OS === 'android' ? 4 : 8,
     borderBottomWidth: 1,
   },
   backButton: {
