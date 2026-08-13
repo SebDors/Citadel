@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { CalendarView } from '../../src/components/History/CalendarView';

@@ -1,26 +1,35 @@
 import * as Notifications from 'expo-notifications';
-import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Configuration de la gestion des notifications au premier plan
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Guard : expo-notifications est limité dans Expo Go - ne pas crasher
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Configuration de la gestion des notifications au premier plan (uniquement hors Expo Go)
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 let activeNotificationId: string | null = null;
-let soundObject: Audio.Sound | null = null;
 
 export const NotificationService = {
   /**
    * Initialise les canaux de notifications Android et demande les permissions.
+   * No-op silencieux dans Expo Go.
    */
   async init(): Promise<boolean> {
+    if (isExpoGo) {
+      console.info('[NotificationService] Expo Go détecté – notifications désactivées. Utilisez un Development Build pour les activer.');
+      return false;
+    }
     try {
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('rest-timer', {
@@ -49,8 +58,10 @@ export const NotificationService = {
 
   /**
    * Programme une notification locale qui se déclenchera exactement à la fin du timer de repos.
+   * No-op silencieux dans Expo Go.
    */
   async scheduleTimerExpirationNotification(seconds: number, exerciseName?: string): Promise<void> {
+    if (isExpoGo) return;
     try {
       await this.cancelScheduledNotification();
 
@@ -80,8 +91,10 @@ export const NotificationService = {
 
   /**
    * Annule toute notification de timer en cours ou programmée.
+   * No-op silencieux dans Expo Go.
    */
   async cancelScheduledNotification(): Promise<void> {
+    if (isExpoGo) return;
     try {
       if (activeNotificationId) {
         await Notifications.dismissNotificationAsync(activeNotificationId);
@@ -96,29 +109,25 @@ export const NotificationService = {
 
   /**
    * Joue un son d'alerte sonore pour la fin du timer de repos.
+   * Utilise expo-audio (SDK 54+).
+   * Fonctionne dans Expo Go et dans un Development Build.
    */
   async playTimerEndSound(): Promise<void> {
     try {
-      if (soundObject) {
-        await soundObject.unloadAsync();
-        soundObject = null;
-      }
+      const { createAudioPlayer, setIsAudioActiveAsync } = await import('expo-audio');
 
-      // Configuration du mode audio pour retentir même en mode silencieux
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-      });
+      await setIsAudioActiveAsync(true);
 
-      // Bip sonore haute fréquence de notification (Audio Synthétique Base64 Data URI)
-      const soundUri = 'data:audio/wav;base64,UklGRl9vAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUtvAAB4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4';
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUri },
-        { shouldPlay: true, volume: 1.0 }
+      const player = createAudioPlayer(
+        { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' }
       );
-      soundObject = sound;
+      player.volume = 1.0;
+      player.play();
+
+      // Nettoyage après 5s
+      setTimeout(() => {
+        try { player.remove(); } catch (_) {}
+      }, 5000);
     } catch (e) {
       console.warn('Audio play error:', e);
     }

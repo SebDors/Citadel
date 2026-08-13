@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Modal,
   TextInput,
@@ -12,6 +11,7 @@ import {
   StatusBar as RNStatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { Button } from '../../src/components/UI/Button';
