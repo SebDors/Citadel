@@ -227,7 +227,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             <View style={styles.rirContainer}>
               {rirOptions.map((option) => {
                 const isSelected =
-                  localValue === option || (option === '5+' && localValue === '5');
+                  localValue === option || (option === '5+' && (localValue === '5+' || localValue === '5'));
                 return (
                   <KeyButton
                     key={option}

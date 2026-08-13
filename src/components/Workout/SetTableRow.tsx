@@ -49,10 +49,24 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       const num = valStr === '' ? undefined : parseInt(valStr, 10);
       onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
     } else if (field === 'rir') {
-      const num = valStr === '' ? undefined : parseInt(valStr, 10);
-      onUpdate('rir', num !== undefined && !isNaN(num) ? num : undefined);
+      if (valStr === '' || valStr === null || valStr === undefined) {
+        onUpdate('rir', undefined);
+      } else if (valStr === '5+' || valStr === '5') {
+        onUpdate('rir', 5);
+      } else {
+        const num = parseInt(valStr, 10);
+        onUpdate('rir', !isNaN(num) ? num : undefined);
+      }
     }
   }, [onUpdate]);
+
+  // Changement en direct de la valeur
+  const handleKeypadChange = useCallback((val: string) => {
+    setTempValue(val);
+    if (activeKeypadField) {
+      commitFieldValue(activeKeypadField, val);
+    }
+  }, [activeKeypadField, commitFieldValue]);
 
   // Passage au champ suivant (KG ➔ REPS ➔ RIR)
   const handleKeypadNext = useCallback((currentVal?: string) => {
@@ -212,6 +226,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           setNumber={set.setNumber}
           activeField={activeKeypadField}
           value={tempValue}
+          onChangeValue={handleKeypadChange}
           onNextField={handleKeypadNext}
           onValidate={handleKeypadValidate}
           onClear={() => commitFieldValue(activeKeypadField, '')}
