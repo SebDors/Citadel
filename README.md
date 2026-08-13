@@ -1,6 +1,6 @@
-# WarriorFit - Fitness & Circuit Training Companion 🏋️‍♂️⚡
+# Citadel - Fitness & Circuit Training Companion 🏋️‍♂️⚡
 
-**WarriorFit** is a modern, high-performance mobile application built with React Native and Expo. Designed for fitness enthusiasts and athletes, it allows users to create, structure, and track custom workouts using both standard exercises and dynamic circuit blocks (**Rounds** & **AMRAP**).
+**Citadel** is a modern, high-performance mobile application built with React Native and Expo. Designed for fitness enthusiasts and athletes, it allows users to create, structure, and track custom workouts using both standard exercises and dynamic circuit blocks (**Rounds** & **AMRAP**).
 
 ---
 
@@ -24,6 +24,7 @@
   - **Automatic Round Rest Timers**: Automatic rest timer triggered upon completing each round (for Round circuits).
   - **Live AMRAP Countdown**: Real-time countdown timer with completed rounds counter.
 - **Rest Timer Bar**: Floating rest timer bar between sets with `+30s` adjustment and skip capabilities.
+- **Rest Timer Notifications**: Local notifications sent to the system tray when the app is in the background, with audio alert on expiration.
 - **In-Workout Exercise Insertion**: Add any exercise from the database directly into an active circuit or session on the fly.
 
 ### 📚 3. Built-In 52-Exercise Database
@@ -37,7 +38,7 @@
   - **Round Circuits**: Displays total time, volume (kg), and total rounds.
   - **Standard Sessions**: Displays total time, volume (kg), and completed sets count.
 - **Detailed History Summaries**: Muscle targeting Breakdown, inline exercise lists, and session deletion.
-- **Workout Analytics**: Individual workout template recaps, progression metrics, and volume history.
+- **Workout Analytics**: Individual workout template recaps, progression metrics, and volume history — with full circuit block rendering.
 
 ### 📐 5. Body Measurements & Profile Tracking
 - Track body weight (kg), body fat percentage (%), chest, waist, thigh, and biceps measurements over time.
@@ -52,6 +53,8 @@
 - **Icons**: [Lucide React Native](https://lucide.dev/)
 - **Theme & UI**: Custom Theme System (Dark / Light mode support with dynamic HSL color tokens)
 - **Local Storage**: `@react-native-async-storage/async-storage`
+- **Notifications**: `expo-notifications` (local background timer alerts)
+- **Audio**: `expo-audio` (rest timer sound alerts)
 
 ---
 
@@ -68,14 +71,16 @@ Ensure you have the following installed on your machine:
   - 🤖 [Android (Google Play Store)](https://play.google.com/store/apps/details?id=host.exp.exponent)
   - 🍏 [iOS (App Store)](https://apps.apple.com/app/expo-go/id982107779)
 
+> ⚠️ **Note**: Timer notifications and audio alerts require a **Development Build** or a production **APK** — they are not available in Expo Go.
+
 ---
 
 ### Installation & Setup
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/warriorfit.git
-   cd warriorfit
+   git clone git@github.com:SebDors/Citadel.git
+   cd Citadel
    ```
 
 2. **Install dependencies**:
@@ -102,7 +107,7 @@ Ensure you have the following installed on your machine:
 ## 📱 Project Structure
 
 ```text
-WarriorFit/
+Citadel/
 ├── app/                      # Expo Router File-Based Pages
 │   ├── (tabs)/               # Tab Navigation (Home/Workouts, History, Profile)
 │   ├── live-workout.tsx      # Active Workout Execution Screen
@@ -112,7 +117,7 @@ WarriorFit/
 │   ├── components/           # UI Components (ExerciseCard, SetTable, CalendarView, etc.)
 │   ├── constants/            # 52-Exercise Database & Configuration
 │   ├── context/              # ThemeContext & WorkoutContext (Global State & Storage)
-│   ├── services/             # StorageService, MockData
+│   ├── services/             # StorageService, NotificationService
 │   └── types/                # TypeScript Interfaces & Helpers
 └── assets/                   # App Icons & Visual Assets
 ```
@@ -125,4 +130,4 @@ This project is open-source and available under the [MIT License](LICENSE).
 
 ---
 
-*Enjoy your workout with WarriorFit! 🏋️‍♂️*
+*Train hard. Stay consistent. Build your Citadel. 🏋️‍♂️⚡*
