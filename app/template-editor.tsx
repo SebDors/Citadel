@@ -12,6 +12,7 @@ import {
   StatusBar as RNStatusBar,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../src/context/ThemeContext';
 import { useWorkout } from '../src/context/WorkoutContext';
 import { Button } from '../src/components/UI/Button';
@@ -57,6 +58,7 @@ const formatMinutesSeconds = (totalSeconds: number): string => {
 };
 
 export default function TemplateEditorScreen() {
+  const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const { data, saveTemplate } = useWorkout();
   const router = useRouter();
@@ -673,17 +675,24 @@ export default function TemplateEditorScreen() {
 
 
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.safeArea,
         {
           backgroundColor: theme.background,
-          paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
         },
       ]}
     >
       {/* Barre de navigation haute */}
-      <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            borderBottomColor: theme.border,
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 16) + 8,
+          },
+        ]}
+      >
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={20} color={theme.text} />
           <Text style={[styles.backText, { color: theme.text }]}>Retour</Text>
@@ -1594,7 +1603,7 @@ export default function TemplateEditorScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1607,9 +1616,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'android' ? 14 : 16,
     paddingBottom: 14,
-    marginTop: Platform.OS === 'android' ? 4 : 8,
     borderBottomWidth: 1,
   },
   backButton: {
