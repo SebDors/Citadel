@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { WorkoutSet, SetType, SET_TYPES_CONFIG } from '../../types';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { WorkoutSet, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { Check, Trash2, X } from 'lucide-react-native';
+import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 
 interface SetTableRowProps {
   set: WorkoutSet;
@@ -20,8 +21,61 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
 }) => {
   const { theme } = useTheme();
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const [activeKeypadField, setActiveKeypadField] = useState<NumericFieldType | null>(null);
+  const [tempValue, setTempValue] = useState<string>('');
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
+
+  const handleOpenKeypad = (field: NumericFieldType) => {
+    setActiveKeypadField(field);
+    let valStr = '';
+    if (field === 'weightKg') {
+      valStr = set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '';
+    } else if (field === 'reps') {
+      valStr = set.reps !== undefined && set.reps !== null ? String(set.reps) : '';
+    } else if (field === 'rir') {
+      valStr = set.rir !== undefined && set.rir !== null ? String(set.rir) : '';
+    }
+    setTempValue(valStr);
+  };
+
+  const handleKeypadChange = (newVal: string) => {
+    setTempValue(newVal);
+    if (!activeKeypadField) return;
+
+    if (activeKeypadField === 'weightKg') {
+      const num = newVal === '' || newVal === '.' ? undefined : parseFloat(newVal);
+      onUpdate('weightKg', num !== undefined && !isNaN(num) ? num : undefined);
+    } else if (activeKeypadField === 'reps') {
+      const num = newVal === '' ? undefined : parseInt(newVal, 10);
+      onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
+    } else if (activeKeypadField === 'rir') {
+      const num = newVal === '' ? 0 : parseInt(newVal, 10);
+      onUpdate('rir', !isNaN(num) ? num : 0);
+    }
+  };
+
+  const handleKeypadNext = () => {
+    if (activeKeypadField === 'weightKg') {
+      handleOpenKeypad('reps');
+    } else if (activeKeypadField === 'reps') {
+      handleOpenKeypad('rir');
+    }
+  };
+
+  const handleKeypadValidate = () => {
+    const num = tempValue === '' ? 0 : parseInt(tempValue, 10);
+    onUpdate('rir', !isNaN(num) ? num : 0);
+
+    if (!set.completed) {
+      onToggleComplete();
+    }
+    setActiveKeypadField(null);
+  };
+
+  const handleKeypadClose = () => {
+    setActiveKeypadField(null);
+  };
 
   return (
     <View
@@ -33,7 +87,7 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         },
       ]}
     >
-      {/* Set # / Type Selector (Ouvre un volet/modal de sélection) */}
+      {/* Set # / Type Selector */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => setShowTypeModal(true)}
@@ -49,43 +103,82 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         </Text>
       </View>
 
-      {/* Weight (Kg) Input (Non pré-rempli, placeholder uniquement) */}
+      {/* Weight (Kg) Touch Cell */}
       <View style={styles.colInput}>
-        <TextInput
-          style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-          keyboardType="numeric"
-          value={set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : ''}
-          onChangeText={(val: string) => onUpdate('weightKg', val === '' ? undefined : parseFloat(val) || 0)}
-          placeholder="0"
-          placeholderTextColor={theme.textMuted}
-        />
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => handleOpenKeypad('weightKg')}
+          style={[
+            styles.cellBtn,
+            {
+              borderColor: activeKeypadField === 'weightKg' ? theme.accent : theme.border,
+              borderWidth: activeKeypadField === 'weightKg' ? 2 : 1,
+              backgroundColor: theme.surface,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.cellText,
+              { color: set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted },
+            ]}
+          >
+            {set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '-'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Reps Input (Non pré-rempli, placeholder uniquement) */}
+      {/* Reps Touch Cell */}
       <View style={styles.colInput}>
-        <TextInput
-          style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-          keyboardType="numeric"
-          value={set.reps !== undefined && set.reps !== null ? String(set.reps) : ''}
-          onChangeText={(val: string) => onUpdate('reps', val === '' ? undefined : parseInt(val, 10) || 0)}
-          placeholder="0"
-          placeholderTextColor={theme.textMuted}
-        />
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => handleOpenKeypad('reps')}
+          style={[
+            styles.cellBtn,
+            {
+              borderColor: activeKeypadField === 'reps' ? theme.accent : theme.border,
+              borderWidth: activeKeypadField === 'reps' ? 2 : 1,
+              backgroundColor: theme.surface,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.cellText,
+              { color: set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted },
+            ]}
+          >
+            {set.reps !== undefined && set.reps !== null ? String(set.reps) : '-'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* RIR Direct Numeric Input (Saisie directe du RIR : 0, 1, 2, 3...) */}
+      {/* RIR Touch Cell */}
       <View style={styles.colInput}>
-        <TextInput
-          style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-          keyboardType="numeric"
-          value={set.rir !== undefined && set.rir !== null ? String(set.rir) : ''}
-          onChangeText={(val: string) => onUpdate('rir', val === '' ? 0 : parseInt(val, 10) || 0)}
-          placeholder="0"
-          placeholderTextColor={theme.textMuted}
-        />
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => handleOpenKeypad('rir')}
+          style={[
+            styles.cellBtn,
+            {
+              borderColor: activeKeypadField === 'rir' ? theme.accent : theme.border,
+              borderWidth: activeKeypadField === 'rir' ? 2 : 1,
+              backgroundColor: theme.surface,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.cellText,
+              { color: set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted },
+            ]}
+          >
+            {set.rir !== undefined && set.rir !== null ? String(set.rir) : '0'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Validation Checkbox (Carré à bords arrondis, contour vert et fond coché uniquement à la validation) */}
+      {/* Validation Checkbox */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onToggleComplete}
@@ -105,7 +198,22 @@ export const SetTableRow: React.FC<SetTableRowProps> = ({
         <Trash2 size={16} color={theme.danger} />
       </TouchableOpacity>
 
-      {/* Modal / Volet de sélection du type de série (Demande utilisateur!) */}
+      {/* Clavier Numérique Personnalisé */}
+      {activeKeypadField !== null && (
+        <CustomNumericKeypad
+          visible={activeKeypadField !== null}
+          onClose={handleKeypadClose}
+          setNumber={set.setNumber}
+          activeField={activeKeypadField}
+          value={tempValue}
+          onChangeValue={handleKeypadChange}
+          onNextField={handleKeypadNext}
+          onValidate={handleKeypadValidate}
+          onClear={() => handleKeypadChange('')}
+        />
+      )}
+
+      {/* Modal / Volet de sélection du type de série */}
       <Modal visible={showTypeModal} transparent animationType="slide" onRequestClose={() => setShowTypeModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowTypeModal(false)}>
           <View style={[styles.modalSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
@@ -183,26 +291,17 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 2,
   },
-  input: {
+  cellBtn: {
     height: 34,
-    paddingVertical: 2,
-    paddingHorizontal: 2,
-    borderWidth: 1,
     borderRadius: 6,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  cellText: {
     fontSize: 13,
     fontWeight: '700',
-  },
-  rirButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    marginHorizontal: 3,
-  },
-  rirText: {
-    fontSize: 11,
-    fontWeight: '700',
+    textAlign: 'center',
   },
   checkButton: {
     width: 34,
