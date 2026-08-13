@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "WarriorFit",
-    "slug": "warriorfit",
+    "name": "Citadel",
+    "slug": "citadel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,9 +13,11 @@
       "backgroundColor": "#273338"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sebdors.citadel"
     },
     "android": {
+      "package": "com.sebdors.citadel",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#273338"
@@ -28,6 +30,6 @@
       "expo-router",
       "expo-audio"
     ],
-    "scheme": "warriorfit"
+    "scheme": "citadel"
   }
 }
