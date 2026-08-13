@@ -47,6 +47,7 @@ interface WorkoutContextType {
   renameFolder: (folderId: string, newName: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   toggleFolderCollapse: (folderId: string) => Promise<void>;
+  moveTemplateToFolder: (templateId: string, targetFolderId: string | null) => Promise<void>;
   deleteWorkoutSession: (sessionId: string) => Promise<void>;
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
@@ -920,6 +921,21 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const moveTemplateToFolder = async (templateId: string, targetFolderId: string | null) => {
+    if (!data) return;
+    const currentFolders = data.folders || [];
+    const updatedFolders = currentFolders.map((f) => {
+      const filteredTemplateIds = f.templateIds.filter((id) => id !== templateId);
+      if (targetFolderId !== null && f.id === targetFolderId) {
+        return { ...f, templateIds: [...filteredTemplateIds, templateId] };
+      }
+      return { ...f, templateIds: filteredTemplateIds };
+    });
+    const updated = { ...data, folders: updatedFolders };
+    await StorageService.saveFolders(updatedFolders);
+    setData(updated);
+  };
+
   const deleteWorkoutSession = async (sessionId: string) => {
     const updated = await StorageService.deleteWorkoutSession(sessionId);
     setData(updated);
@@ -967,6 +983,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         renameFolder,
         deleteFolder,
         toggleFolderCollapse,
+        moveTemplateToFolder,
         deleteWorkoutSession,
         deleteExerciseFromSession,
         deleteSetFromSession,
