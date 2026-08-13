@@ -35,6 +35,7 @@ import {
   Share2,
   X,
   Tag,
+  Check,
 } from 'lucide-react-native';
 import {
   WorkoutSession,
@@ -99,6 +100,7 @@ export default function WorkoutTab() {
     renameFolder,
     deleteFolder,
     toggleFolderCollapse,
+    moveTemplateToFolder,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -106,6 +108,7 @@ export default function WorkoutTab() {
   // Modals state
   const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
   const [showTemplateMenuModal, setShowTemplateMenuModal] = useState(false);
+  const [showMoveFolderModal, setShowMoveFolderModal] = useState(false);
 
   const [showRenameTemplateModal, setShowRenameTemplateModal] = useState(false);
   const [renameTemplateTitle, setRenameTemplateTitle] = useState('');
@@ -189,6 +192,11 @@ export default function WorkoutTab() {
   const folders = data?.folders || [];
   const templatesInFolders = new Set(folders.flatMap((f) => f.templateIds));
   const unassignedTemplates = (data?.templates || []).filter((t) => !templatesInFolders.has(t.id));
+
+  const currentFolder = selectedTemplate
+    ? folders.find((f) => f.templateIds.includes(selectedTemplate.id))
+    : null;
+  const isNoFolderSelected = !currentFolder;
 
   // Render a Workout Template Card (High Density layout)
   const renderTemplateCard = (tpl: WorkoutTemplate) => {
@@ -525,6 +533,18 @@ export default function WorkoutTab() {
               <Text style={[styles.menuOptionText, { color: theme.text }]}>Dupliquer la séance</Text>
             </TouchableOpacity>
 
+            {/* Déplacer dans un dossier */}
+            <TouchableOpacity
+              style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowTemplateMenuModal(false);
+                setShowMoveFolderModal(true);
+              }}
+            >
+              <FolderPlus size={18} color={theme.text} />
+              <Text style={[styles.menuOptionText, { color: theme.text }]}>Déplacer dans un dossier</Text>
+            </TouchableOpacity>
+
             {/* 5. Exporter JSON (Séance vierge) */}
             <TouchableOpacity
               style={[styles.menuOptionRow, { borderBottomColor: theme.border }]}
@@ -613,6 +633,80 @@ export default function WorkoutTab() {
               <Button title="Enregistrer" variant="primary" onPress={handleConfirmRenameFolder} style={{ flex: 1, marginLeft: 6 }} />
             </View>
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ---------------- MODALE DÉPLACER DANS UN DOSSIER ---------------- */}
+      <Modal visible={showMoveFolderModal} transparent animationType="fade" onRequestClose={() => setShowMoveFolderModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMoveFolderModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.menuModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <View style={styles.modalMenuHeader}>
+              <Text style={[styles.modalMenuTitle, { color: theme.text }]} numberOfLines={1}>
+                Déplacer "{selectedTemplate?.title}"
+              </Text>
+              <TouchableOpacity onPress={() => setShowMoveFolderModal(false)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 280 }}>
+              {/* Option Aucun dossier (Hors dossier) */}
+              <TouchableOpacity
+                style={[styles.menuOptionRow, { borderBottomColor: theme.border, justifyContent: 'space-between' }]}
+                onPress={async () => {
+                  if (selectedTemplate) {
+                    await moveTemplateToFolder(selectedTemplate.id, null);
+                    setShowMoveFolderModal(false);
+                  }
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                  <Folder size={18} color={theme.textMuted} />
+                  <Text style={[styles.menuOptionText, { color: theme.text }]} numberOfLines={1}>
+                    Aucun dossier (Hors dossier)
+                  </Text>
+                </View>
+                {isNoFolderSelected && <Check size={18} color={theme.accent} />}
+              </TouchableOpacity>
+
+              {/* Dossiers existants */}
+              {folders.map((f) => {
+                const isSelected = currentFolder?.id === f.id;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[styles.menuOptionRow, { borderBottomColor: theme.border, justifyContent: 'space-between' }]}
+                    onPress={async () => {
+                      if (selectedTemplate) {
+                        await moveTemplateToFolder(selectedTemplate.id, f.id);
+                        setShowMoveFolderModal(false);
+                      }
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                      <Folder size={18} color={theme.accent} />
+                      <Text style={[styles.menuOptionText, { color: theme.text }]} numberOfLines={1}>
+                        {f.name}
+                      </Text>
+                    </View>
+                    {isSelected && <Check size={18} color={theme.accent} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Bouton + Créer un nouveau dossier */}
+            <TouchableOpacity
+              style={[styles.createNewFolderOption, { borderColor: theme.accent, backgroundColor: theme.surface }]}
+              onPress={() => {
+                setShowMoveFolderModal(false);
+                setShowCreateFolderModal(true);
+              }}
+            >
+              <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.createNewFolderText, { color: theme.accent }]}>+ Créer un nouveau dossier</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
@@ -914,5 +1008,18 @@ const styles = StyleSheet.create({
   },
   compactStartBtnText: {
     fontSize: 13,
+  },
+  createNewFolderOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginTop: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  createNewFolderText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
