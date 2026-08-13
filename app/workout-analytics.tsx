@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { useTheme } from '../src/context/ThemeContext';
 import { useWorkout } from '../src/context/WorkoutContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, TrendingUp, Star, ChevronRight, Award } from 'lucide-react-native';
+import { ArrowLeft, Star, ChevronRight, Award, Repeat } from 'lucide-react-native';
+import {
+  getTemplateBlocks,
+  formatCircuitSummary,
+  calculateEstimatedWorkoutMinutes,
+  getSessionBlocks,
+  WorkoutBlock,
+  WorkoutExercise,
+  WorkoutSession,
+} from '../src/types';
 
 export default function WorkoutAnalyticsScreen() {
   const { theme } = useTheme();
@@ -17,10 +26,232 @@ export default function WorkoutAnalyticsScreen() {
   const [activeMetricTab, setActiveMetricTab] = useState<'volume' | 'duree' | 'reps'>('volume');
   const [activeTimeFilter, setActiveTimeFilter] = useState<'30J' | '3M' | '6M' | '1A'>('30J');
 
-  const historySessions = (data?.history || []).filter((s) => s.title === template?.title || s.templateId === template?.id);
+  // 1. Extraction des Blocs & Exercices d'un Template (getTemplateBlocks)
+  const blocks: WorkoutBlock[] = useMemo(() => {
+    return template ? getTemplateBlocks(template) : [];
+  }, [template]);
+
+  // Récupération de l'historique associé à ce template (trié par date décroissante)
+  const historySessions: WorkoutSession[] = useMemo(() => {
+    if (!data?.history || !template) return [];
+    return data.history
+      .filter(
+        (s) =>
+          s.status === 'completed' &&
+          (s.templateId === template.id || s.title.trim().toLowerCase() === template.title.trim().toLowerCase())
+      )
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  }, [data?.history, template]);
+
+  const lastCompletedSession = historySessions[0] || null;
+
+  // 4. Calculs Dynamiques des Métriques ("Metric Callout") depuis la dernière séance ou depuis les blocs
+  const { actualVolume, actualDurationSec, actualReps } = useMemo(() => {
+    if (lastCompletedSession) {
+      let vol = lastCompletedSession.totalVolumeKg || 0;
+      if (vol === 0 && lastCompletedSession.exercises) {
+        lastCompletedSession.exercises.forEach((ex) => {
+          (ex.sets || []).forEach((set) => {
+            if (set.completed) {
+              vol += (set.weightKg || 0) * (set.reps || 0);
+            }
+          });
+        });
+      }
+
+      const dur = lastCompletedSession.durationSeconds || 0;
+
+      let reps = 0;
+      if (lastCompletedSession.exercises && lastCompletedSession.exercises.length > 0) {
+        lastCompletedSession.exercises.forEach((ex) => {
+          (ex.sets || []).forEach((set) => {
+            if (set.completed) {
+              reps += set.reps || 0;
+            }
+          });
+        });
+      } else {
+        const sessBlocks = getSessionBlocks(lastCompletedSession);
+        sessBlocks.forEach((b) => {
+          if (b.type === 'single') {
+            (b.exercise.sets || []).forEach((set) => {
+              if (set.completed) reps += set.reps || 0;
+            });
+          } else if (b.type === 'circuit') {
+            const rounds = b.rounds || 1;
+            b.exercises.forEach((item) => {
+              if (item.targetType === 'reps') {
+                reps += (item.targetValue || 0) * rounds;
+              }
+            });
+          }
+        });
+      }
+
+      return { actualVolume: vol, actualDurationSec: dur, actualReps: reps };
+    } else {
+      let vol = 0;
+      let reps = 0;
+
+      blocks.forEach((b) => {
+        if (b.type === 'single') {
+          (b.exercise.sets || []).forEach((set) => {
+            vol += (set.weightKg || 0) * (set.reps || 0);
+            reps += set.reps || 0;
+          });
+        } else if (b.type === 'circuit') {
+          const rounds = b.rounds || 1;
+          b.exercises.forEach((item) => {
+            if (item.targetType === 'reps') {
+              reps += (item.targetValue || 0) * rounds;
+            }
+          });
+        }
+      });
+
+      const estMins = calculateEstimatedWorkoutMinutes(blocks);
+      const dur = estMins * 60;
+
+      return { actualVolume: vol, actualDurationSec: dur, actualReps: reps };
+    }
+  }, [lastCompletedSession, blocks]);
+
+  const metricCalloutValue = useMemo(() => {
+    if (activeMetricTab === 'volume') {
+      if (actualVolume >= 1000) {
+        return `${(actualVolume / 1000).toFixed(1).replace('.', ',')}k kg`;
+      }
+      return `${actualVolume} kg`;
+    }
+    if (activeMetricTab === 'duree') {
+      const hours = Math.floor(actualDurationSec / 3600);
+      const mins = Math.round((actualDurationSec % 3600) / 60);
+      if (hours > 0) {
+        return `${hours} h ${mins < 10 ? '0' : ''}${mins}`;
+      }
+      return `${mins} min`;
+    }
+    return `${actualReps} reps`;
+  }, [activeMetricTab, actualVolume, actualDurationSec, actualReps]);
+
+  // 3. Extraction de l'ensemble des exercices (isolés et issus des circuits) pour les PRs
+  const allExercises = useMemo(() => {
+    const list: Array<{
+      id: string;
+      exerciseName: string;
+      primaryMuscle?: string;
+      isCircuit: boolean;
+      targetText?: string;
+      singleExercise?: WorkoutExercise;
+    }> = [];
+
+    blocks.forEach((b) => {
+      if (b.type === 'single') {
+        list.push({
+          id: b.exercise.id || b.exercise.exerciseId,
+          exerciseName: b.exercise.exerciseName,
+          primaryMuscle: b.exercise.primaryMuscle,
+          isCircuit: false,
+          singleExercise: b.exercise,
+        });
+      } else if (b.type === 'circuit') {
+        b.exercises.forEach((item) => {
+          list.push({
+            id: item.id,
+            exerciseName: item.exerciseName,
+            primaryMuscle: item.primaryMuscle,
+            isCircuit: true,
+            targetText: `${item.targetValue} ${item.targetType === 'time' ? 's' : 'reps'}`,
+          });
+        });
+      }
+    });
+
+    return list;
+  }, [blocks]);
+
+  // Calcul des records pour chaque exercice (isolé et circuit)
+  const exercisePRs = useMemo(() => {
+    return allExercises.map((exItem) => {
+      let bestWeight = 0;
+      let bestReps = 0;
+      let lastDateFormatted = '';
+
+      if (historySessions.length > 0) {
+        for (const session of historySessions) {
+          const sessExercises = session.exercises || [];
+          const matchEx = sessExercises.find(
+            (e) => e.exerciseName.trim().toLowerCase() === exItem.exerciseName.trim().toLowerCase()
+          );
+          if (matchEx) {
+            for (const s of matchEx.sets || []) {
+              if (s.completed) {
+                const w = s.weightKg || 0;
+                const r = s.reps || 0;
+                if (w > bestWeight || (w === bestWeight && r > bestReps)) {
+                  bestWeight = w;
+                  bestReps = r;
+                  const dateObj = new Date(session.startTime);
+                  lastDateFormatted = dateObj
+                    .toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                    .toUpperCase();
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (bestWeight > 0 || bestReps > 0) {
+        const e1RM = Math.round(bestWeight * (1 + bestReps / 30));
+        return {
+          name: exItem.exerciseName,
+          dateText: lastDateFormatted || 'RÉCENT',
+          valueText: bestWeight > 0 ? `${e1RM} kg e1RM` : `${bestReps} reps`,
+          subText: bestWeight > 0 ? `${bestWeight} kg × ${bestReps}` : 'Poids de corps',
+        };
+      }
+
+      if (exItem.singleExercise && exItem.singleExercise.sets?.length > 0) {
+        const firstSet = exItem.singleExercise.sets[0];
+        const w = firstSet.weightKg || 0;
+        const r = firstSet.reps || 10;
+        if (w > 0) {
+          const e1RM = Math.round(w * (1 + r / 30));
+          return {
+            name: exItem.exerciseName,
+            dateText: 'OBJECTIF',
+            valueText: `${e1RM} kg e1RM`,
+            subText: `${w} kg × ${r}`,
+          };
+        }
+        return {
+          name: exItem.exerciseName,
+          dateText: 'OBJECTIF',
+          valueText: `${r} reps`,
+          subText: 'Poids de corps',
+        };
+      }
+
+      return {
+        name: exItem.exerciseName,
+        dateText: 'OBJECTIF',
+        valueText: exItem.targetText || 'Circuit',
+        subText: 'Objectif circuit',
+      };
+    });
+  }, [allExercises, historySessions]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0 }]}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.background,
+          paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
+        },
+      ]}
+    >
       {/* Top Header Navigation */}
       <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -29,21 +260,19 @@ export default function WorkoutAnalyticsScreen() {
         <View style={styles.titleBox}>
           <Text style={[styles.topTitle, { color: theme.text }]}>{template?.title || 'Upper B'}</Text>
           <Text style={[styles.topSub, { color: theme.textMuted }]}>
-            {historySessions.length} entraînement · 0,2×/sem
+            {historySessions.length} entraînement{historySessions.length > 1 ? 's' : ''}
           </Text>
         </View>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Main Metric Callout (Volume / Dernier) */}
+        {/* Main Metric Callout (Volume / Dernier ou Estimé) */}
         <View style={styles.metricCallout}>
           <Text style={[styles.metricLabel, { color: theme.textMuted }]}>
-            {activeMetricTab.toUpperCase()} · DERNIER
+            {activeMetricTab.toUpperCase()} · {lastCompletedSession ? 'DERNIER' : 'ESTIMÉ'}
           </Text>
-          <Text style={[styles.metricValue, { color: theme.text }]}>
-            {activeMetricTab === 'volume' ? '2,8k kg' : activeMetricTab === 'duree' ? '1 h 21' : '142 reps'}
-          </Text>
+          <Text style={[styles.metricValue, { color: theme.text }]}>{metricCalloutValue}</Text>
         </View>
 
         {/* Metric Selector Tabs */}
@@ -104,7 +333,7 @@ export default function WorkoutAnalyticsScreen() {
           </View>
         </View>
 
-        {/* Records / PRs Section */}
+        {/* 3. Records / PRs Section (Toutes les PRs isolées & circuits) */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>PRs DANS CETTE SÉANCE</Text>
           <Text style={[styles.recordsBadgeText, { color: theme.accent }]}>Records</Text>
@@ -114,41 +343,106 @@ export default function WorkoutAnalyticsScreen() {
           <View style={styles.prSummaryRow}>
             <Award size={18} color={theme.accent} />
             <Text style={[styles.prSummaryText, { color: theme.text }]}>
-              7 records battus dans {template?.title || 'Upper B'}
+              {allExercises.length} record{allExercises.length > 1 ? 's' : ''} dans {template?.title || 'la séance'}
             </Text>
           </View>
 
-          {(template?.exercises || []).map((ex, idx) => (
+          {exercisePRs.map((pr, idx) => (
             <View key={idx} style={[styles.prRow, { borderTopColor: theme.border }]}>
               <View style={styles.prLeft}>
                 <View style={[styles.starCircle, { backgroundColor: theme.surface }]}>
                   <Star size={12} color={theme.accent} fill={theme.accent} />
                 </View>
-                <View style={{ marginLeft: 8 }}>
-                  <Text style={[styles.prExName, { color: theme.text }]}>{ex.exerciseName}</Text>
-                  <Text style={[styles.prExDate, { color: theme.textMuted }]}>7 AOÛT</Text>
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <Text style={[styles.prExName, { color: theme.text }]} numberOfLines={1}>
+                    {pr.name}
+                  </Text>
+                  <Text style={[styles.prExDate, { color: theme.textMuted }]}>{pr.dateText}</Text>
                 </View>
               </View>
               <View style={styles.prRight}>
-                <Text style={[styles.prValue, { color: theme.text }]}>14 kg e1RM</Text>
-                <Text style={[styles.prSub, { color: theme.textMuted }]}>10 kg × 10</Text>
+                <Text style={[styles.prValue, { color: theme.text }]}>{pr.valueText}</Text>
+                <Text style={[styles.prSub, { color: theme.textMuted }]}>{pr.subText}</Text>
               </View>
             </View>
           ))}
         </View>
 
-        {/* Exercices de la Séance Section */}
+        {/* 2. Exercices de la Séance Section (Singles & Circuits avec formatCircuitSummary) */}
         <Text style={[styles.sectionTitle, { color: theme.textMuted, marginTop: 18, marginBottom: 8 }]}>
           EXERCICES DE LA SÉANCE
         </Text>
 
-        <View style={[styles.cardBox, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-          {(template?.exercises || []).map((ex, idx) => (
-            <TouchableOpacity key={idx} style={[styles.exLinkRow, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.exLinkName, { color: theme.text }]}>{ex.exerciseName}</Text>
-              <ChevronRight size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-          ))}
+        <View style={styles.blocksContainer}>
+          {blocks.map((block, idx) => {
+            if (block.type === 'single') {
+              return (
+                <View
+                  key={block.id || idx}
+                  style={[styles.cardBox, { backgroundColor: theme.cardBg, borderColor: theme.border, marginBottom: 10 }]}
+                >
+                  <TouchableOpacity style={styles.exLinkRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.exLinkName, { color: theme.text }]}>{block.exercise.exerciseName}</Text>
+                      {block.exercise.primaryMuscle ? (
+                        <Text style={[styles.exSubText, { color: theme.textMuted }]}>{block.exercise.primaryMuscle}</Text>
+                      ) : null}
+                    </View>
+                    <ChevronRight size={18} color={theme.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              );
+            } else if (block.type === 'circuit') {
+              return (
+                <View
+                  key={block.id || idx}
+                  style={[
+                    styles.cardBox,
+                    {
+                      backgroundColor: theme.cardBg,
+                      borderColor: theme.border,
+                      marginBottom: 10,
+                      paddingHorizontal: 0,
+                      paddingVertical: 0,
+                      overflow: 'hidden',
+                    },
+                  ]}
+                >
+                  <View style={[styles.circuitHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+                    <View style={styles.circuitBadge}>
+                      <Repeat size={14} color={theme.accent} style={{ marginRight: 6 }} />
+                      <Text style={[styles.circuitBadgeText, { color: theme.accent }]}>
+                        {formatCircuitSummary(block)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {block.exercises.map((item, itemIdx) => (
+                    <View
+                      key={item.id || itemIdx}
+                      style={[
+                        styles.circuitItemRow,
+                        itemIdx > 0 && { borderTopWidth: 1, borderTopColor: theme.border },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.circuitItemName, { color: theme.text }]}>{item.exerciseName}</Text>
+                        {item.primaryMuscle ? (
+                          <Text style={[styles.circuitItemMuscle, { color: theme.textMuted }]}>{item.primaryMuscle}</Text>
+                        ) : null}
+                      </View>
+                      <View style={[styles.targetBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                        <Text style={[styles.targetText, { color: theme.accent }]}>
+                          {item.targetValue} {item.targetType === 'time' ? 's' : 'reps'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              );
+            }
+            return null;
+          })}
         </View>
 
         {/* Historique Passé */}
@@ -157,14 +451,41 @@ export default function WorkoutAnalyticsScreen() {
         </Text>
 
         <View style={[styles.cardBox, { backgroundColor: theme.cardBg, borderColor: theme.border, marginBottom: 30 }]}>
-          <TouchableOpacity style={styles.historyLinkRow}>
-            <Text style={[styles.historyDate, { color: theme.text }]}>ven. 7 août</Text>
-            <View style={styles.historyRight}>
-              <Text style={[styles.historyVol, { color: theme.text }]}>2 802 kg</Text>
-              <Text style={[styles.historyDur, { color: theme.textMuted, marginLeft: 10 }]}>1 h 21</Text>
-              <ChevronRight size={16} color={theme.textMuted} style={{ marginLeft: 6 }} />
+          {historySessions.length > 0 ? (
+            historySessions.map((sess, idx) => {
+              const dateObj = new Date(sess.startTime);
+              const formattedDate = dateObj.toLocaleDateString('fr-FR', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              });
+              const hours = Math.floor((sess.durationSeconds || 0) / 3600);
+              const mins = Math.round(((sess.durationSeconds || 0) % 3600) / 60);
+              const durStr = hours > 0 ? `${hours} h ${mins < 10 ? '0' : ''}${mins}` : `${mins} min`;
+
+              return (
+                <TouchableOpacity
+                  key={sess.id || idx}
+                  style={[styles.historyLinkRow, idx > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}
+                >
+                  <Text style={[styles.historyDate, { color: theme.text }]}>{formattedDate}</Text>
+                  <View style={styles.historyRight}>
+                    <Text style={[styles.historyVol, { color: theme.text }]}>
+                      {sess.totalVolumeKg ? `${sess.totalVolumeKg} kg` : durStr}
+                    </Text>
+                    <Text style={[styles.historyDur, { color: theme.textMuted, marginLeft: 10 }]}>{durStr}</Text>
+                    <ChevronRight size={16} color={theme.textMuted} style={{ marginLeft: 6 }} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={{ paddingVertical: 12 }}>
+              <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center' }}>
+                Aucune séance historique enregistrée
+              </Text>
             </View>
-          </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -301,6 +622,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  blocksContainer: {
+    marginBottom: 8,
+  },
+  circuitHeader: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+  },
+  circuitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  circuitBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  circuitItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  circuitItemName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  circuitItemMuscle: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  targetBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  targetText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  exSubText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
   prSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -321,6 +689,7 @@ const styles = StyleSheet.create({
   prLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   starCircle: {
     width: 26,
@@ -339,6 +708,7 @@ const styles = StyleSheet.create({
   },
   prRight: {
     alignItems: 'flex-end',
+    marginLeft: 8,
   },
   prValue: {
     fontSize: 13,
@@ -352,7 +722,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 0.5,
   },
   exLinkName: {
     fontSize: 14,
@@ -380,3 +749,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
