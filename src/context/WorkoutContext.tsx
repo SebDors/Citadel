@@ -168,6 +168,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...s,
               weightKg: undefined,
               reps: undefined,
+              rir: undefined,
               completed: false,
             })),
           },
@@ -187,6 +188,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...s,
             weightKg: undefined,
             reps: undefined,
+            rir: undefined,
             completed: false,
           })),
         }))
