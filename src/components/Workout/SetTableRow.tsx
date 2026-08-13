@@ -205,13 +205,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   checkButton: {
-    width: 30,
-    height: 30,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 4,
+    marginLeft: 6,
   },
   deleteButton: {
     width: 24,

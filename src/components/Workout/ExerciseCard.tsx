@@ -110,8 +110,10 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
           <Text style={[styles.thText, { color: theme.textMuted }]}>RIR</Text>
         </View>
-        <View style={{ width: 30, marginLeft: 4, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>Check</Text>
+        <View style={{ width: 38, marginLeft: 4, alignItems: 'center' }}>
+          <Text numberOfLines={1} style={[styles.thText, { color: theme.textMuted, fontSize: 10 }]}>
+            Check
+          </Text>
         </View>
         <View style={{ width: 24, marginLeft: 4 }} />
       </View>
