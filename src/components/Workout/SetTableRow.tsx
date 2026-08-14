@@ -13,6 +13,11 @@ interface SetTableRowProps {
   onDelete: () => void;
 }
 
+type KeypadTarget =
+  | { type: 'main'; field: NumericFieldType }
+  | { type: 'drop'; stepId: string; field: 'weightKg' | 'reps' }
+  | null;
+
 const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   set,
   onUpdate,
@@ -21,14 +26,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 }) => {
   const { theme } = useTheme();
   const [showTypeModal, setShowTypeModal] = useState(false);
-  const [activeKeypadField, setActiveKeypadField] = useState<NumericFieldType | null>(null);
+  const [keypadTarget, setKeypadTarget] = useState<KeypadTarget>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
 
-  // Ouverture du clavier numérique sur le champ spécifié
-  const handleOpenKeypad = useCallback((field: NumericFieldType) => {
-    setActiveKeypadField(field);
+  // Ouverture du clavier numérique sur un champ principal ou décharge
+  const handleOpenMainKeypad = useCallback((field: NumericFieldType) => {
+    setKeypadTarget({ type: 'main', field });
     let valStr = '';
     if (field === 'weightKg') {
       valStr = set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '';
@@ -40,74 +45,92 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setTempValue(valStr);
   }, [set.weightKg, set.reps, set.rir]);
 
+  const handleOpenDropKeypad = useCallback((stepId: string, field: 'weightKg' | 'reps') => {
+    setKeypadTarget({ type: 'drop', stepId, field });
+    const step = (set.dropSteps || []).find((s) => s.id === stepId);
+    const val = step ? step[field] : undefined;
+    setTempValue(val !== undefined && val !== null ? String(val) : '');
+  }, [set.dropSteps]);
+
   // Validation et mise à jour de la valeur saisie
-  const commitFieldValue = useCallback((field: NumericFieldType, valStr: string) => {
-    if (field === 'weightKg') {
-      const num = valStr === '' || valStr === '.' ? undefined : parseFloat(valStr);
-      onUpdate('weightKg', num !== undefined && !isNaN(num) ? num : undefined);
-    } else if (field === 'reps') {
-      const num = valStr === '' ? undefined : parseInt(valStr, 10);
-      onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
-    } else if (field === 'rir') {
-      if (valStr === '' || valStr === null || valStr === undefined) {
-        onUpdate('rir', undefined);
-      } else if (valStr === '5+' || valStr === '5') {
-        onUpdate('rir', 5);
-      } else {
-        const num = parseInt(valStr, 10);
-        onUpdate('rir', !isNaN(num) ? num : undefined);
+  const commitValue = useCallback((target: KeypadTarget, valStr: string) => {
+    if (!target) return;
+    if (target.type === 'main') {
+      const field = target.field;
+      if (field === 'weightKg') {
+        const num = valStr === '' || valStr === '.' ? undefined : parseFloat(valStr);
+        onUpdate('weightKg', num !== undefined && !isNaN(num) ? num : undefined);
+      } else if (field === 'reps') {
+        const num = valStr === '' ? undefined : parseInt(valStr, 10);
+        onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
+      } else if (field === 'rir') {
+        if (valStr === '' || valStr === null || valStr === undefined) {
+          onUpdate('rir', undefined);
+        } else if (valStr === '5+' || valStr === '5') {
+          onUpdate('rir', 5);
+        } else {
+          const num = parseInt(valStr, 10);
+          onUpdate('rir', !isNaN(num) ? num : undefined);
+        }
       }
+    } else if (target.type === 'drop') {
+      const { stepId, field } = target;
+      const num = valStr === '' || valStr === '.' ? undefined : parseFloat(valStr);
+      const current = set.dropSteps || [];
+      const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num !== undefined && !isNaN(num) ? num : undefined } : s));
+      onUpdate('dropSteps', next);
     }
-  }, [onUpdate]);
+  }, [onUpdate, set.dropSteps]);
 
   // Changement en direct de la valeur
   const handleKeypadChange = useCallback((val: string) => {
     setTempValue(val);
-    if (activeKeypadField) {
-      commitFieldValue(activeKeypadField, val);
+    if (keypadTarget) {
+      commitValue(keypadTarget, val);
     }
-  }, [activeKeypadField, commitFieldValue]);
+  }, [keypadTarget, commitValue]);
 
   // Passage au champ suivant (KG ➔ REPS ➔ RIR)
   const handleKeypadNext = useCallback((currentVal?: string) => {
-    if (!activeKeypadField) return;
+    if (!keypadTarget) return;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
-    commitFieldValue(activeKeypadField, valToCommit);
+    commitValue(keypadTarget, valToCommit);
 
-    if (activeKeypadField === 'weightKg') {
-      handleOpenKeypad('reps');
-    } else if (activeKeypadField === 'reps') {
-      handleOpenKeypad('rir');
+    if (keypadTarget.type === 'main') {
+      if (keypadTarget.field === 'weightKg') {
+        handleOpenMainKeypad('reps');
+      } else if (keypadTarget.field === 'reps') {
+        if (set.type === 'normal') {
+          handleOpenMainKeypad('rir');
+        } else {
+          if (!set.completed) onToggleComplete();
+          setKeypadTarget(null);
+        }
+      }
+    } else if (keypadTarget.type === 'drop') {
+      if (keypadTarget.field === 'weightKg') {
+        handleOpenDropKeypad(keypadTarget.stepId, 'reps');
+      } else {
+        setKeypadTarget(null);
+      }
     }
-  }, [activeKeypadField, tempValue, commitFieldValue, handleOpenKeypad]);
+  }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad, set.type, set.completed, onToggleComplete]);
 
   // Validation finale
   const handleKeypadValidate = useCallback((finalVal?: string) => {
-    if (!activeKeypadField) return;
+    if (!keypadTarget) return;
     const valToCommit = finalVal !== undefined ? finalVal : tempValue;
-    commitFieldValue(activeKeypadField, valToCommit);
+    commitValue(keypadTarget, valToCommit);
 
-    if (!set.completed) {
+    if (keypadTarget.type === 'main' && !set.completed) {
       onToggleComplete();
     }
-    setActiveKeypadField(null);
-  }, [activeKeypadField, tempValue, commitFieldValue, set.completed, onToggleComplete]);
+    setKeypadTarget(null);
+  }, [keypadTarget, tempValue, commitValue, set.completed, onToggleComplete]);
 
   const handleKeypadClose = useCallback(() => {
-    setActiveKeypadField(null);
+    setKeypadTarget(null);
   }, []);
-
-  const isRirLockedZero = set.type === 'failure' || set.type === 'amrap';
-  const isRirDisabled = set.type === 'warmup';
-  const rirText = isRirLockedZero
-    ? '0'
-    : isRirDisabled
-    ? '-'
-    : set.rir !== undefined && set.rir !== null
-    ? set.rir >= 5
-      ? '5+'
-      : String(set.rir)
-    : '-';
 
   const handleAddDropStep = () => {
     const current = set.dropSteps || [];
@@ -121,12 +144,6 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const handleRemoveDropStep = (stepId: string) => {
     const current = set.dropSteps || [];
     const next = current.filter((s) => s.id !== stepId);
-    onUpdate('dropSteps', next);
-  };
-
-  const handleUpdateDropStep = (stepId: string, field: 'weightKg' | 'reps', num?: number) => {
-    const current = set.dropSteps || [];
-    const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num } : s));
     onUpdate('dropSteps', next);
   };
 
@@ -161,12 +178,12 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
         <View style={styles.colInput}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => handleOpenKeypad('weightKg')}
+            onPress={() => handleOpenMainKeypad('weightKg')}
             style={[
               styles.cellBtn,
               {
-                borderColor: activeKeypadField === 'weightKg' ? theme.accent : theme.border,
-                borderWidth: activeKeypadField === 'weightKg' ? 2 : 1,
+                borderColor: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg' ? theme.accent : theme.border,
+                borderWidth: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg' ? 2 : 1,
                 backgroundColor: theme.surface,
               },
             ]}
@@ -186,12 +203,12 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
         <View style={styles.colInput}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => handleOpenKeypad('reps')}
+            onPress={() => handleOpenMainKeypad('reps')}
             style={[
               styles.cellBtn,
               {
-                borderColor: activeKeypadField === 'reps' ? theme.accent : theme.border,
-                borderWidth: activeKeypadField === 'reps' ? 2 : 1,
+                borderColor: keypadTarget?.type === 'main' && keypadTarget.field === 'reps' ? theme.accent : theme.border,
+                borderWidth: keypadTarget?.type === 'main' && keypadTarget.field === 'reps' ? 2 : 1,
                 backgroundColor: theme.surface,
               },
             ]}
@@ -207,31 +224,31 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Saisie RIR (Verrouillé à 0 pour Échec/AMRAP, désactivé pour Échauffement) */}
+        {/* Saisie RIR : Affichée UNIQUEMENT si la série est de type "normal" */}
         <View style={styles.colInput}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            disabled={isRirDisabled || isRirLockedZero}
-            onPress={() => handleOpenKeypad('rir')}
-            style={[
-              styles.cellBtn,
-              {
-                borderColor: activeKeypadField === 'rir' ? theme.accent : theme.border,
-                borderWidth: activeKeypadField === 'rir' ? 2 : 1,
-                backgroundColor: isRirDisabled || isRirLockedZero ? theme.cardBg : theme.surface,
-                opacity: isRirDisabled ? 0.5 : 1,
-              },
-            ]}
-          >
-            <Text
+          {set.type === 'normal' ? (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => handleOpenMainKeypad('rir')}
               style={[
-                styles.cellText,
-                { color: isRirLockedZero ? theme.danger : (set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted) },
+                styles.cellBtn,
+                {
+                  borderColor: keypadTarget?.type === 'main' && keypadTarget.field === 'rir' ? theme.accent : theme.border,
+                  borderWidth: keypadTarget?.type === 'main' && keypadTarget.field === 'rir' ? 2 : 1,
+                  backgroundColor: theme.surface,
+                },
               ]}
             >
-              {rirText}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.cellText,
+                  { color: set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted },
+                ]}
+              >
+                {set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '-'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Checkbox de complétion */}
@@ -265,53 +282,64 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
             </Text>
           </View>
 
-          {(set.dropSteps || []).map((step, idx) => (
-            <View key={step.id || idx} style={styles.dropStepRow}>
-              <Text style={[styles.dropStepLabel, { color: theme.textMuted }]}>
-                Étape {idx + 2} :
-              </Text>
+          {(set.dropSteps || []).map((step, idx) => {
+            const isWeightActive = keypadTarget?.type === 'drop' && keypadTarget.stepId === step.id && keypadTarget.field === 'weightKg';
+            const isRepsActive = keypadTarget?.type === 'drop' && keypadTarget.stepId === step.id && keypadTarget.field === 'reps';
 
-              {/* Bouton Poids Décharge */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[styles.dropCellBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                onPress={() => {
-                  const current = step.weightKg || 0;
-                  const next = current > 0 ? current + 2.5 : 20;
-                  handleUpdateDropStep(step.id, 'weightKg', next);
-                }}
-              >
-                <Text style={[styles.dropCellText, { color: theme.text }]}>
-                  {step.weightKg !== undefined ? `${step.weightKg} kg` : '- kg'}
+            return (
+              <View key={step.id || idx} style={styles.dropStepRow}>
+                <Text style={[styles.dropStepLabel, { color: theme.textMuted }]}>
+                  Étape {idx + 2} :
                 </Text>
-              </TouchableOpacity>
 
-              <Text style={[styles.dropTimesText, { color: theme.textMuted }]}>×</Text>
+                {/* Bouton Poids Décharge (Ouvre le clavier numérique) */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[
+                    styles.dropCellBtn,
+                    {
+                      backgroundColor: theme.cardBg,
+                      borderColor: isWeightActive ? theme.accent : theme.border,
+                      borderWidth: isWeightActive ? 2 : 1,
+                    },
+                  ]}
+                  onPress={() => handleOpenDropKeypad(step.id, 'weightKg')}
+                >
+                  <Text style={[styles.dropCellText, { color: step.weightKg !== undefined ? theme.text : theme.textMuted }]}>
+                    {step.weightKg !== undefined ? `${step.weightKg} kg` : '- kg'}
+                  </Text>
+                </TouchableOpacity>
 
-              {/* Bouton Reps Décharge */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[styles.dropCellBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
-                onPress={() => {
-                  const current = step.reps || 0;
-                  const next = current > 0 ? current + 2 : 8;
-                  handleUpdateDropStep(step.id, 'reps', next);
-                }}
-              >
-                <Text style={[styles.dropCellText, { color: theme.text }]}>
-                  {step.reps !== undefined ? `${step.reps} reps` : '- reps'}
-                </Text>
-              </TouchableOpacity>
+                <Text style={[styles.dropTimesText, { color: theme.textMuted }]}>×</Text>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => handleRemoveDropStep(step.id)}
-                style={{ padding: 4, marginLeft: 4 }}
-              >
-                <Trash2 size={14} color={theme.danger} />
-              </TouchableOpacity>
-            </View>
-          ))}
+                {/* Bouton Reps Décharge (Ouvre le clavier numérique) */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[
+                    styles.dropCellBtn,
+                    {
+                      backgroundColor: theme.cardBg,
+                      borderColor: isRepsActive ? theme.accent : theme.border,
+                      borderWidth: isRepsActive ? 2 : 1,
+                    },
+                  ]}
+                  onPress={() => handleOpenDropKeypad(step.id, 'reps')}
+                >
+                  <Text style={[styles.dropCellText, { color: step.reps !== undefined ? theme.text : theme.textMuted }]}>
+                    {step.reps !== undefined ? `${step.reps} reps` : '- reps'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleRemoveDropStep(step.id)}
+                  style={{ padding: 4, marginLeft: 4 }}
+                >
+                  <Trash2 size={14} color={theme.danger} />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
 
           <TouchableOpacity
             activeOpacity={0.7}
@@ -325,17 +353,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       )}
 
       {/* Clavier Numérique Personnalisé */}
-      {activeKeypadField !== null && (
+      {keypadTarget !== null && (
         <CustomNumericKeypad
-          visible={activeKeypadField !== null}
+          visible={keypadTarget !== null}
           onClose={handleKeypadClose}
           setNumber={set.setNumber}
-          activeField={activeKeypadField}
+          activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
           onChangeValue={handleKeypadChange}
           onNextField={handleKeypadNext}
           onValidate={handleKeypadValidate}
-          onClear={() => commitFieldValue(activeKeypadField, '')}
+          onClear={() => commitValue(keypadTarget, '')}
         />
       )}
 
