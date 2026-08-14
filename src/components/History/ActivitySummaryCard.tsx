@@ -1,10 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
 import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw } from 'lucide-react-native';
 
 interface ActivitySummaryCardProps {
@@ -20,26 +21,10 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
 }) => {
   const { theme } = useTheme();
   const { deleteWorkoutSession } = useWorkout();
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   const handleDelete = (sessionId: string) => {
-    Alert.alert(
-      'Supprimer la séance',
-      'Voulez-vous vraiment supprimer cette séance de votre historique ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            if (onDeleteSession) {
-              onDeleteSession(sessionId);
-            } else {
-              await deleteWorkoutSession(sessionId);
-            }
-          },
-        },
-      ]
-    );
+    setSessionToDelete(sessionId);
   };
 
   // Mode 1: Affichage d'une séance spécifique (Carte compacte d'historique)
@@ -168,6 +153,40 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
             <Text style={[styles.emptyMusclesText, { color: theme.textMuted }]}>-</Text>
           )}
         </View>
+        {/* Modal de confirmation de suppression personnalisée */}
+        <Modal visible={!!sessionToDelete} transparent animationType="fade" onRequestClose={() => setSessionToDelete(null)}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSessionToDelete(null)}>
+            <View style={[styles.deleteModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+              <Text style={[styles.deleteModalTitle, { color: theme.text }]}>Supprimer la séance</Text>
+              <Text style={[styles.deleteModalSub, { color: theme.textMuted }]}>
+                Voulez-vous vraiment supprimer cette séance de votre historique ?
+              </Text>
+              <View style={{ flexDirection: 'row', marginTop: 16 }}>
+                <Button
+                  title="Annuler"
+                  variant="outline"
+                  onPress={() => setSessionToDelete(null)}
+                  style={{ flex: 1, marginRight: 6 }}
+                />
+                <Button
+                  title="Supprimer"
+                  variant="danger"
+                  onPress={async () => {
+                    if (sessionToDelete) {
+                      if (onDeleteSession) {
+                        onDeleteSession(sessionToDelete);
+                      } else {
+                        await deleteWorkoutSession(sessionToDelete);
+                      }
+                    }
+                    setSessionToDelete(null);
+                  }}
+                  style={{ flex: 1, marginLeft: 6 }}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </Card>
     );
   }
@@ -303,5 +322,28 @@ const styles = StyleSheet.create({
   emptyMusclesText: {
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModalContent: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deleteModalSub: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

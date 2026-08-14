@@ -12,6 +12,7 @@ import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary } 
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
+import { Button } from '../UI/Button';
 import {
   ChevronLeft,
   ChevronRight,
@@ -55,6 +56,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   // État de la modale pour le jour sélectionné
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   const isCurrentMonthView =
     currentMonthIndex === now.getMonth() && currentYear === now.getFullYear();
@@ -110,20 +112,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
     : '';
 
   const handleDeleteSession = (sessionId: string) => {
-    Alert.alert(
-      'Supprimer la séance',
-      'Voulez-vous vraiment supprimer cette séance complète de l\'historique ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteWorkoutSession(sessionId);
-          },
-        },
-      ]
-    );
+    setSessionToDelete(sessionId);
   };
 
   return (
@@ -343,6 +332,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal de confirmation de suppression de séance personnalisée */}
+      <Modal visible={!!sessionToDelete} transparent animationType="fade" onRequestClose={() => setSessionToDelete(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSessionToDelete(null)}>
+          <View style={[styles.deleteModalContent, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <Text style={[styles.deleteModalTitle, { color: theme.text }]}>Supprimer la séance</Text>
+            <Text style={[styles.deleteModalSub, { color: theme.textMuted }]}>
+              Voulez-vous vraiment supprimer cette séance complète de l'historique ?
+            </Text>
+            <View style={{ flexDirection: 'row', marginTop: 16 }}>
+              <Button
+                title="Annuler"
+                variant="outline"
+                onPress={() => setSessionToDelete(null)}
+                style={{ flex: 1, marginRight: 6 }}
+              />
+              <Button
+                title="Supprimer"
+                variant="danger"
+                onPress={async () => {
+                  if (sessionToDelete) {
+                    await deleteWorkoutSession(sessionToDelete);
+                  }
+                  setSessionToDelete(null);
+                }}
+                style={{ flex: 1, marginLeft: 6 }}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Card>
   );
 };
@@ -497,5 +517,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
     lineHeight: 16,
+  },
+  deleteModalContent: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deleteModalSub: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
