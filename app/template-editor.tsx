@@ -1095,6 +1095,15 @@ export default function TemplateEditorScreen() {
                   <Text style={[styles.exRestLabel, { color: theme.textMuted }]}>Repos exercice :</Text>
                 </View>
                 <View style={styles.rowAlign}>
+                  {exRest !== defaultRestSeconds && (
+                    <TouchableOpacity
+                      style={[styles.resetRestBtn, { marginRight: 6 }]}
+                      onPress={() => handleResetExerciseRest(block.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <RotateCcw size={14} color={theme.textMuted} />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={[styles.smallStepperBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
                     onPress={() => handleAdjustExerciseRest(block.id, -15)}
@@ -1108,16 +1117,6 @@ export default function TemplateEditorScreen() {
                   >
                     <Text style={[styles.smallStepperText, { color: theme.text }]}>+15s</Text>
                   </TouchableOpacity>
-
-                  {exRest !== defaultRestSeconds && (
-                    <TouchableOpacity
-                      style={styles.resetRestBtn}
-                      onPress={() => handleResetExerciseRest(block.id)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <RotateCcw size={14} color={theme.textMuted} />
-                    </TouchableOpacity>
-                  )}
                 </View>
               </View>
 

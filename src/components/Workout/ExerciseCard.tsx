@@ -4,8 +4,9 @@ import { WorkoutExercise, WorkoutSet } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
 import { SetTableRow } from './SetTableRow';
-import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check } from 'lucide-react-native';
+import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw } from 'lucide-react-native';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -140,31 +141,48 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         <Text style={[styles.addSetText, { color: theme.accent }]}>Ajouter une série</Text>
       </TouchableOpacity>
 
-      {/* Modal Édition Temps de Repos */}
+      {/* Modal Édition Temps de Repos (Steppers +/- 15s et Reset à gauche) */}
       <Modal visible={showRestModal} transparent animationType="fade" onRequestClose={() => setShowRestModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRestModal(false)}>
-          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Temps de repos (secondes)</Text>
-            <TextInput
-              style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-              keyboardType="numeric"
-              value={tempRestSeconds}
-              onChangeText={setTempRestSeconds}
-            />
-            <View style={{ flexDirection: 'row', marginTop: 12 }}>
+          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, alignItems: 'center' }]}>
+            <Text style={[styles.menuTitle, { color: theme.text }]}>Temps de repos exercice</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+              {exercise.restSeconds !== 75 && (
+                <TouchableOpacity
+                  style={[styles.smallStepperBtn, { backgroundColor: theme.surface, borderColor: theme.border, marginRight: 8 }]}
+                  onPress={() => onUpdateRestTime(75)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <RotateCcw size={16} color={theme.textMuted} />
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: theme.surface, marginRight: 6 }]}
-                onPress={() => setShowRestModal(false)}
+                style={[styles.stepperActionBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => onUpdateRestTime(Math.max(0, (exercise.restSeconds || 75) - 15))}
               >
-                <Text style={[styles.modalBtnText, { color: theme.text }]}>Annuler</Text>
+                <Text style={[styles.stepperActionText, { color: theme.text }]}>-15s</Text>
               </TouchableOpacity>
+
+              <Text style={[styles.restDisplayValue, { color: theme.accent }]}>
+                {exercise.restSeconds || 75}s
+              </Text>
+
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: theme.accent, marginLeft: 6 }]}
-                onPress={handleSaveRestTime}
+                style={[styles.stepperActionBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => onUpdateRestTime((exercise.restSeconds || 75) + 15)}
               >
-                <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>Valider</Text>
+                <Text style={[styles.stepperActionText, { color: theme.text }]}>+15s</Text>
               </TouchableOpacity>
             </View>
+
+            <Button
+              title="Fermer"
+              variant="primary"
+              onPress={() => setShowRestModal(false)}
+              style={{ width: '100%', marginTop: 8 }}
+            />
           </View>
         </TouchableOpacity>
       </Modal>
@@ -394,5 +412,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 12,
     flex: 1,
+  },
+  stepperActionBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginHorizontal: 8,
+  },
+  stepperActionText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  restDisplayValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    minWidth: 60,
+    textAlign: 'center',
+  },
+  smallStepperBtn: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
