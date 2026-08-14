@@ -95,7 +95,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <TrendingUp size={18} color={theme.accent} />
-          <Text style={[styles.title, { color: theme.text }]}>Graphique Modulable de Mensurations</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Graphique de Mensurations</Text>
         </View>
       </View>
 
