@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 12,
     paddingTop: 2,
-    paddingBottom: 24,
+    paddingBottom: 90,
   },
   pageHeader: {
     marginTop: 2,
