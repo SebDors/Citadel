@@ -14,15 +14,7 @@ export default function HistoryTab() {
   const historyList = data?.history || [];
 
   return (
-    <SafeAreaView
-      style={[
-        styles.safeArea,
-        {
-          backgroundColor: theme.background,
-          paddingTop: Platform.OS === 'android' ? Math.min(RNStatusBar.currentHeight || 0, 16) : 0,
-        },
-      ]}
-    >
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header */}
         <View style={styles.header}>
@@ -68,11 +60,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 2,
     paddingBottom: 110,
   },
   header: {
-    marginTop: 10,
-    marginBottom: 14,
+    marginTop: 2,
+    marginBottom: 10,
   },
   title: {
     fontSize: 28,
