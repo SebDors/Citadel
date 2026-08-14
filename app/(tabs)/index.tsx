@@ -181,10 +181,12 @@ export default function WorkoutTab() {
     }
   };
 
-  // Group templates by folder
-  const folders = data?.folders || [];
+  // Group and sort templates alphabetically by folder & title
+  const folders = [...(data?.folders || [])].sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
   const templatesInFolders = new Set(folders.flatMap((f) => f.templateIds));
-  const unassignedTemplates = (data?.templates || []).filter((t) => !templatesInFolders.has(t.id));
+  const unassignedTemplates = [...(data?.templates || [])]
+    .filter((t) => !templatesInFolders.has(t.id))
+    .sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
 
   const currentFolder = selectedTemplate
     ? folders.find((f) => f.templateIds.includes(selectedTemplate.id))
@@ -388,7 +390,9 @@ export default function WorkoutTab() {
 
         {/* Folders List */}
         {folders.map((folder) => {
-          const folderTemplates = (data?.templates || []).filter((t) => folder.templateIds.includes(t.id));
+          const folderTemplates = [...(data?.templates || [])]
+            .filter((t) => folder.templateIds.includes(t.id))
+            .sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
           const isCollapsed = !!folder.isCollapsed;
 
           return (
