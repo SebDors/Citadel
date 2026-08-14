@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { WorkoutSet, SET_TYPES_CONFIG } from '../../types';
+import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { Check, Trash2, X } from 'lucide-react-native';
+import { Check, Trash2, X, Plus, CornerDownRight } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 
 interface SetTableRowProps {
@@ -97,126 +97,232 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setActiveKeypadField(null);
   }, []);
 
+  const isRirLockedZero = set.type === 'failure' || set.type === 'amrap';
+  const isRirDisabled = set.type === 'warmup';
+  const rirText = isRirLockedZero
+    ? '0'
+    : isRirDisabled
+    ? '-'
+    : set.rir !== undefined && set.rir !== null
+    ? set.rir >= 5
+      ? '5+'
+      : String(set.rir)
+    : '-';
+
+  const handleAddDropStep = () => {
+    const current = set.dropSteps || [];
+    const next: DropStep[] = [
+      ...current,
+      { id: `drop_${Date.now()}_${current.length + 1}`, weightKg: undefined, reps: undefined },
+    ];
+    onUpdate('dropSteps', next);
+  };
+
+  const handleRemoveDropStep = (stepId: string) => {
+    const current = set.dropSteps || [];
+    const next = current.filter((s) => s.id !== stepId);
+    onUpdate('dropSteps', next);
+  };
+
+  const handleUpdateDropStep = (stepId: string, field: 'weightKg' | 'reps', num?: number) => {
+    const current = set.dropSteps || [];
+    const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num } : s));
+    onUpdate('dropSteps', next);
+  };
+
   return (
-    <View
-      style={[
-        styles.row,
-        {
-          backgroundColor: set.completed ? theme.completedSet : 'transparent',
-          borderBottomColor: theme.border,
-        },
-      ]}
-    >
-      {/* Sélecteur de type de série */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setShowTypeModal(true)}
-        style={[styles.typeButton, { backgroundColor: currentTypeConfig.color }]}
-      >
-        <Text style={styles.typeText}>{currentTypeConfig.code}</Text>
-      </TouchableOpacity>
-
-      {/* Performance précédente */}
-      <View style={styles.colPrevious}>
-        <Text style={[styles.previousText, { color: theme.textMuted }]}>
-          {set.previous || '-'}
-        </Text>
-      </View>
-
-      {/* Saisie Poids (Kg) */}
-      <View style={styles.colInput}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => handleOpenKeypad('weightKg')}
-          style={[
-            styles.cellBtn,
-            {
-              borderColor: activeKeypadField === 'weightKg' ? theme.accent : theme.border,
-              borderWidth: activeKeypadField === 'weightKg' ? 2 : 1,
-              backgroundColor: theme.surface,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.cellText,
-              { color: set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted },
-            ]}
-          >
-            {set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '-'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Saisie Reps */}
-      <View style={styles.colInput}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => handleOpenKeypad('reps')}
-          style={[
-            styles.cellBtn,
-            {
-              borderColor: activeKeypadField === 'reps' ? theme.accent : theme.border,
-              borderWidth: activeKeypadField === 'reps' ? 2 : 1,
-              backgroundColor: theme.surface,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.cellText,
-              { color: set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted },
-            ]}
-          >
-            {set.reps !== undefined && set.reps !== null ? String(set.reps) : '-'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Saisie RIR (S'il n'a pas été saisi, affiche '-' en couleur muette theme.textMuted) */}
-      <View style={styles.colInput}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => handleOpenKeypad('rir')}
-          style={[
-            styles.cellBtn,
-            {
-              borderColor: activeKeypadField === 'rir' ? theme.accent : theme.border,
-              borderWidth: activeKeypadField === 'rir' ? 2 : 1,
-              backgroundColor: theme.surface,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.cellText,
-              { color: set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted },
-            ]}
-          >
-            {set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '-'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Checkbox de complétion */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={onToggleComplete}
+    <View style={styles.containerCol}>
+      <View
         style={[
-          styles.checkButton,
+          styles.row,
           {
-            backgroundColor: set.completed ? (theme.success || '#618764') : 'transparent',
-            borderColor: theme.success || '#618764',
+            backgroundColor: set.completed ? theme.completedSet : 'transparent',
+            borderBottomColor: theme.border,
           },
         ]}
       >
-        {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
-      </TouchableOpacity>
+        {/* Sélecteur de type de série */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setShowTypeModal(true)}
+          style={[styles.typeButton, { backgroundColor: currentTypeConfig.color }]}
+        >
+          <Text style={styles.typeText}>{currentTypeConfig.code}</Text>
+        </TouchableOpacity>
 
-      {/* Suppression de la série */}
-      <TouchableOpacity activeOpacity={0.7} onPress={onDelete} style={styles.deleteButton}>
-        <Trash2 size={16} color={theme.danger} />
-      </TouchableOpacity>
+        {/* Performance précédente */}
+        <View style={styles.colPrevious}>
+          <Text style={[styles.previousText, { color: theme.textMuted }]}>
+            {set.previous || '-'}
+          </Text>
+        </View>
+
+        {/* Saisie Poids (Kg) */}
+        <View style={styles.colInput}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleOpenKeypad('weightKg')}
+            style={[
+              styles.cellBtn,
+              {
+                borderColor: activeKeypadField === 'weightKg' ? theme.accent : theme.border,
+                borderWidth: activeKeypadField === 'weightKg' ? 2 : 1,
+                backgroundColor: theme.surface,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.cellText,
+                { color: set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted },
+              ]}
+            >
+              {set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '-'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Saisie Reps */}
+        <View style={styles.colInput}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleOpenKeypad('reps')}
+            style={[
+              styles.cellBtn,
+              {
+                borderColor: activeKeypadField === 'reps' ? theme.accent : theme.border,
+                borderWidth: activeKeypadField === 'reps' ? 2 : 1,
+                backgroundColor: theme.surface,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.cellText,
+                { color: set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted },
+              ]}
+            >
+              {set.reps !== undefined && set.reps !== null ? String(set.reps) : '-'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Saisie RIR (Verrouillé à 0 pour Échec/AMRAP, désactivé pour Échauffement) */}
+        <View style={styles.colInput}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={isRirDisabled || isRirLockedZero}
+            onPress={() => handleOpenKeypad('rir')}
+            style={[
+              styles.cellBtn,
+              {
+                borderColor: activeKeypadField === 'rir' ? theme.accent : theme.border,
+                borderWidth: activeKeypadField === 'rir' ? 2 : 1,
+                backgroundColor: isRirDisabled || isRirLockedZero ? theme.cardBg : theme.surface,
+                opacity: isRirDisabled ? 0.5 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.cellText,
+                { color: isRirLockedZero ? theme.danger : (set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted) },
+              ]}
+            >
+              {rirText}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Checkbox de complétion */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onToggleComplete}
+          style={[
+            styles.checkButton,
+            {
+              backgroundColor: set.completed ? (theme.success || '#618764') : 'transparent',
+              borderColor: theme.success || '#618764',
+            },
+          ]}
+        >
+          {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
+        </TouchableOpacity>
+
+        {/* Suppression de la série */}
+        <TouchableOpacity activeOpacity={0.7} onPress={onDelete} style={styles.deleteButton}>
+          <Trash2 size={16} color={theme.danger} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sous-section pour les décharges Drop Set (Type D) */}
+      {set.type === 'drop' && (
+        <View style={[styles.dropContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.dropHeaderRow}>
+            <CornerDownRight size={14} color={theme.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.dropHeaderText, { color: theme.accent }]}>
+              Décharges dégressives (Drop Set)
+            </Text>
+          </View>
+
+          {(set.dropSteps || []).map((step, idx) => (
+            <View key={step.id || idx} style={styles.dropStepRow}>
+              <Text style={[styles.dropStepLabel, { color: theme.textMuted }]}>
+                Étape {idx + 2} :
+              </Text>
+
+              {/* Bouton Poids Décharge */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[styles.dropCellBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+                onPress={() => {
+                  const current = step.weightKg || 0;
+                  const next = current > 0 ? current + 2.5 : 20;
+                  handleUpdateDropStep(step.id, 'weightKg', next);
+                }}
+              >
+                <Text style={[styles.dropCellText, { color: theme.text }]}>
+                  {step.weightKg !== undefined ? `${step.weightKg} kg` : '- kg'}
+                </Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.dropTimesText, { color: theme.textMuted }]}>×</Text>
+
+              {/* Bouton Reps Décharge */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[styles.dropCellBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+                onPress={() => {
+                  const current = step.reps || 0;
+                  const next = current > 0 ? current + 2 : 8;
+                  handleUpdateDropStep(step.id, 'reps', next);
+                }}
+              >
+                <Text style={[styles.dropCellText, { color: theme.text }]}>
+                  {step.reps !== undefined ? `${step.reps} reps` : '- reps'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleRemoveDropStep(step.id)}
+                style={{ padding: 4, marginLeft: 4 }}
+              >
+                <Trash2 size={14} color={theme.danger} />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleAddDropStep}
+            style={[styles.addDropBtn, { borderColor: theme.accent }]}
+          >
+            <Plus size={13} color={theme.accent} style={{ marginRight: 4 }} />
+            <Text style={[styles.addDropText, { color: theme.accent }]}>+ Décharge</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Clavier Numérique Personnalisé */}
       {activeKeypadField !== null && (
@@ -254,6 +360,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 ]}
                 onPress={() => {
                   onUpdate('type', cfg.type);
+                  if (cfg.type === 'failure' || cfg.type === 'amrap') {
+                    onUpdate('rir', 0);
+                  } else if (cfg.type === 'warmup') {
+                    onUpdate('rir', undefined);
+                  } else if (cfg.type === 'drop') {
+                    if (!set.dropSteps || set.dropSteps.length === 0) {
+                      onUpdate('dropSteps', [
+                        { id: `drop_${Date.now()}_1`, weightKg: undefined, reps: undefined }
+                      ]);
+                    }
+                  }
                   setShowTypeModal(false);
                 }}
               >
@@ -392,5 +509,65 @@ const styles = StyleSheet.create({
   },
   typeOptionDesc: {
     fontSize: 12,
+  },
+  containerCol: {
+    width: '100%',
+  },
+  dropContainer: {
+    marginLeft: 32,
+    marginTop: 4,
+    marginBottom: 8,
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  dropHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  dropHeaderText: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  dropStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 3,
+  },
+  dropStepLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    width: 62,
+  },
+  dropCellBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  dropCellText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dropTimesText: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginHorizontal: 6,
+  },
+  addDropBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  addDropText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

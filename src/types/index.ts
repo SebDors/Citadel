@@ -16,6 +16,12 @@ export const SET_TYPES_CONFIG: Record<SetType, SetTypeInfo> = {
   failure: { type: 'failure', label: 'Échec', code: 'F', description: 'Poussée jusqu\'à l\'échec mécanique ultime', color: '#EF4444' },
 };
 
+export interface DropStep {
+  id: string;
+  weightKg?: number;
+  reps?: number;
+}
+
 export interface WorkoutSet {
   id: string;
   setNumber: number;
@@ -23,6 +29,7 @@ export interface WorkoutSet {
   weightKg?: number; // Optionnel (champ vide si non renseigné)
   reps?: number;     // Optionnel (champ vide si non renseigné)
   rir?: number;      // Reps In Reserve (0 à 5+)
+  dropSteps?: DropStep[]; // Décharges (Drop Sets)
   durationSeconds?: number;
   previous?: string; // Ex: "100kg x 8" ou "45s"
   completed: boolean;
