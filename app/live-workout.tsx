@@ -811,12 +811,23 @@ export default function LiveWorkoutScreen() {
 
         {/* Bouton Terminer l'entraînement (Cliquable à tout moment, vert/accent si tous les blocs sont complétés) */}
         <Button
-          title="Terminer l'entraînement"
+          title="Terminer la séance"
           variant={isAllCompleted ? 'primary' : 'outline'}
           onPress={handleFinish}
           icon={<Check size={18} color={isAllCompleted ? '#FFFFFF' : theme.text} />}
           style={{ marginTop: 10 }}
         />
+
+        {/* Bouton Abandonner la séance (Texte rouge centré sans contour) */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handleCancel}
+          style={{ paddingVertical: 14, alignItems: 'center', marginTop: 6, marginBottom: 10 }}
+        >
+          <Text style={{ color: theme.danger, fontSize: 15, fontWeight: '700' }}>
+            Abandonner la séance
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Modal Ajout d'Exercice avec Barre de Recherche */}

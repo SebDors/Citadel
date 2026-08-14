@@ -107,11 +107,6 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
             {renderSubtitle()}
           </Text>
         </View>
-
-        <View style={styles.actions}>
-          <Button title="Annuler" variant="outline" onPress={onCancel} style={styles.btnSmall} />
-          <Button title="Terminer" variant="primary" onPress={onFinish} style={styles.btnSmall} />
-        </View>
       </View>
 
       <View style={styles.statsRow}>
