@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { WorkoutSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { Button } from '../UI/Button';
 import { Clock, Dumbbell, CheckCircle, RotateCw, Timer } from 'lucide-react-native';
 
 export interface CircuitInfo {
@@ -23,11 +22,26 @@ interface LiveWorkoutHeaderProps {
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
-  onFinish,
-  onCancel,
   circuitInfo,
 }) => {
   const { theme } = useTheme();
+
+  const progressPercent = useMemo(() => {
+    if (circuitInfo?.isCircuit) {
+      if (circuitInfo.isAmrap) {
+        const totalSecs = (circuitInfo.amrapDurationMinutes || 12) * 60;
+        const elapsed = totalSecs - (circuitInfo.amrapSecondsLeft || 0);
+        return Math.min(100, Math.max(0, Math.round((elapsed / totalSecs) * 100)));
+      }
+      return Math.min(
+        100,
+        Math.max(0, Math.round((circuitInfo.currentRound / Math.max(1, circuitInfo.totalRounds)) * 100))
+      );
+    }
+    const total = session.totalSetsCount || 1;
+    const completed = session.completedSetsCount || 0;
+    return Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+  }, [session, circuitInfo]);
 
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -66,7 +80,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       if (circuitInfo.isAmrap) {
         return (
           <View style={styles.statBox}>
-            <Timer size={16} color={theme.primary} />
+            <Timer size={14} color={theme.accent} />
             <Text style={[styles.statValue, { color: theme.text }]}>
               {formatMinutesSeconds(circuitInfo.amrapSecondsLeft ?? 0)}
             </Text>
@@ -76,7 +90,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       }
       return (
         <View style={styles.statBox}>
-          <RotateCw size={16} color={theme.primary} />
+          <RotateCw size={14} color={theme.accent} />
           <Text style={[styles.statValue, { color: theme.text }]}>
             {circuitInfo.currentRound} / {circuitInfo.totalRounds}
           </Text>
@@ -87,7 +101,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
 
     return (
       <View style={styles.statBox}>
-        <CheckCircle size={16} color={theme.primary} />
+        <CheckCircle size={14} color={theme.accent} />
         <Text style={[styles.statValue, { color: theme.text }]}>
           {session.completedSetsCount} / {session.totalSetsCount}
         </Text>
@@ -107,12 +121,30 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
             {renderSubtitle()}
           </Text>
         </View>
+
+        {/* Badge de Progression % dynamique dans le coin supérieur droit */}
+        <View style={[styles.progressBadge, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+          <Text style={[styles.progressPercentText, { color: theme.accent }]}>
+            {progressPercent}%
+          </Text>
+          <View style={[styles.miniTrack, { backgroundColor: theme.border }]}>
+            <View
+              style={[
+                styles.miniFill,
+                {
+                  backgroundColor: theme.accent,
+                  width: `${progressPercent}%`,
+                },
+              ]}
+            />
+          </View>
+        </View>
       </View>
 
       <View style={styles.statsRow}>
         {/* Timer */}
         <View style={styles.statBox}>
-          <Clock size={16} color={theme.accent} />
+          <Clock size={14} color={theme.accent} />
           <Text style={[styles.statValue, { color: theme.text }]}>
             {formatDuration(session.durationSeconds)}
           </Text>
@@ -121,7 +153,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
 
         {/* Volume */}
         <View style={styles.statBox}>
-          <Dumbbell size={16} color={theme.secondary} />
+          <Dumbbell size={14} color={theme.secondary} />
           <Text style={[styles.statValue, { color: theme.text }]}>{session.totalVolumeKg} kg</Text>
           <Text style={[styles.statLabel, { color: theme.textMuted }]}>Volume</Text>
         </View>
@@ -135,41 +167,57 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    padding: 14,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   titleBox: {
     flex: 1,
     marginRight: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
   },
   subtitle: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
   },
-  actions: {
-    flexDirection: 'row',
-  },
-  btnSmall: {
-    paddingVertical: 6,
+  progressBadge: {
     paddingHorizontal: 8,
-    marginLeft: 4,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    minWidth: 54,
+  },
+  progressPercentText: {
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  miniTrack: {
+    width: 44,
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  miniFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 8,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
   },
@@ -177,12 +225,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
-    marginTop: 2,
+    marginTop: 1,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
 });
