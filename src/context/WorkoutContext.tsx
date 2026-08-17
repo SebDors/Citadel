@@ -20,7 +20,15 @@ import {
 import { StorageService } from '../services/storage';
 import { NotificationService } from '../services/notificationService';
 
-interface WorkoutContextType {
+export interface NextSetPreview {
+  exerciseName: string;
+  setNumber: number;
+  weightKg?: number;
+  reps?: number;
+  isNextExercise: boolean;
+}
+
+export interface WorkoutContextType {
   data: FitTrackerData | null;
   loading: boolean;
   activeSession: WorkoutSession | null;
@@ -58,10 +66,11 @@ interface WorkoutContextType {
   restTimer: {
     active: boolean;
     exerciseName: string;
+    nextSetInfo?: NextSetPreview | null;
     targetEndTime: number | null;
     secondsRemaining: number;
   };
-  startRestTimer: (exerciseName: string, seconds: number) => void;
+  startRestTimer: (exerciseName: string, seconds: number, nextSetInfo?: NextSetPreview | null) => void;
   dismissRestTimer: () => void;
   adjustRestTimer: (deltaSeconds: number) => void;
 }
@@ -76,21 +85,24 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [restTimer, setRestTimer] = useState<{
     active: boolean;
     exerciseName: string;
+    nextSetInfo?: NextSetPreview | null;
     targetEndTime: number | null;
     secondsRemaining: number;
   }>({
     active: false,
     exerciseName: '',
+    nextSetInfo: null,
     targetEndTime: null,
     secondsRemaining: 0,
   });
 
-  const startRestTimer = (exerciseName: string, seconds: number) => {
+  const startRestTimer = (exerciseName: string, seconds: number, nextSetInfo?: NextSetPreview | null) => {
     if (seconds <= 0) return;
     const targetEnd = Date.now() + seconds * 1000;
     setRestTimer({
       active: true,
       exerciseName,
+      nextSetInfo: nextSetInfo || null,
       targetEndTime: targetEnd,
       secondsRemaining: seconds,
     });
@@ -350,11 +362,97 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveCurrentWorkout(updatedSession);
   };
 
+  const findNextSetPreview = (
+    session: WorkoutSession,
+    currentExerciseId: string,
+    currentSetId: string
+  ): NextSetPreview | null => {
+    if (session.blocks && session.blocks.length > 0) {
+      let foundCurrentEx = false;
+      for (let i = 0; i < session.blocks.length; i++) {
+        const block = session.blocks[i];
+        if (block.type === 'single') {
+          const ex = block.exercise;
+          if (ex.id === currentExerciseId) {
+            foundCurrentEx = true;
+            let foundCurrentSet = false;
+            for (const s of ex.sets) {
+              if (s.id === currentSetId) {
+                foundCurrentSet = true;
+                continue;
+              }
+              if (foundCurrentSet && !s.completed) {
+                return {
+                  exerciseName: ex.exerciseName,
+                  setNumber: s.setNumber,
+                  weightKg: s.weightKg,
+                  reps: s.reps,
+                  isNextExercise: false,
+                };
+              }
+            }
+          } else if (foundCurrentEx) {
+            for (const s of ex.sets) {
+              if (!s.completed) {
+                return {
+                  exerciseName: ex.exerciseName,
+                  setNumber: s.setNumber,
+                  weightKg: s.weightKg,
+                  reps: s.reps,
+                  isNextExercise: true,
+                };
+              }
+            }
+          }
+        }
+      }
+    } else if (session.exercises && session.exercises.length > 0) {
+      let foundCurrentEx = false;
+      for (let i = 0; i < session.exercises.length; i++) {
+        const ex = session.exercises[i];
+        if (ex.id === currentExerciseId) {
+          foundCurrentEx = true;
+          let foundCurrentSet = false;
+          for (const s of ex.sets) {
+            if (s.id === currentSetId) {
+              foundCurrentSet = true;
+              continue;
+            }
+            if (foundCurrentSet && !s.completed) {
+              return {
+                exerciseName: ex.exerciseName,
+                setNumber: s.setNumber,
+                weightKg: s.weightKg,
+                reps: s.reps,
+                isNextExercise: false,
+              };
+            }
+          }
+        } else if (foundCurrentEx) {
+          for (const s of ex.sets) {
+            if (!s.completed) {
+              return {
+                exerciseName: ex.exerciseName,
+                setNumber: s.setNumber,
+                weightKg: s.weightKg,
+                reps: s.reps,
+                isNextExercise: true,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
   const toggleSetComplete = (exerciseId: string, setId: string) => {
     if (!activeSession) return;
 
     let targetRestSeconds = 75;
     let exerciseName = '';
+    let isMarkingCompleted = false;
 
     const currentExercises = activeSession.exercises || [];
     const updatedExercises = currentExercises.map((ex) => {
@@ -365,10 +463,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const updatedSets = ex.sets.map((s) => {
         if (s.id !== setId) return s;
         const newCompleted = !s.completed;
-
-        if (newCompleted) {
-          startRestTimer(ex.exerciseName, targetRestSeconds);
-        }
+        if (newCompleted) isMarkingCompleted = true;
 
         return {
           ...s,
@@ -389,10 +484,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const updatedSets = block.exercise.sets.map((s) => {
               if (s.id !== setId) return s;
               const newCompleted = !s.completed;
-
-              if (newCompleted) {
-                startRestTimer(block.exercise.exerciseName, targetRestSeconds);
-              }
+              if (newCompleted) isMarkingCompleted = true;
 
               return {
                 ...s,
@@ -423,6 +515,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setActiveSession(updatedSession);
     StorageService.saveCurrentWorkout(updatedSession);
+
+    if (isMarkingCompleted) {
+      const nextSetInfo = findNextSetPreview(updatedSession, exerciseId, setId);
+      startRestTimer(exerciseName, targetRestSeconds, nextSetInfo);
+    }
   };
 
   const addSet = (exerciseId: string) => {

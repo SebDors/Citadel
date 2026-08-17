@@ -14,15 +14,40 @@ export const RestTimerBar: React.FC = () => {
   const secs = restTimer.secondsRemaining % 60;
   const formatted = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
+  const nextInfo = restTimer.nextSetInfo;
+  let nextText = '';
+  if (nextInfo) {
+    const hasDetails = nextInfo.weightKg !== undefined || nextInfo.reps !== undefined;
+    const details = hasDetails
+      ? ` (${nextInfo.weightKg ? `${nextInfo.weightKg} kg` : ''}${nextInfo.weightKg && nextInfo.reps ? ' × ' : ''}${nextInfo.reps ? `${nextInfo.reps} reps` : ''})`
+      : '';
+    if (nextInfo.isNextExercise) {
+      nextText = `Suivant : ${nextInfo.exerciseName} · S${nextInfo.setNumber}${details}`;
+    } else {
+      nextText = `Prochaine : Série ${nextInfo.setNumber}${details}`;
+    }
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
       <View style={styles.left}>
         <Clock size={20} color={theme.accent} style={{ marginRight: 8 }} />
-        <View>
-          <Text style={[styles.timerText, { color: theme.accent }]}>{formatted}</Text>
-          <Text style={[styles.exerciseText, { color: theme.textMuted }]} numberOfLines={1}>
-            Repos : {restTimer.exerciseName}
-          </Text>
+        <View style={{ flex: 1, marginRight: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[styles.timerText, { color: theme.accent }]}>{formatted}</Text>
+            <Text style={[styles.exerciseText, { color: theme.textMuted, marginLeft: 8 }]} numberOfLines={1}>
+              Repos · {restTimer.exerciseName}
+            </Text>
+          </View>
+          {nextInfo ? (
+            <Text style={[styles.nextSetText, { color: theme.text }]} numberOfLines={1}>
+              {nextText}
+            </Text>
+          ) : (
+            <Text style={[styles.nextSetText, { color: theme.accent }]} numberOfLines={1}>
+              Dernière série terminée ! 🎉
+            </Text>
+          )}
         </View>
       </View>
 
@@ -83,6 +108,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     maxWidth: 140,
+  },
+  nextSetText: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
   },
   controls: {
     flexDirection: 'row',

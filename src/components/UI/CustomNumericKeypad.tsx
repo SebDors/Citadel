@@ -173,8 +173,8 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     ['.', '0', 'backspace'],
   ];
 
-  // Choix rapides RIR dédiés
-  const rirOptions = ['1', '2', '3', '4', '5+'];
+  // Choix rapides RIR dédiés (start at 0)
+  const rirOptions = ['0', '1', '2', '3', '4', '5+'];
 
   return (
     <Modal
@@ -230,7 +230,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
           {/* Affichage du mode de saisie selon le champ actif */}
           {activeField === 'rir' ? (
-            /* Mode RIR : Rangée exclusive de boutons de choix rapide (1, 2, 3, 4, 5+) */
+            /* Mode RIR : Rangée exclusive de boutons de choix rapide (0, 1, 2, 3, 4, 5+) */
             <View style={styles.rirContainer}>
               {rirOptions.map((option) => {
                 const isSelected =
