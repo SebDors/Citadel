@@ -435,14 +435,20 @@ export default function LiveWorkoutScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
-        {/* 1. Carte d'En-tête de Séance (Fixe en haut) */}
-        <LiveWorkoutHeader
-          session={activeSession}
-          onFinish={handleFinish}
-          onCancel={handleCancel}
-          circuitInfo={circuitInfo}
-        />
+      <ScrollView
+        ref={scrollViewRef}
+        stickyHeaderIndices={[0]}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* 1. Carte d'En-tête de Séance Sticky (Collée en haut au défilement) */}
+        <View style={[styles.stickyHeaderWrapper, { backgroundColor: theme.background }]}>
+          <LiveWorkoutHeader
+            session={activeSession}
+            onFinish={handleFinish}
+            onCancel={handleCancel}
+            circuitInfo={circuitInfo}
+          />
+        </View>
 
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
         {blocks.map((block, blockIdx) => {
@@ -1189,6 +1195,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginTop: 6,
+  },
+  stickyHeaderWrapper: {
+    paddingBottom: 4,
+    zIndex: 10,
+    elevation: 4,
   },
   addCircuitExBtnText: {
     fontSize: 13,
