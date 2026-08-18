@@ -1,8 +1,14 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { WorkoutSession } from '../../types';
-import { useTheme } from '../../context/ThemeContext';
-import { Clock, Dumbbell, CheckCircle, RotateCw, Timer } from 'lucide-react-native';
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { WorkoutSession } from "../../types";
+import { useTheme } from "../../context/ThemeContext";
+import {
+  Clock,
+  Dumbbell,
+  CheckCircle,
+  RotateCw,
+  Timer,
+} from "lucide-react-native";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -31,11 +37,20 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       if (circuitInfo.isAmrap) {
         const totalSecs = (circuitInfo.amrapDurationMinutes || 12) * 60;
         const elapsed = totalSecs - (circuitInfo.amrapSecondsLeft || 0);
-        return Math.min(100, Math.max(0, Math.round((elapsed / totalSecs) * 100)));
+        return Math.min(
+          100,
+          Math.max(0, Math.round((elapsed / totalSecs) * 100)),
+        );
       }
       return Math.min(
         100,
-        Math.max(0, Math.round((circuitInfo.currentRound / Math.max(1, circuitInfo.totalRounds)) * 100))
+        Math.max(
+          0,
+          Math.round(
+            (circuitInfo.currentRound / Math.max(1, circuitInfo.totalRounds)) *
+              100,
+          ),
+        ),
       );
     }
     const total = session.totalSetsCount || 1;
@@ -58,21 +73,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   const formatMinutesSeconds = (totalSeconds: number = 0): string => {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const renderSubtitle = () => {
-    if (circuitInfo?.isCircuit) {
-      if (circuitInfo.isAmrap) {
-        const amrapMins = circuitInfo.amrapDurationMinutes ?? 12;
-        return `Circuit AMRAP (${amrapMins} min)`;
-      }
-      return `Circuit (${circuitInfo.totalRounds} tours)`;
-    }
-    if (session.isCircuit) {
-      return `Circuit (${session.circuitRounds ?? 0} tours)`;
-    }
-    return 'Séance en cours';
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   const renderThirdStatBox = () => {
@@ -84,7 +85,9 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
             <Text style={[styles.statValue, { color: theme.text }]}>
               {formatMinutesSeconds(circuitInfo.amrapSecondsLeft ?? 0)}
             </Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Temps restant</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+              Temps restant
+            </Text>
           </View>
         );
       }
@@ -94,7 +97,9 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           <Text style={[styles.statValue, { color: theme.text }]}>
             {circuitInfo.currentRound} / {circuitInfo.totalRounds}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tours</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+            Tours
+          </Text>
         </View>
       );
     }
@@ -105,25 +110,38 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
         <Text style={[styles.statValue, { color: theme.text }]}>
           {session.completedSetsCount} / {session.totalSetsCount}
         </Text>
-        <Text style={[styles.statLabel, { color: theme.textMuted }]}>Séries</Text>
+        <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+          Séries
+        </Text>
       </View>
     );
   };
 
   return (
-    <View style={[styles.headerContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+    <View
+      style={[
+        styles.headerContainer,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+      ]}
+    >
       <View style={styles.topRow}>
         <View style={styles.titleBox}>
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={[styles.title, { color: theme.text }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {session.title}
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            {renderSubtitle()}
           </Text>
         </View>
 
         {/* Badge de Progression % dynamique dans le coin supérieur droit */}
-        <View style={[styles.progressBadge, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.progressBadge,
+            { backgroundColor: theme.cardBg, borderColor: theme.border },
+          ]}
+        >
           <Text style={[styles.progressPercentText, { color: theme.accent }]}>
             {progressPercent}%
           </Text>
@@ -148,14 +166,20 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           <Text style={[styles.statValue, { color: theme.text }]}>
             {formatDuration(session.durationSeconds)}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Temps</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+            Temps
+          </Text>
         </View>
 
         {/* Volume */}
         <View style={styles.statBox}>
           <Dumbbell size={14} color={theme.secondary} />
-          <Text style={[styles.statValue, { color: theme.text }]}>{session.totalVolumeKg} kg</Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Volume</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>
+            {session.totalVolumeKg} kg
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+            Volume
+          </Text>
         </View>
 
         {/* 3ème stat: Tours / Temps restant / Séries */}
@@ -171,12 +195,12 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: 0,
   },
   topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 6,
   },
   titleBox: {
@@ -185,52 +209,48 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontWeight: '800',
-  },
-  subtitle: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "800",
   },
   progressBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    alignItems: 'center',
+    alignItems: "center",
     minWidth: 54,
   },
   progressPercentText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     marginBottom: 2,
   },
   miniTrack: {
     width: 44,
     height: 3,
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   miniFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: 2,
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: "rgba(255,255,255,0.08)",
   },
   statBox: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   statValue: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "800",
     marginTop: 1,
   },
   statLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

@@ -1197,7 +1197,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   stickyHeaderWrapper: {
-    paddingBottom: 4,
+    paddingTop: 2,
+    paddingBottom: 8,
     zIndex: 10,
     elevation: 4,
   },
