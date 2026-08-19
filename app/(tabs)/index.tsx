@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 12,
     paddingTop: 2,
-    paddingBottom: 90,
+    paddingBottom: 20,
   },
   pageHeader: {
     marginTop: 2,
