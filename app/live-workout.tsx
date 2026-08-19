@@ -919,7 +919,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   scrollContent: {
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingTop: 0,
     paddingBottom: 100,
   },
   emptyContainer: {
@@ -1197,7 +1198,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   stickyHeaderWrapper: {
-    paddingTop: 2,
+    paddingTop: 10,
     paddingBottom: 8,
     zIndex: 10,
     elevation: 4,

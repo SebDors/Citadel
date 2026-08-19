@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   title: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "800",
   },
   progressBadge: {
