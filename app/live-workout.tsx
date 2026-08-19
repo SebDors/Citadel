@@ -506,12 +506,7 @@ export default function LiveWorkoutScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* 1. Carte d'En-tête de Séance Sticky (Collée en haut au défilement) */}
-        <View
-          style={[
-            styles.stickyHeaderWrapper,
-            { backgroundColor: theme.background },
-          ]}
-        >
+        <View style={[styles.stickyHeaderWrapper]}>
           <LiveWorkoutHeader
             session={activeSession}
             onFinish={handleFinish}
