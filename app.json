@@ -21,7 +21,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#273338"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +34,12 @@
       "expo-router",
       "expo-audio"
     ],
-    "scheme": "citadel"
+    "scheme": "citadel",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "550ab996-d2df-4cac-957a-e9afadf5c90d"
+      }
+    }
   }
 }
