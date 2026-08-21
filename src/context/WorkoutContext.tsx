@@ -953,12 +953,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const saveTemplate = async (template: WorkoutTemplate) => {
     if (!data) return;
-    const existingIndex = data.templates.findIndex((t) => t.id === template.id);
+    const templateToSave = {
+      ...template,
+      createdAt: template.createdAt || new Date().toISOString(),
+    };
+    const existingIndex = data.templates.findIndex((t) => t.id === templateToSave.id);
     let updatedTemplates = [...data.templates];
     if (existingIndex >= 0) {
-      updatedTemplates[existingIndex] = template;
+      updatedTemplates[existingIndex] = templateToSave;
     } else {
-      updatedTemplates.push(template);
+      updatedTemplates.push(templateToSave);
     }
     const updated = { ...data, templates: updatedTemplates };
     await StorageService.saveData(updated);
@@ -988,6 +992,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const duplicated: WorkoutTemplate = JSON.parse(JSON.stringify(tpl));
     duplicated.id = `tpl_${Date.now()}`;
     duplicated.title = `${tpl.title} (Copie)`;
+    duplicated.createdAt = new Date().toISOString();
 
     const updatedTemplates = [...data.templates, duplicated];
     // Optionnel : ajouter dans le même dossier si applicable

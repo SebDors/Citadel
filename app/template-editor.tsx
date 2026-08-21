@@ -645,9 +645,12 @@ export default function TemplateEditorScreen() {
     const isAnyCircuit = selectedBlocks.some((b) => b.type === 'circuit');
     const firstCircuitBlock = selectedBlocks.find((b): b is CircuitBlock => b.type === 'circuit');
 
+    const existingTpl = templateIdParam ? data?.templates?.find((t) => t.id === templateIdParam) : undefined;
+
     const newTemplate: WorkoutTemplate = {
       id: templateIdParam || `tpl_${Date.now()}`,
       title: title.trim(),
+      createdAt: existingTpl?.createdAt || new Date().toISOString(),
       defaultRestSeconds,
       blocks: selectedBlocks,
       exercises: singleExercises,

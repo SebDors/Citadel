@@ -45,6 +45,7 @@ import {
   getTemplateBlocks,
   getSessionBlocks,
   formatCircuitSummary,
+  calculateEstimatedWorkoutMinutes,
 } from "../../src/types";
 import { StorageService } from "../../src/services/storage";
 
@@ -188,7 +189,7 @@ export default function WorkoutTab() {
     }
   };
 
-  // Group and sort templates alphabetically by folder & title
+  // Group folders & unassigned templates alphabetically by name/title
   const folders = [...(data?.folders || [])].sort((a, b) =>
     a.name.localeCompare(b.name, "fr", { sensitivity: "base" }),
   );
@@ -211,12 +212,15 @@ export default function WorkoutTab() {
 
     let totalExercises = 0;
     let hasCircuit = false;
+    let isOnlyAmrap = blocks.length > 0;
+    let totalAmrapMinutes = 0;
 
     const blockSummaries: string[] = [];
 
     blocks.forEach((block) => {
       if (block.type === "single") {
         totalExercises += 1;
+        isOnlyAmrap = false;
         if (block.exercise.exerciseName) {
           blockSummaries.push(block.exercise.exerciseName);
         }
@@ -224,11 +228,26 @@ export default function WorkoutTab() {
         hasCircuit = true;
         totalExercises += block.exercises.length;
         blockSummaries.push(formatCircuitSummary(block));
+        if (block.circuitType === "amrap") {
+          totalAmrapMinutes += block.amrapDurationMinutes || 12;
+        } else {
+          isOnlyAmrap = false;
+        }
       }
     });
 
     const inlineExercisesText = blockSummaries.join(" · ") || "Aucun exercice";
     const realLast = getRealLastWorkoutDate(data?.history || [], tpl.title);
+
+    let templateSubtitle = `${totalExercises} exos`;
+    if (isOnlyAmrap && totalAmrapMinutes > 0) {
+      templateSubtitle = `${totalExercises} exos · AMRAP ${totalAmrapMinutes} min`;
+    } else {
+      const estimatedMins = calculateEstimatedWorkoutMinutes(blocks);
+      const circuitTag = hasCircuit ? " · ⚡ CIRCUIT" : "";
+      const timeTag = estimatedMins > 0 ? ` · ~${estimatedMins} min` : "";
+      templateSubtitle = `${totalExercises} exos${circuitTag}${timeTag}`;
+    }
 
     if (isCompact) {
       return (
@@ -242,7 +261,7 @@ export default function WorkoutTab() {
                 {tpl.title}
               </Text>
               <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-                {totalExercises} exos {hasCircuit ? "· ⚡ CIRCUIT" : ""}
+                {templateSubtitle}
               </Text>
             </View>
 
@@ -280,7 +299,7 @@ export default function WorkoutTab() {
               {tpl.title}
             </Text>
             <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-              {totalExercises} exos {hasCircuit ? "· ⚡ CIRCUIT" : ""}
+              {templateSubtitle}
             </Text>
           </View>
 

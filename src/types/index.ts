@@ -108,6 +108,7 @@ export interface WorkoutTemplate {
   circuitRounds?: number;
   restBetweenRoundsSeconds?: number;
   defaultRestSeconds?: number;
+  createdAt?: string;
 }
 
 export interface BodyMeasurement {
