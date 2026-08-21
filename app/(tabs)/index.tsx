@@ -361,6 +361,7 @@ export default function WorkoutTab() {
 
   return (
     <SafeAreaView
+      edges={['top', 'left', 'right']}
       style={[styles.safeArea, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>

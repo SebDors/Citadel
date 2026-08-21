@@ -14,7 +14,7 @@ export default function HistoryTab() {
   const historyList = data?.history || [];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header */}
         <View style={styles.header}>

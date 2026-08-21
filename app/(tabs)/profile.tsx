@@ -16,7 +16,7 @@ export default function ProfileTab() {
   if (!data) return null;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header avec bouton de bascule Thème (Soleil / Lune) dans l'angle supérieur droit */}
         <View style={styles.header}>
