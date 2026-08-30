@@ -336,16 +336,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  customBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  customBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
   exSub: {
     fontSize: 12,
     marginTop: 2,
