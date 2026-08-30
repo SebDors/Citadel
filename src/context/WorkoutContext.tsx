@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
+import { EXERCISE_DATABASE, SharedExercise } from '../constants/exerciseDatabase';
 import {
   FitTrackerData,
   WorkoutSession,
@@ -62,6 +63,12 @@ export interface WorkoutContextType {
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
+  // Base d'exercices personnalisés
+  customExercises: SharedExercise[];
+  allExercises: SharedExercise[];
+  addCustomExercise: (exerciseData: Omit<SharedExercise, 'id' | 'isCustom'>) => Promise<SharedExercise>;
+  updateCustomExercise: (exercise: SharedExercise) => Promise<void>;
+  deleteCustomExercise: (exerciseId: string) => Promise<void>;
   // Rest Timer State
   restTimer: {
     active: boolean;
@@ -1093,6 +1100,41 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
 
+  const customExercises = data?.customExercises || [];
+  const deletedExerciseIds = useMemo(() => new Set(data?.deletedExerciseIds || []), [data?.deletedExerciseIds]);
+
+  const allExercises = useMemo(() => {
+    const customMap = new Map(customExercises.map((ex) => [ex.id, ex]));
+
+    // Exercices système non supprimés (avec remplacement si modifié par l'utilisateur)
+    const systemFiltered = EXERCISE_DATABASE
+      .filter((ex) => !deletedExerciseIds.has(ex.id))
+      .map((ex) => customMap.get(ex.id) || ex);
+
+    // Exercices purement personnalisés (non-système)
+    const customOnly = customExercises.filter(
+      (ex) => !EXERCISE_DATABASE.some((sys) => sys.id === ex.id)
+    );
+
+    return [...customOnly, ...systemFiltered];
+  }, [customExercises, deletedExerciseIds]);
+
+  const addCustomExercise = async (exerciseData: Omit<SharedExercise, 'id' | 'isCustom'>): Promise<SharedExercise> => {
+    const { updatedData, newExercise } = await StorageService.addCustomExercise(exerciseData);
+    setData(updatedData);
+    return newExercise;
+  };
+
+  const updateCustomExercise = async (exercise: SharedExercise): Promise<void> => {
+    const updatedData = await StorageService.updateCustomExercise(exercise);
+    setData(updatedData);
+  };
+
+  const deleteCustomExercise = async (exerciseId: string): Promise<void> => {
+    const updatedData = await StorageService.deleteCustomExercise(exerciseId);
+    setData(updatedData);
+  };
+
   return (
     <WorkoutContext.Provider
       value={{
@@ -1129,6 +1171,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteExerciseFromSession,
         deleteSetFromSession,
         reloadAllData,
+        customExercises,
+        allExercises,
+        addCustomExercise,
+        updateCustomExercise,
+        deleteCustomExercise,
         restTimer,
         startRestTimer,
         dismissRestTimer,

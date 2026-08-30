@@ -24,6 +24,7 @@ import {
   SharedExercise,
 } from "../src/constants/exerciseDatabase";
 import { normalizeString } from "../src/utils/stringUtils";
+import { CreateExerciseModal } from "../src/components/Workout/CreateExerciseModal";
 import {
   getSessionBlocks,
   WorkoutBlock,
@@ -79,12 +80,14 @@ export default function LiveWorkoutScreen() {
     setExerciseSupersetGroup,
     startRestTimer,
     updateActiveSessionCircuitStates,
+    allExercises,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [showAddExModal, setShowAddExModal] = useState(false);
+  const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
     string | null
@@ -239,22 +242,22 @@ export default function LiveWorkoutScreen() {
   const filteredDatabase = useMemo(() => {
     const q = normalizeString(searchQuery);
     if (!q) {
-      const selected = EXERCISE_DATABASE.filter((ex) =>
+      const selected = allExercises.filter((ex) =>
         selectedExerciseIds.has(ex.id),
       );
-      const unselected = EXERCISE_DATABASE.filter(
+      const unselected = allExercises.filter(
         (ex) => !selectedExerciseIds.has(ex.id),
       );
       return [...selected, ...unselected];
     }
-    return EXERCISE_DATABASE.filter(
+    return allExercises.filter(
       (ex) =>
         normalizeString(ex.name).includes(q) ||
         normalizeString(ex.primaryMuscle).includes(q) ||
         normalizeString(ex.category).includes(q) ||
         ex.targetMuscles.some((m) => normalizeString(m).includes(q)),
     );
-  }, [searchQuery, selectedExerciseIds]);
+  }, [allExercises, searchQuery, selectedExerciseIds]);
 
   const circuitInfo = useMemo(() => {
     const circuitBlock = blocks.find(
@@ -354,7 +357,7 @@ export default function LiveWorkoutScreen() {
   const handleBatchAddSharedExercises = () => {
     if (selectedExerciseIds.size === 0) return;
 
-    const selectedExercises = EXERCISE_DATABASE.filter((ex) =>
+    const selectedExercises = allExercises.filter((ex) =>
       selectedExerciseIds.has(ex.id),
     );
 
@@ -1275,7 +1278,7 @@ export default function LiveWorkoutScreen() {
                 )}
               </ScrollView>
 
-              {/* Barre d'action fixe en bas avec bouton Ajouter (X) */}
+              {/* Barre d'action fixe en bas avec bouton Ajouter (X) et Créer un exercice */}
               <View style={styles.pickerActionBar}>
                 <Button
                   title={
@@ -1288,11 +1291,26 @@ export default function LiveWorkoutScreen() {
                   onPress={handleBatchAddSharedExercises}
                   style={{ width: "100%" }}
                 />
+                <Button
+                  title="+ Créer un exercice"
+                  variant="outline"
+                  onPress={() => setShowCreateExerciseModal(true)}
+                  style={{ width: "100%", marginTop: 8 }}
+                />
               </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modale de création d'exercice */}
+      <CreateExerciseModal
+        visible={showCreateExerciseModal}
+        onClose={() => setShowCreateExerciseModal(false)}
+        onSuccess={(created) => {
+          setSelectedExerciseIds((prev) => new Set(prev).add(created.id));
+        }}
+      />
 
       {/* Floating Rest Timer Bar */}
       <RestTimerBar />

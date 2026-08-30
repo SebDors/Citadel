@@ -137,12 +137,16 @@ export interface UserProfile {
   totalWorkouts: number;
 }
 
+import { SharedExercise } from '../constants/exerciseDatabase';
+
 export interface FitTrackerData {
   profile: UserProfile;
   templates: WorkoutTemplate[];
   history: WorkoutSession[];
   measurements: BodyMeasurement[];
   folders?: WorkoutFolder[];
+  customExercises?: SharedExercise[];
+  deletedExerciseIds?: string[];
   currentWorkout?: WorkoutSession | null;
 }
 

@@ -35,7 +35,10 @@ import {
   X,
   Tag,
   Check,
+  FolderInput,
+  BookOpen,
 } from "lucide-react-native";
+import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import {
   WorkoutSession,
   WorkoutTemplate,
@@ -110,6 +113,7 @@ export default function WorkoutTab() {
   const [selectedTemplate, setSelectedTemplate] =
     useState<WorkoutTemplate | null>(null);
   const [showTemplateMenuModal, setShowTemplateMenuModal] = useState(false);
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [showMoveFolderModal, setShowMoveFolderModal] = useState(false);
 
   const [showRenameTemplateModal, setShowRenameTemplateModal] = useState(false);
@@ -583,10 +587,34 @@ export default function WorkoutTab() {
             {unassignedTemplates.map((tpl) => renderTemplateCard(tpl))}
           </View>
         )}
+
+        {/* Carte Accès Bibliothèque d'Exercices */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[styles.libraryCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          onPress={() => setShowLibraryModal(true)}
+        >
+          <View style={[styles.libraryIconBox, { backgroundColor: theme.surface }]}>
+            <BookOpen size={20} color={theme.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.libraryTitle, { color: theme.text }]}>Bibliothèque d'Exercices</Text>
+            <Text style={[styles.librarySub, { color: theme.textMuted }]}>
+              Consulter, créer et gérer vos exercices personnalisés
+            </Text>
+          </View>
+          <ChevronRight size={18} color={theme.textMuted} />
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Floating Rest Timer Bar */}
       <RestTimerBar />
+
+      {/* Modale Bibliothèque d'Exercices */}
+      <ExerciseLibraryModal
+        visible={showLibraryModal}
+        onClose={() => setShowLibraryModal(false)}
+      />
 
       {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}
       <Modal
@@ -1259,6 +1287,30 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
+  },
+  libraryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  libraryIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  libraryTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  librarySub: {
+    fontSize: 12,
+    marginTop: 2,
   },
   modalMenuHeader: {
     flexDirection: "row",
