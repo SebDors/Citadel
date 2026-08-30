@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
+import { SharedExercise } from '../constants/exerciseDatabase';
 
 const STORAGE_KEY = '@warriorfit_app_data_v1';
 const COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
@@ -309,6 +310,63 @@ export const StorageService = {
       ...currentData,
       history: updatedHistory,
     };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Ajoute un exercice personnalisé à la base de données locale.
+   */
+  async addCustomExercise(exerciseData: Omit<SharedExercise, 'id' | 'isCustom'>): Promise<{ updatedData: FitTrackerData; newExercise: SharedExercise }> {
+    const currentData = await this.loadData();
+    const customList = currentData.customExercises || [];
+
+    const newExercise: SharedExercise = {
+      ...exerciseData,
+      id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      isCustom: true,
+      defaultRestSeconds: exerciseData.defaultRestSeconds || 75,
+    };
+
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      customExercises: [newExercise, ...customList],
+    };
+
+    await this.saveData(updatedData);
+    return { updatedData, newExercise };
+  },
+
+  /**
+   * Met à jour un exercice personnalisé existant.
+   */
+  async updateCustomExercise(exercise: SharedExercise): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const customList = currentData.customExercises || [];
+
+    const updatedList = customList.map((ex) => (ex.id === exercise.id ? { ...exercise, isCustom: true } : ex));
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      customExercises: updatedList,
+    };
+
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Supprime un exercice personnalisé de la base locale.
+   */
+  async deleteCustomExercise(exerciseId: string): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const customList = currentData.customExercises || [];
+
+    const updatedList = customList.filter((ex) => ex.id !== exerciseId);
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      customExercises: updatedList,
+    };
+
     await this.saveData(updatedData);
     return updatedData;
   },

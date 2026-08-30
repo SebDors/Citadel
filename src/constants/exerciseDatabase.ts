@@ -5,6 +5,7 @@ export interface SharedExercise {
   targetMuscles: string[];
   defaultRestSeconds: number;
   category: 'Pectoraux' | 'Dos' | 'Épaules' | 'Bras' | 'Jambes' | 'Abdos';
+  isCustom?: boolean;
 }
 
 export const EXERCISE_DATABASE: SharedExercise[] = [

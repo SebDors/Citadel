@@ -19,6 +19,7 @@ import { Button } from '../src/components/UI/Button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EXERCISE_DATABASE, SharedExercise } from '../src/constants/exerciseDatabase';
 import { normalizeString } from '../src/utils/stringUtils';
+import { CreateExerciseModal } from '../src/components/Workout/CreateExerciseModal';
 import {
   WorkoutExercise,
   WorkoutTemplate,
@@ -61,7 +62,7 @@ const formatMinutesSeconds = (totalSeconds: number): string => {
 export default function TemplateEditorScreen() {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
-  const { data, saveTemplate } = useWorkout();
+  const { data, saveTemplate, allExercises } = useWorkout();
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -75,6 +76,7 @@ export default function TemplateEditorScreen() {
 
   // Modaux et Cibles
   const [showPickerModal, setShowPickerModal] = useState(false);
+  const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(new Set());
@@ -163,7 +165,7 @@ export default function TemplateEditorScreen() {
   const handleBatchAddSharedExercises = () => {
     if (selectedExerciseIds.size === 0) return;
 
-    const selectedExercises = EXERCISE_DATABASE.filter((ex) => selectedExerciseIds.has(ex.id));
+    const selectedExercises = allExercises.filter((ex) => selectedExerciseIds.has(ex.id));
 
     if (targetCircuitBlockId) {
       const newCircuitItems: CircuitExerciseItem[] = selectedExercises.map((ex, idx) => ({
@@ -693,18 +695,18 @@ export default function TemplateEditorScreen() {
   const filteredDatabase = useMemo(() => {
     const q = normalizeString(searchQuery);
     if (!q) {
-      const selected = EXERCISE_DATABASE.filter((ex) => selectedExerciseIds.has(ex.id));
-      const unselected = EXERCISE_DATABASE.filter((ex) => !selectedExerciseIds.has(ex.id));
+      const selected = allExercises.filter((ex) => selectedExerciseIds.has(ex.id));
+      const unselected = allExercises.filter((ex) => !selectedExerciseIds.has(ex.id));
       return [...selected, ...unselected];
     }
-    return EXERCISE_DATABASE.filter(
+    return allExercises.filter(
       (ex) =>
         normalizeString(ex.name).includes(q) ||
         normalizeString(ex.primaryMuscle).includes(q) ||
         normalizeString(ex.category).includes(q) ||
         ex.targetMuscles.some((m) => normalizeString(m).includes(q))
     );
-  }, [searchQuery, selectedExerciseIds]);
+  }, [allExercises, searchQuery, selectedExerciseIds]);
 
 
   return (
@@ -1664,7 +1666,7 @@ export default function TemplateEditorScreen() {
                 )}
               </ScrollView>
 
-              {/* Barre d'action fixe en bas avec bouton Ajouter (X) */}
+              {/* Barre d'action fixe en bas avec bouton Ajouter (X) et Créer un exercice */}
               <View style={styles.pickerActionBar}>
                 <Button
                   title={
@@ -1677,11 +1679,26 @@ export default function TemplateEditorScreen() {
                   onPress={handleBatchAddSharedExercises}
                   style={{ width: '100%' }}
                 />
+                <Button
+                  title="+ Créer un exercice"
+                  variant="outline"
+                  onPress={() => setShowCreateExerciseModal(true)}
+                  style={{ width: '100%', marginTop: 8 }}
+                />
               </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modale de création d'exercice */}
+      <CreateExerciseModal
+        visible={showCreateExerciseModal}
+        onClose={() => setShowCreateExerciseModal(false)}
+        onSuccess={(created) => {
+          setSelectedExerciseIds((prev) => new Set(prev).add(created.id));
+        }}
+      />
     </View>
   );
 }
