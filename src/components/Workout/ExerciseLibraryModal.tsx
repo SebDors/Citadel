@@ -92,9 +92,12 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
         <View style={[styles.content, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <BookOpen size={20} color={theme.accent} style={{ marginRight: 8 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <BookOpen size={20} color={theme.accent} style={{ marginRight: 2 }} />
               <Text style={[styles.title, { color: theme.text }]}>Bibliothèque d'Exercices</Text>
+              <View style={[styles.countBadge, { backgroundColor: theme.accent + '22', borderColor: theme.accent }]}>
+                <Text style={[styles.countBadgeText, { color: theme.accent }]}>{allExercises.length}</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
               <X size={20} color={theme.textMuted} />
@@ -283,6 +286,17 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
+    fontWeight: '800',
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  countBadgeText: {
+    fontSize: 12,
     fontWeight: '800',
   },
   searchBox: {

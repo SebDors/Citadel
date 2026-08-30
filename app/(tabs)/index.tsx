@@ -105,6 +105,7 @@ export default function WorkoutTab() {
     deleteFolder,
     toggleFolderCollapse,
     moveTemplateToFolder,
+    allExercises,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -598,9 +599,14 @@ export default function WorkoutTab() {
             <BookOpen size={20} color={theme.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.libraryTitle, { color: theme.text }]}>Bibliothèque d'Exercices</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[styles.libraryTitle, { color: theme.text }]}>Bibliothèque d'Exercices</Text>
+              <View style={[styles.countBadge, { backgroundColor: theme.accent + '22', borderColor: theme.accent }]}>
+                <Text style={[styles.countBadgeText, { color: theme.accent }]}>{allExercises.length}</Text>
+              </View>
+            </View>
             <Text style={[styles.librarySub, { color: theme.textMuted }]}>
-              Consulter, créer et gérer vos exercices personnalisés
+              {allExercises.length} exercices • Consulter, créer et gérer vos exercices
             </Text>
           </View>
           <ChevronRight size={18} color={theme.textMuted} />
@@ -1311,6 +1317,16 @@ const styles = StyleSheet.create({
   librarySub: {
     fontSize: 12,
     marginTop: 2,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
   },
   modalMenuHeader: {
     flexDirection: "row",
