@@ -691,21 +691,27 @@ export default function TemplateEditorScreen() {
     router.back();
   };
 
-  // Filtrage et tri de la base d'exercices (insensible aux accents & à la casse)
+  // Filtrage et tri de la base d'exercices (ordre alphabétique + coche prioritaire)
   const filteredDatabase = useMemo(() => {
     const q = normalizeString(searchQuery);
     if (!q) {
-      const selected = allExercises.filter((ex) => selectedExerciseIds.has(ex.id));
-      const unselected = allExercises.filter((ex) => !selectedExerciseIds.has(ex.id));
+      const selected = allExercises
+        .filter((ex) => selectedExerciseIds.has(ex.id))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+      const unselected = allExercises
+        .filter((ex) => !selectedExerciseIds.has(ex.id))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
       return [...selected, ...unselected];
     }
-    return allExercises.filter(
-      (ex) =>
-        normalizeString(ex.name).includes(q) ||
-        normalizeString(ex.primaryMuscle).includes(q) ||
-        normalizeString(ex.category).includes(q) ||
-        ex.targetMuscles.some((m) => normalizeString(m).includes(q))
-    );
+    return allExercises
+      .filter(
+        (ex) =>
+          normalizeString(ex.name).includes(q) ||
+          normalizeString(ex.primaryMuscle).includes(q) ||
+          normalizeString(ex.category).includes(q) ||
+          ex.targetMuscles.some((m) => normalizeString(m).includes(q))
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
   }, [allExercises, searchQuery, selectedExerciseIds]);
 
 

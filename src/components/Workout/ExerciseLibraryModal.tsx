@@ -40,10 +40,10 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
   const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<SharedExercise | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Normalisation & Filtrage
+  // Normalisation, Filtrage & Tri par ordre alphabétique
   const filteredExercises = useMemo(() => {
     const q = normalizeString(searchQuery);
-    return allExercises.filter((ex) => {
+    const list = allExercises.filter((ex) => {
       const matchCat = selectedCategory === 'Tous' || ex.category === selectedCategory;
       if (!matchCat) return false;
 
@@ -55,6 +55,8 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
         ex.targetMuscles.some((m) => normalizeString(m).includes(q))
       );
     });
+
+    return list.sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
   }, [allExercises, searchQuery, selectedCategory]);
 
   const handleEdit = (ex: SharedExercise) => {

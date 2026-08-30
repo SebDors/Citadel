@@ -238,25 +238,27 @@ export default function LiveWorkoutScreen() {
     });
   }, [activeSession, blocks, circuitStates]);
 
-  // Filter & sort exercises database for search modal (case & accent insensitive)
+  // Filter & sort exercises database for search modal (alphabetical order + top checked items)
   const filteredDatabase = useMemo(() => {
     const q = normalizeString(searchQuery);
     if (!q) {
-      const selected = allExercises.filter((ex) =>
-        selectedExerciseIds.has(ex.id),
-      );
-      const unselected = allExercises.filter(
-        (ex) => !selectedExerciseIds.has(ex.id),
-      );
+      const selected = allExercises
+        .filter((ex) => selectedExerciseIds.has(ex.id))
+        .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+      const unselected = allExercises
+        .filter((ex) => !selectedExerciseIds.has(ex.id))
+        .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
       return [...selected, ...unselected];
     }
-    return allExercises.filter(
-      (ex) =>
-        normalizeString(ex.name).includes(q) ||
-        normalizeString(ex.primaryMuscle).includes(q) ||
-        normalizeString(ex.category).includes(q) ||
-        ex.targetMuscles.some((m) => normalizeString(m).includes(q)),
-    );
+    return allExercises
+      .filter(
+        (ex) =>
+          normalizeString(ex.name).includes(q) ||
+          normalizeString(ex.primaryMuscle).includes(q) ||
+          normalizeString(ex.category).includes(q) ||
+          ex.targetMuscles.some((m) => normalizeString(m).includes(q)),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
   }, [allExercises, searchQuery, selectedExerciseIds]);
 
   const circuitInfo = useMemo(() => {
