@@ -1101,10 +1101,23 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 
   const customExercises = data?.customExercises || [];
+  const deletedExerciseIds = useMemo(() => new Set(data?.deletedExerciseIds || []), [data?.deletedExerciseIds]);
 
   const allExercises = useMemo(() => {
-    return [...customExercises, ...EXERCISE_DATABASE];
-  }, [customExercises]);
+    const customMap = new Map(customExercises.map((ex) => [ex.id, ex]));
+
+    // Exercices système non supprimés (avec remplacement si modifié par l'utilisateur)
+    const systemFiltered = EXERCISE_DATABASE
+      .filter((ex) => !deletedExerciseIds.has(ex.id))
+      .map((ex) => customMap.get(ex.id) || ex);
+
+    // Exercices purement personnalisés (non-système)
+    const customOnly = customExercises.filter(
+      (ex) => !EXERCISE_DATABASE.some((sys) => sys.id === ex.id)
+    );
+
+    return [...customOnly, ...systemFiltered];
+  }, [customExercises, deletedExerciseIds]);
 
   const addCustomExercise = async (exerciseData: Omit<SharedExercise, 'id' | 'isCustom'>): Promise<SharedExercise> => {
     const { updatedData, newExercise } = await StorageService.addCustomExercise(exerciseData);

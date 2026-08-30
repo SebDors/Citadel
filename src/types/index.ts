@@ -146,6 +146,7 @@ export interface FitTrackerData {
   measurements: BodyMeasurement[];
   folders?: WorkoutFolder[];
   customExercises?: SharedExercise[];
+  deletedExerciseIds?: string[];
   currentWorkout?: WorkoutSession | null;
 }
 

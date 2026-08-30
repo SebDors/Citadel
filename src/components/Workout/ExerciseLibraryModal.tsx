@@ -168,25 +168,23 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
                     </Text>
                   </View>
 
-                  {/* Actions d'édition/suppression pour exercices personnalisés */}
-                  {ex.isCustom ? (
-                    <View style={styles.actionsBox}>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => handleEdit(ex)}
-                        style={[styles.iconBtn, { backgroundColor: theme.surface }]}
-                      >
-                        <Edit2 size={16} color={theme.accent} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => handleDelete(ex)}
-                        style={[styles.iconBtn, { backgroundColor: theme.surface, marginLeft: 6 }]}
-                      >
-                        <Trash2 size={16} color={theme.danger} />
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
+                  {/* Actions d'édition/suppression pour tous les exercices */}
+                  <View style={styles.actionsBox}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => handleEdit(ex)}
+                      style={[styles.iconBtn, { backgroundColor: theme.surface }]}
+                    >
+                      <Edit2 size={16} color={theme.accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => handleDelete(ex)}
+                      style={[styles.iconBtn, { backgroundColor: theme.surface, marginLeft: 6 }]}
+                    >
+                      <Trash2 size={16} color={theme.danger} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))
             )}

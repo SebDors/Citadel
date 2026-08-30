@@ -338,13 +338,21 @@ export const StorageService = {
   },
 
   /**
-   * Met à jour un exercice personnalisé existant.
+   * Met à jour un exercice (système ou personnalisé) dans la base locale.
    */
   async updateCustomExercise(exercise: SharedExercise): Promise<FitTrackerData> {
     const currentData = await this.loadData();
     const customList = currentData.customExercises || [];
 
-    const updatedList = customList.map((ex) => (ex.id === exercise.id ? { ...exercise, isCustom: true } : ex));
+    const existsInCustom = customList.some((ex) => ex.id === exercise.id);
+    let updatedList: SharedExercise[];
+
+    if (existsInCustom) {
+      updatedList = customList.map((ex) => (ex.id === exercise.id ? exercise : ex));
+    } else {
+      updatedList = [exercise, ...customList];
+    }
+
     const updatedData: FitTrackerData = {
       ...currentData,
       customExercises: updatedList,
@@ -355,16 +363,22 @@ export const StorageService = {
   },
 
   /**
-   * Supprime un exercice personnalisé de la base locale.
+   * Supprime un exercice (système ou personnalisé) de la base locale.
    */
   async deleteCustomExercise(exerciseId: string): Promise<FitTrackerData> {
     const currentData = await this.loadData();
     const customList = currentData.customExercises || [];
+    const deletedIds = currentData.deletedExerciseIds || [];
 
-    const updatedList = customList.filter((ex) => ex.id !== exerciseId);
+    const updatedCustomList = customList.filter((ex) => ex.id !== exerciseId);
+    const updatedDeletedIds = deletedIds.includes(exerciseId)
+      ? deletedIds
+      : [...deletedIds, exerciseId];
+
     const updatedData: FitTrackerData = {
       ...currentData,
-      customExercises: updatedList,
+      customExercises: updatedCustomList,
+      deletedExerciseIds: updatedDeletedIds,
     };
 
     await this.saveData(updatedData);
