@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -76,6 +76,7 @@ export default function TemplateEditorScreen() {
   const [showPickerModal, setShowPickerModal] = useState(false);
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(new Set());
 
   // Target set pour modal de type de série: { blockId, setIdx }
   const [activeSetTarget, setActiveSetTarget] = useState<{ blockId: string; setIdx: number } | null>(null);
@@ -138,56 +139,79 @@ export default function TemplateEditorScreen() {
     setSupersetModalBlockId(null);
   };
 
-  // Ajouter un exercice depuis la base (individuel ou dans circuit)
-  const handleAddSharedExercise = (ex: SharedExercise) => {
+  const toggleSelectExercise = (exId: string) => {
+    setSelectedExerciseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(exId)) {
+        next.delete(exId);
+      } else {
+        next.add(exId);
+      }
+      return next;
+    });
+  };
+
+  const handleClosePickerModal = () => {
+    setShowPickerModal(false);
+    setTargetCircuitBlockId(null);
+    setSearchQuery('');
+    setSelectedExerciseIds(new Set());
+  };
+
+  // Ajouter les exercices sélectionnés par lot (individuel ou dans circuit)
+  const handleBatchAddSharedExercises = () => {
+    if (selectedExerciseIds.size === 0) return;
+
+    const selectedExercises = EXERCISE_DATABASE.filter((ex) => selectedExerciseIds.has(ex.id));
+
     if (targetCircuitBlockId) {
-      const newCircuitEx: CircuitExerciseItem = {
-        id: `circ_ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      const newCircuitItems: CircuitExerciseItem[] = selectedExercises.map((ex, idx) => ({
+        id: `circ_ex_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
         exerciseName: ex.name,
         primaryMuscle: ex.primaryMuscle,
         targetMuscles: ex.targetMuscles,
         targetValue: 12,
         targetType: 'reps',
-      };
+      }));
 
       setSelectedBlocks((prev) =>
         prev.map((b) => {
           if (b.id === targetCircuitBlockId && b.type === 'circuit') {
             return {
               ...b,
-              exercises: [...b.exercises, newCircuitEx],
+              exercises: [...b.exercises, ...newCircuitItems],
             };
           }
           return b;
         })
       );
     } else {
-      const newEx: WorkoutExercise = {
-        id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        primaryMuscle: ex.primaryMuscle,
-        targetMuscles: ex.targetMuscles,
-        restSeconds: defaultRestSeconds || ex.defaultRestSeconds || 75,
-        sets: [
-          { id: `s1_${Date.now()}`, setNumber: 1, type: 'normal', rir: undefined, completed: false },
-          { id: `s2_${Date.now()}`, setNumber: 2, type: 'normal', rir: undefined, completed: false },
-          { id: `s3_${Date.now()}`, setNumber: 3, type: 'normal', rir: undefined, completed: false },
-        ],
-      };
+      const newBlocks: SingleExerciseBlock[] = selectedExercises.map((ex, idx) => {
+        const uniqueId = `${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+        const newEx: WorkoutExercise = {
+          id: `ex_${uniqueId}`,
+          exerciseId: ex.id,
+          exerciseName: ex.name,
+          primaryMuscle: ex.primaryMuscle,
+          targetMuscles: ex.targetMuscles,
+          restSeconds: defaultRestSeconds || ex.defaultRestSeconds || 75,
+          sets: [
+            { id: `s1_${uniqueId}`, setNumber: 1, type: 'normal', rir: undefined, completed: false },
+            { id: `s2_${uniqueId}`, setNumber: 2, type: 'normal', rir: undefined, completed: false },
+            { id: `s3_${uniqueId}`, setNumber: 3, type: 'normal', rir: undefined, completed: false },
+          ],
+        };
+        return {
+          id: `blk_single_${newEx.id}`,
+          type: 'single',
+          exercise: newEx,
+        };
+      });
 
-      const newBlock: SingleExerciseBlock = {
-        id: `blk_single_${newEx.id}`,
-        type: 'single',
-        exercise: newEx,
-      };
-
-      setSelectedBlocks((prev) => [...prev, newBlock]);
+      setSelectedBlocks((prev) => [...prev, ...newBlocks]);
     }
 
-    setShowPickerModal(false);
-    setTargetCircuitBlockId(null);
-    setSearchQuery('');
+    handleClosePickerModal();
   };
 
   // Créer un nouveau conteneur Circuit ([+ Circuit])
@@ -664,17 +688,22 @@ export default function TemplateEditorScreen() {
     router.back();
   };
 
-  // Filtrage de la base d'exercices
-  const filteredDatabase = EXERCISE_DATABASE.filter((ex) => {
+  // Filtrage et tri de la base d'exercices : Si recherche vide, les cochés remontent en premier !
+  const filteredDatabase = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      ex.name.toLowerCase().includes(q) ||
-      ex.primaryMuscle.toLowerCase().includes(q) ||
-      ex.category.toLowerCase().includes(q) ||
-      ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
+    if (!q) {
+      const selected = EXERCISE_DATABASE.filter((ex) => selectedExerciseIds.has(ex.id));
+      const unselected = EXERCISE_DATABASE.filter((ex) => !selectedExerciseIds.has(ex.id));
+      return [...selected, ...unselected];
+    }
+    return EXERCISE_DATABASE.filter(
+      (ex) =>
+        ex.name.toLowerCase().includes(q) ||
+        ex.primaryMuscle.toLowerCase().includes(q) ||
+        ex.category.toLowerCase().includes(q) ||
+        ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
     );
-  });
+  }, [searchQuery, selectedExerciseIds]);
 
 
   return (
@@ -1545,18 +1574,12 @@ export default function TemplateEditorScreen() {
         visible={showPickerModal}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setShowPickerModal(false);
-          setTargetCircuitBlockId(null);
-        }}
+        onRequestClose={handleClosePickerModal}
       >
         <TouchableOpacity
           style={styles.pickerModalOverlay}
           activeOpacity={1}
-          onPress={() => {
-            setShowPickerModal(false);
-            setTargetCircuitBlockId(null);
-          }}
+          onPress={handleClosePickerModal}
         >
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1569,12 +1592,17 @@ export default function TemplateEditorScreen() {
                 { backgroundColor: theme.cardBg, borderColor: theme.border },
               ]}
             >
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {targetCircuitBlockId ? 'Ajouter au Circuit' : "Base de Données d'Exercices"}
-              </Text>
+              <View style={styles.pickerModalHeaderRow}>
+                <Text style={[styles.modalTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
+                  {targetCircuitBlockId ? 'Ajouter au Circuit' : "Base de Données d'Exercices"}
+                </Text>
+                <TouchableOpacity onPress={handleClosePickerModal} style={{ padding: 4 }}>
+                  <X size={20} color={theme.textMuted} />
+                </TouchableOpacity>
+              </View>
 
               {/* Barre de Recherche */}
-              <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border, marginTop: 8 }]}>
                 <Search size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
                 <TextInput
                   style={[styles.searchInput, { color: theme.text }]}
@@ -1586,27 +1614,69 @@ export default function TemplateEditorScreen() {
                 />
               </View>
 
-              <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+              <ScrollView style={{ maxHeight: 270 }} keyboardShouldPersistTaps="handled">
                 {filteredDatabase.length === 0 ? (
                   <Text style={[styles.noResultText, { color: theme.textMuted }]}>Aucun exercice trouvé</Text>
                 ) : (
-                  filteredDatabase.map((ex) => (
-                    <TouchableOpacity
-                      key={ex.id}
-                      style={[styles.dbItemRow, { borderBottomColor: theme.border }]}
-                      onPress={() => handleAddSharedExercise(ex)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.dbItemName, { color: theme.text }]}>{ex.name}</Text>
-                        <Text style={[styles.dbItemMuscle, { color: theme.textMuted }]}>
-                          {ex.primaryMuscle} • {ex.category} • {defaultRestSeconds || ex.defaultRestSeconds}s repos
-                        </Text>
-                      </View>
-                      <Plus size={18} color={theme.accent} />
-                    </TouchableOpacity>
-                  ))
+                  filteredDatabase.map((ex: SharedExercise) => {
+                    const isSelected = selectedExerciseIds.has(ex.id);
+                    return (
+                      <TouchableOpacity
+                        key={ex.id}
+                        activeOpacity={0.7}
+                        style={[
+                          styles.dbItemRow,
+                          { borderBottomColor: theme.border },
+                          isSelected && { backgroundColor: theme.surface },
+                        ]}
+                        onPress={() => toggleSelectExercise(ex.id)}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.dbItemName,
+                              { color: theme.text },
+                              isSelected && { fontWeight: '900', color: theme.accent },
+                            ]}
+                          >
+                            {ex.name}
+                          </Text>
+                          <Text style={[styles.dbItemMuscle, { color: theme.textMuted }]}>
+                            {ex.primaryMuscle} • {ex.category} • {defaultRestSeconds || ex.defaultRestSeconds}s repos
+                          </Text>
+                        </View>
+                        {/* Checkbox Icon */}
+                        <View
+                          style={[
+                            styles.checkboxBox,
+                            {
+                              borderColor: isSelected ? theme.accent : theme.border,
+                              backgroundColor: isSelected ? theme.accent : 'transparent',
+                            },
+                          ]}
+                        >
+                          {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
                 )}
               </ScrollView>
+
+              {/* Barre d'action fixe en bas avec bouton Ajouter (X) */}
+              <View style={styles.pickerActionBar}>
+                <Button
+                  title={
+                    selectedExerciseIds.size > 0
+                      ? `Ajouter (${selectedExerciseIds.size})`
+                      : 'Ajouter (0)'
+                  }
+                  variant="primary"
+                  disabled={selectedExerciseIds.size === 0}
+                  onPress={handleBatchAddSharedExercises}
+                  style={{ width: '100%' }}
+                />
+              </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
         </TouchableOpacity>
@@ -2038,6 +2108,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
+  },
+  pickerModalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  pickerActionBar: {
+    marginTop: 10,
+    paddingTop: 8,
   },
   modalSheet: {
     borderTopLeftRadius: 20,

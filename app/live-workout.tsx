@@ -41,6 +41,7 @@ import {
   ChevronUp,
   Play,
   Clock,
+  X,
 } from "lucide-react-native";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
@@ -87,6 +88,9 @@ export default function LiveWorkoutScreen() {
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
     string | null
   >(null);
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const isInitialMount = useRef(true);
 
@@ -230,10 +234,18 @@ export default function LiveWorkoutScreen() {
     });
   }, [activeSession, blocks, circuitStates]);
 
-  // Filter exercises database for search modal
+  // Filter & sort exercises database for search modal
   const filteredDatabase = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return EXERCISE_DATABASE;
+    if (!q) {
+      const selected = EXERCISE_DATABASE.filter((ex) =>
+        selectedExerciseIds.has(ex.id),
+      );
+      const unselected = EXERCISE_DATABASE.filter(
+        (ex) => !selectedExerciseIds.has(ex.id),
+      );
+      return [...selected, ...unselected];
+    }
     return EXERCISE_DATABASE.filter(
       (ex) =>
         ex.name.toLowerCase().includes(q) ||
@@ -241,7 +253,7 @@ export default function LiveWorkoutScreen() {
         ex.category.toLowerCase().includes(q) ||
         ex.targetMuscles.some((m) => m.toLowerCase().includes(q)),
     );
-  }, [searchQuery]);
+  }, [searchQuery, selectedExerciseIds]);
 
   const circuitInfo = useMemo(() => {
     const circuitBlock = blocks.find(
@@ -319,28 +331,52 @@ export default function LiveWorkoutScreen() {
     router.replace("/(tabs)");
   };
 
+  const toggleSelectExercise = (exId: string) => {
+    setSelectedExerciseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(exId)) {
+        next.delete(exId);
+      } else {
+        next.add(exId);
+      }
+      return next;
+    });
+  };
+
   const handleCloseModal = () => {
     setShowAddExModal(false);
     setSearchQuery("");
     setTargetCircuitBlockId(null);
+    setSelectedExerciseIds(new Set());
   };
 
-  const handleSelectSharedExercise = (ex: SharedExercise) => {
+  const handleBatchAddSharedExercises = () => {
+    if (selectedExerciseIds.size === 0) return;
+
+    const selectedExercises = EXERCISE_DATABASE.filter((ex) =>
+      selectedExerciseIds.has(ex.id),
+    );
+
     if (targetCircuitBlockId) {
-      addExerciseToCircuit(
-        targetCircuitBlockId,
-        ex.name,
-        ex.primaryMuscle,
-        ex.targetMuscles,
-      );
+      selectedExercises.forEach((ex) => {
+        addExerciseToCircuit(
+          targetCircuitBlockId,
+          ex.name,
+          ex.primaryMuscle,
+          ex.targetMuscles,
+        );
+      });
     } else {
-      addExerciseToActiveWorkout(
-        ex.name,
-        ex.primaryMuscle,
-        ex.targetMuscles,
-        ex.defaultRestSeconds,
-      );
+      selectedExercises.forEach((ex) => {
+        addExerciseToActiveWorkout(
+          ex.name,
+          ex.primaryMuscle,
+          ex.targetMuscles,
+          ex.defaultRestSeconds,
+        );
+      });
     }
+
     handleCloseModal();
   };
 
@@ -1147,17 +1183,27 @@ export default function LiveWorkoutScreen() {
                 { backgroundColor: theme.cardBg, borderColor: theme.border },
               ]}
             >
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {targetCircuitBlockId
-                  ? "Ajouter au circuit"
-                  : "Sélectionner un exercice"}
-              </Text>
+              <View style={styles.pickerModalHeaderRow}>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    { color: theme.text, flex: 1, marginBottom: 0 },
+                  ]}
+                >
+                  {targetCircuitBlockId
+                    ? "Ajouter au circuit"
+                    : "Sélectionner un exercice"}
+                </Text>
+                <TouchableOpacity onPress={handleCloseModal} style={{ padding: 4 }}>
+                  <X size={20} color={theme.textMuted} />
+                </TouchableOpacity>
+              </View>
 
               {/* Barre de Recherche Clavier */}
               <View
                 style={[
                   styles.searchBarBox,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  { backgroundColor: theme.surface, borderColor: theme.border, marginTop: 8 },
                 ]}
               >
                 <Search
@@ -1175,33 +1221,73 @@ export default function LiveWorkoutScreen() {
                 />
               </View>
 
-              <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+              <ScrollView style={{ maxHeight: 270 }} keyboardShouldPersistTaps="handled">
                 {filteredDatabase.length === 0 ? (
                   <Text style={[styles.noResultText, { color: theme.textMuted }]}>
                     Aucun exercice trouvé
                   </Text>
                 ) : (
-                  filteredDatabase.map((ex) => (
-                    <TouchableOpacity
-                      key={ex.id}
-                      style={[styles.dbRow, { borderBottomColor: theme.border }]}
-                      onPress={() => handleSelectSharedExercise(ex)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.dbExName, { color: theme.text }]}>
-                          {ex.name}
-                        </Text>
-                        <Text
-                          style={[styles.dbExMuscle, { color: theme.textMuted }]}
+                  filteredDatabase.map((ex) => {
+                    const isSelected = selectedExerciseIds.has(ex.id);
+                    return (
+                      <TouchableOpacity
+                        key={ex.id}
+                        activeOpacity={0.7}
+                        style={[
+                          styles.dbRow,
+                          { borderBottomColor: theme.border },
+                          isSelected && { backgroundColor: theme.surface },
+                        ]}
+                        onPress={() => toggleSelectExercise(ex.id)}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.dbExName,
+                              { color: theme.text },
+                              isSelected && { fontWeight: "900", color: theme.accent },
+                            ]}
+                          >
+                            {ex.name}
+                          </Text>
+                          <Text
+                            style={[styles.dbExMuscle, { color: theme.textMuted }]}
+                          >
+                            {ex.primaryMuscle} • {ex.category}
+                          </Text>
+                        </View>
+                        {/* Checkbox Icon */}
+                        <View
+                          style={[
+                            styles.checkboxBox,
+                            {
+                              borderColor: isSelected ? theme.accent : theme.border,
+                              backgroundColor: isSelected ? theme.accent : "transparent",
+                            },
+                          ]}
                         >
-                          {ex.primaryMuscle} • {ex.category}
-                        </Text>
-                      </View>
-                      <Plus size={18} color={theme.accent} />
-                    </TouchableOpacity>
-                  ))
+                          {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
                 )}
               </ScrollView>
+
+              {/* Barre d'action fixe en bas avec bouton Ajouter (X) */}
+              <View style={styles.pickerActionBar}>
+                <Button
+                  title={
+                    selectedExerciseIds.size > 0
+                      ? `Ajouter (${selectedExerciseIds.size})`
+                      : "Ajouter (0)"
+                  }
+                  variant="primary"
+                  disabled={selectedExerciseIds.size === 0}
+                  onPress={handleBatchAddSharedExercises}
+                  style={{ width: "100%" }}
+                />
+              </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
         </TouchableOpacity>
@@ -1478,6 +1564,24 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
+  },
+  pickerModalHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 10,
+  },
+  pickerActionBar: {
+    marginTop: 10,
+    paddingTop: 8,
   },
   modalContent: {
     width: "90%",
