@@ -161,11 +161,6 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
                   <View style={{ flex: 1 }}>
                     <View style={styles.titleRow}>
                       <Text style={[styles.exName, { color: theme.text }]}>{ex.name}</Text>
-                      {ex.isCustom && (
-                        <View style={[styles.customBadge, { backgroundColor: theme.accent + '22', borderColor: theme.accent }]}>
-                          <Text style={[styles.customBadgeText, { color: theme.accent }]}>Personnalisé</Text>
-                        </View>
-                      )}
                     </View>
                     <Text style={[styles.exSub, { color: theme.textMuted }]}>
                       {ex.primaryMuscle} • {ex.category}
