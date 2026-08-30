@@ -16,7 +16,7 @@ import { SharedExercise } from '../../constants/exerciseDatabase';
 import { normalizeString } from '../../utils/stringUtils';
 import { CreateExerciseModal } from './CreateExerciseModal';
 import { Button } from '../UI/Button';
-import { Search, Plus, Edit2, Trash2, X, BookOpen } from 'lucide-react-native';
+import { Search, Plus, Edit2, Trash2, X, BookOpen, AlertTriangle } from 'lucide-react-native';
 
 const CATEGORY_FILTERS = ['Tous', 'Pectoraux', 'Dos', 'Épaules', 'Bras', 'Jambes', 'Abdos'] as const;
 
@@ -35,6 +35,10 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
   // État de modale de création / édition
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingExercise, setEditingExercise] = useState<SharedExercise | null>(null);
+
+  // État de la modale de confirmation de suppression personnalisée
+  const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<SharedExercise | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Normalisation & Filtrage
   const filteredExercises = useMemo(() => {
@@ -58,21 +62,21 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
     setShowCreateModal(true);
   };
 
-  const handleDelete = (ex: SharedExercise) => {
-    Alert.alert(
-      'Supprimer l\'exercice',
-      `Voulez-vous vraiment supprimer "${ex.name}" de la base de données ?\n(Vos séances passées conserveront leur nom sans altération).`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteCustomExercise(ex.id);
-          },
-        },
-      ]
-    );
+  const handleRequestDelete = (ex: SharedExercise) => {
+    setDeleteConfirmExercise(ex);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmExercise) return;
+    setDeleting(true);
+    try {
+      await deleteCustomExercise(deleteConfirmExercise.id);
+      setDeleteConfirmExercise(null);
+    } catch (e) {
+      console.error("Erreur lors de la suppression de l'exercice:", e);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleOpenCreate = () => {
@@ -179,7 +183,7 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
                     </TouchableOpacity>
                     <TouchableOpacity
                       activeOpacity={0.7}
-                      onPress={() => handleDelete(ex)}
+                      onPress={() => handleRequestDelete(ex)}
                       style={[styles.iconBtn, { backgroundColor: theme.surface, marginLeft: 6 }]}
                     >
                       <Trash2 size={16} color={theme.danger} />
@@ -198,6 +202,62 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
         onClose={() => setShowCreateModal(false)}
         initialExercise={editingExercise}
       />
+
+      {/* Modale de Confirmation de Suppression (Design & DA Applicative) */}
+      <Modal
+        visible={!!deleteConfirmExercise}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmExercise(null)}
+      >
+        <TouchableOpacity
+          style={styles.confirmOverlay}
+          activeOpacity={1}
+          onPress={() => setDeleteConfirmExercise(null)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.confirmCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          >
+            {/* Badge icône Danger */}
+            <View style={[styles.confirmIconBadge, { backgroundColor: theme.danger + '18' }]}>
+              <AlertTriangle size={24} color={theme.danger} />
+            </View>
+
+            {/* Titre */}
+            <Text style={[styles.confirmTitle, { color: theme.text }]}>Supprimer l'exercice</Text>
+
+            {/* Message */}
+            <Text style={[styles.confirmMessage, { color: theme.textMuted }]}>
+              Voulez-vous vraiment supprimer <Text style={{ color: theme.text, fontWeight: '800' }}>"{deleteConfirmExercise?.name}"</Text> de la base de données ?
+            </Text>
+
+            {/* Note d'information */}
+            <View style={[styles.confirmNoteBox, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.confirmNoteText, { color: theme.textMuted }]}>
+                💡 Vos séances passées et modèles conserveront cet exercice dans l'historique sans altération.
+              </Text>
+            </View>
+
+            {/* Boutons d'action */}
+            <View style={styles.confirmActionsRow}>
+              <Button
+                title="Annuler"
+                variant="outline"
+                onPress={() => setDeleteConfirmExercise(null)}
+                style={{ flex: 1, marginRight: 6 }}
+              />
+              <Button
+                title={deleting ? 'Suppression...' : 'Supprimer'}
+                variant="danger"
+                disabled={deleting}
+                onPress={handleConfirmDelete}
+                style={{ flex: 1, marginLeft: 6 }}
+              />
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 };
@@ -303,5 +363,55 @@ const styles = StyleSheet.create({
   iconBtn: {
     padding: 6,
     borderRadius: 6,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  confirmIconBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  confirmNoteBox: {
+    width: '100%',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  confirmNoteText: {
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    width: '100%',
   },
 });
