@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../src/context/ThemeContext';
@@ -1550,58 +1551,64 @@ export default function TemplateEditorScreen() {
         }}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.pickerModalOverlay}
           activeOpacity={1}
           onPress={() => {
             setShowPickerModal(false);
             setTargetCircuitBlockId(null);
           }}
         >
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%' }}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              {targetCircuitBlockId ? 'Ajouter au Circuit' : "Base de Données d'Exercices"}
-            </Text>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[
+                styles.pickerModalContent,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {targetCircuitBlockId ? 'Ajouter au Circuit' : "Base de Données d'Exercices"}
+              </Text>
 
-            {/* Barre de Recherche */}
-            <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Search size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.text }]}
-                placeholder="Rechercher par nom ou muscle..."
-                placeholderTextColor={theme.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus
-              />
-            </View>
+              {/* Barre de Recherche */}
+              <View style={[styles.searchBarBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Search size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.text }]}
+                  placeholder="Rechercher par nom ou muscle..."
+                  placeholderTextColor={theme.textMuted}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoFocus
+                />
+              </View>
 
-            <ScrollView style={{ maxHeight: 350 }}>
-              {filteredDatabase.length === 0 ? (
-                <Text style={[styles.noResultText, { color: theme.textMuted }]}>Aucun exercice trouvé</Text>
-              ) : (
-                filteredDatabase.map((ex) => (
-                  <TouchableOpacity
-                    key={ex.id}
-                    style={[styles.dbItemRow, { borderBottomColor: theme.border }]}
-                    onPress={() => handleAddSharedExercise(ex)}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.dbItemName, { color: theme.text }]}>{ex.name}</Text>
-                      <Text style={[styles.dbItemMuscle, { color: theme.textMuted }]}>
-                        {ex.primaryMuscle} • {ex.category} • {defaultRestSeconds || ex.defaultRestSeconds}s repos
-                      </Text>
-                    </View>
-                    <Plus size={18} color={theme.accent} />
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          </View>
+              <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+                {filteredDatabase.length === 0 ? (
+                  <Text style={[styles.noResultText, { color: theme.textMuted }]}>Aucun exercice trouvé</Text>
+                ) : (
+                  filteredDatabase.map((ex) => (
+                    <TouchableOpacity
+                      key={ex.id}
+                      style={[styles.dbItemRow, { borderBottomColor: theme.border }]}
+                      onPress={() => handleAddSharedExercise(ex)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.dbItemName, { color: theme.text }]}>{ex.name}</Text>
+                        <Text style={[styles.dbItemMuscle, { color: theme.textMuted }]}>
+                          {ex.primaryMuscle} • {ex.category} • {defaultRestSeconds || ex.defaultRestSeconds}s repos
+                        </Text>
+                      </View>
+                      <Plus size={18} color={theme.accent} />
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -2016,6 +2023,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 60 : 45,
+    paddingHorizontal: 16,
+  },
+  pickerModalContent: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
   },
   modalSheet: {
     borderTopLeftRadius: 20,
