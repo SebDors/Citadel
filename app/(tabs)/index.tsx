@@ -676,7 +676,7 @@ export default function WorkoutTab() {
             <TouchableOpacity
               style={[
                 styles.menuOptionRow,
-                { borderBottomColor: theme.border },
+                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
               ]}
               onPress={() => {
                 setShowTemplateMenuModal(false);
@@ -698,7 +698,7 @@ export default function WorkoutTab() {
             <TouchableOpacity
               style={[
                 styles.menuOptionRow,
-                { borderBottomColor: theme.border },
+                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
               ]}
               onPress={() => {
                 setShowTemplateMenuModal(false);
@@ -720,7 +720,7 @@ export default function WorkoutTab() {
             <TouchableOpacity
               style={[
                 styles.menuOptionRow,
-                { borderBottomColor: theme.border },
+                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
               ]}
               onPress={() => {
                 setShowTemplateMenuModal(false);
@@ -740,7 +740,7 @@ export default function WorkoutTab() {
             <TouchableOpacity
               style={[
                 styles.menuOptionRow,
-                { borderBottomColor: theme.border },
+                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
               ]}
               onPress={() => {
                 setShowTemplateMenuModal(false);
@@ -759,7 +759,7 @@ export default function WorkoutTab() {
             <TouchableOpacity
               style={[
                 styles.menuOptionRow,
-                { borderBottomColor: theme.border },
+                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
               ]}
               onPress={() => {
                 setShowTemplateMenuModal(false);
@@ -772,9 +772,9 @@ export default function WorkoutTab() {
               </Text>
             </TouchableOpacity>
 
-            {/* Supprimer */}
+            {/* Supprimer (sans bordure inférieure) */}
             <TouchableOpacity
-              style={styles.menuOptionRow}
+              style={[styles.menuOptionRow, { borderBottomWidth: 0 }]}
               onPress={() => {
                 setShowTemplateMenuModal(false);
                 if (selectedTemplate) {
@@ -1363,7 +1363,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    borderBottomWidth: 0.5,
   },
   menuOptionText: {
     fontSize: 14,
