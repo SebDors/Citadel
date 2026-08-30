@@ -385,7 +385,7 @@ export default function WorkoutTab() {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right']}
+      edges={["top", "left", "right"]}
       style={[styles.safeArea, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -592,21 +592,41 @@ export default function WorkoutTab() {
         {/* Carte Accès Bibliothèque d'Exercices */}
         <TouchableOpacity
           activeOpacity={0.7}
-          style={[styles.libraryCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          style={[
+            styles.libraryCard,
+            { backgroundColor: theme.cardBg, borderColor: theme.border },
+          ]}
           onPress={() => setShowLibraryModal(true)}
         >
-          <View style={[styles.libraryIconBox, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.libraryIconBox, { backgroundColor: theme.surface }]}
+          >
             <BookOpen size={20} color={theme.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={[styles.libraryTitle, { color: theme.text }]}>Bibliothèque d'Exercices</Text>
-              <View style={[styles.countBadge, { backgroundColor: theme.accent + '22', borderColor: theme.accent }]}>
-                <Text style={[styles.countBadgeText, { color: theme.accent }]}>{allExercises.length}</Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <Text style={[styles.libraryTitle, { color: theme.text }]}>
+                Bibliothèque d'Exercices
+              </Text>
+              <View
+                style={[
+                  styles.countBadge,
+                  {
+                    backgroundColor: theme.accent + "22",
+                    borderColor: theme.accent,
+                  },
+                ]}
+              >
+                <Text style={[styles.countBadgeText, { color: theme.accent }]}>
+                  {allExercises.length}
+                </Text>
               </View>
             </View>
             <Text style={[styles.librarySub, { color: theme.textMuted }]}>
-              {allExercises.length} exercices • Consulter, créer et gérer vos exercices
+              {allExercises.length} exercices • Consulter, créer et gérer vos
+              exercices
             </Text>
           </View>
           <ChevronRight size={18} color={theme.textMuted} />
