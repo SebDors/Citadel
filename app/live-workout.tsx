@@ -23,6 +23,7 @@ import {
   EXERCISE_DATABASE,
   SharedExercise,
 } from "../src/constants/exerciseDatabase";
+import { normalizeString } from "../src/utils/stringUtils";
 import {
   getSessionBlocks,
   WorkoutBlock,
@@ -234,9 +235,9 @@ export default function LiveWorkoutScreen() {
     });
   }, [activeSession, blocks, circuitStates]);
 
-  // Filter & sort exercises database for search modal
+  // Filter & sort exercises database for search modal (case & accent insensitive)
   const filteredDatabase = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = normalizeString(searchQuery);
     if (!q) {
       const selected = EXERCISE_DATABASE.filter((ex) =>
         selectedExerciseIds.has(ex.id),
@@ -248,10 +249,10 @@ export default function LiveWorkoutScreen() {
     }
     return EXERCISE_DATABASE.filter(
       (ex) =>
-        ex.name.toLowerCase().includes(q) ||
-        ex.primaryMuscle.toLowerCase().includes(q) ||
-        ex.category.toLowerCase().includes(q) ||
-        ex.targetMuscles.some((m) => m.toLowerCase().includes(q)),
+        normalizeString(ex.name).includes(q) ||
+        normalizeString(ex.primaryMuscle).includes(q) ||
+        normalizeString(ex.category).includes(q) ||
+        ex.targetMuscles.some((m) => normalizeString(m).includes(q)),
     );
   }, [searchQuery, selectedExerciseIds]);
 

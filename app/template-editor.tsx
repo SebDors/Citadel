@@ -18,6 +18,7 @@ import { useWorkout } from '../src/context/WorkoutContext';
 import { Button } from '../src/components/UI/Button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EXERCISE_DATABASE, SharedExercise } from '../src/constants/exerciseDatabase';
+import { normalizeString } from '../src/utils/stringUtils';
 import {
   WorkoutExercise,
   WorkoutTemplate,
@@ -688,9 +689,9 @@ export default function TemplateEditorScreen() {
     router.back();
   };
 
-  // Filtrage et tri de la base d'exercices : Si recherche vide, les cochés remontent en premier !
+  // Filtrage et tri de la base d'exercices (insensible aux accents & à la casse)
   const filteredDatabase = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = normalizeString(searchQuery);
     if (!q) {
       const selected = EXERCISE_DATABASE.filter((ex) => selectedExerciseIds.has(ex.id));
       const unselected = EXERCISE_DATABASE.filter((ex) => !selectedExerciseIds.has(ex.id));
@@ -698,10 +699,10 @@ export default function TemplateEditorScreen() {
     }
     return EXERCISE_DATABASE.filter(
       (ex) =>
-        ex.name.toLowerCase().includes(q) ||
-        ex.primaryMuscle.toLowerCase().includes(q) ||
-        ex.category.toLowerCase().includes(q) ||
-        ex.targetMuscles.some((m) => m.toLowerCase().includes(q))
+        normalizeString(ex.name).includes(q) ||
+        normalizeString(ex.primaryMuscle).includes(q) ||
+        normalizeString(ex.category).includes(q) ||
+        ex.targetMuscles.some((m) => normalizeString(m).includes(q))
     );
   }, [searchQuery, selectedExerciseIds]);
 
