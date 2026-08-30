@@ -78,13 +78,42 @@ export const StorageService = {
    */
   async addMeasurement(measurement: BodyMeasurement): Promise<FitTrackerData> {
     const currentData = await this.loadData();
-    const updatedMeasurements = [measurement, ...currentData.measurements.filter((m) => m.id !== measurement.id)];
+    const existingIndex = currentData.measurements.findIndex(
+      (m) => m.date === measurement.date || m.id === measurement.id
+    );
+
+    let updatedMeasurements: BodyMeasurement[];
+    if (existingIndex >= 0) {
+      const existing = currentData.measurements[existingIndex];
+      const merged: BodyMeasurement = {
+        ...existing,
+        ...measurement,
+        id: existing.id,
+        date: measurement.date,
+        weightKg: measurement.weightKg,
+        chestCm: measurement.chestCm !== undefined ? measurement.chestCm : existing.chestCm,
+        thighCm: measurement.thighCm !== undefined ? measurement.thighCm : existing.thighCm,
+        bicepsCm: measurement.bicepsCm !== undefined ? measurement.bicepsCm : existing.bicepsCm,
+      };
+      updatedMeasurements = [...currentData.measurements];
+      updatedMeasurements[existingIndex] = merged;
+    } else {
+      updatedMeasurements = [measurement, ...currentData.measurements];
+    }
+
+    // Tri chronologique croissant par date
+    updatedMeasurements.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Récupérer le poids de la mesure la plus récente par date
+    const latestMeasurement = updatedMeasurements[updatedMeasurements.length - 1];
+    const latestWeight = latestMeasurement ? latestMeasurement.weightKg : currentData.profile.currentWeightKg;
+
     const updatedData: FitTrackerData = {
       ...currentData,
       measurements: updatedMeasurements,
       profile: {
         ...currentData.profile,
-        currentWeightKg: measurement.weightKg,
+        currentWeightKg: latestWeight,
       },
     };
     await this.saveData(updatedData);

@@ -16,12 +16,10 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [name, setName] = useState(profile.name);
-  const [weight, setWeight] = useState(String(profile.currentWeightKg));
 
   const handleSave = () => {
     onUpdateProfile({
       name,
-      currentWeightKg: parseFloat(weight) || profile.currentWeightKg,
     });
     setShowEditModal(false);
   };
@@ -52,7 +50,7 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
           </View>
         </View>
 
-        {/* Roue crantée Réglages Profil (Demande utilisateur!) */}
+        {/* Roue crantée Réglages Profil */}
         <TouchableOpacity activeOpacity={0.7} onPress={() => setShowEditModal(true)} style={styles.settingsBtn}>
           <Settings size={20} color={theme.text} />
         </TouchableOpacity>
@@ -69,14 +67,6 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
               style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
               value={name}
               onChangeText={setName}
-            />
-
-            <Text style={[styles.inputLabel, { color: theme.text }]}>Poids actuel (kg)</Text>
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-              keyboardType="numeric"
-              value={weight}
-              onChangeText={setWeight}
             />
 
             <View style={{ flexDirection: 'row', marginTop: 14 }}>
