@@ -35,6 +35,7 @@ export interface WorkoutContextType {
   activeSession: WorkoutSession | null;
   startWorkout: (template?: WorkoutTemplate) => void;
   startSessionTimer: () => void;
+  togglePauseWorkoutSession: () => void;
   finishWorkout: () => Promise<void>;
   cancelWorkout: () => void;
   updateSet: (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => void;
@@ -197,13 +198,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [restTimer.active, restTimer.targetEndTime]);
 
-  // Durée de la séance en cours (ne tourne que si la séance est officiellement lancée)
+  // Durée de la séance en cours (ne tourne que si la séance est officiellement lancée et non en pause)
   useEffect(() => {
-    if (!activeSession || activeSession.status !== 'in_progress' || !activeSession.hasStarted) return;
+    if (!activeSession || activeSession.status !== 'in_progress' || !activeSession.hasStarted || activeSession.isPaused) return;
 
     const interval = setInterval(() => {
       setActiveSession((prev) => {
-        if (!prev || !prev.hasStarted) return prev;
+        if (!prev || !prev.hasStarted || prev.isPaused) return prev;
         const start = new Date(prev.startTime).getTime();
         const duration = Math.floor((Date.now() - start) / 1000);
         return { ...prev, durationSeconds: duration };
@@ -211,7 +212,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeSession?.status, activeSession?.startTime, activeSession?.hasStarted]);
+  }, [activeSession?.status, activeSession?.startTime, activeSession?.hasStarted, activeSession?.isPaused]);
 
   const startSessionTimer = () => {
     setActiveSession((prev) => {
@@ -219,9 +220,34 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const updated: WorkoutSession = {
         ...prev,
         hasStarted: true,
+        isPaused: false,
         startTime: new Date().toISOString(),
         durationSeconds: 0,
       };
+      StorageService.saveCurrentWorkout(updated);
+      return updated;
+    });
+  };
+
+  const togglePauseWorkoutSession = () => {
+    setActiveSession((prev) => {
+      if (!prev || !prev.hasStarted || prev.status !== 'in_progress') return prev;
+      const nextIsPaused = !prev.isPaused;
+      let updated: WorkoutSession;
+
+      if (nextIsPaused) {
+        updated = {
+          ...prev,
+          isPaused: true,
+        };
+      } else {
+        const newStartTimeMs = Date.now() - (prev.durationSeconds || 0) * 1000;
+        updated = {
+          ...prev,
+          isPaused: false,
+          startTime: new Date(newStartTimeMs).toISOString(),
+        };
+      }
       StorageService.saveCurrentWorkout(updated);
       return updated;
     });
@@ -1164,6 +1190,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeSession,
         startWorkout,
         startSessionTimer,
+        togglePauseWorkoutSession,
         finishWorkout,
         cancelWorkout,
         updateSet,

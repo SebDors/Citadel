@@ -56,6 +56,12 @@ function getActiveBannerSubtitle(session: WorkoutSession): string {
   if (session.hasStarted === false) {
     return "Séance en préparation · 00:00";
   }
+  if (session.isPaused) {
+    const mins = Math.floor((session.durationSeconds || 0) / 60);
+    const secs = (session.durationSeconds || 0) % 60;
+    const timeStr = `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
+    return `Séance en pause ⏸ · ${timeStr}`;
+  }
   const blocks = getSessionBlocks(session);
   const circuitBlock = blocks.find(
     (b): b is CircuitBlock => b.type === "circuit",

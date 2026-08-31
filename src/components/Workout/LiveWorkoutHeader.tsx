@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
 import {
@@ -8,6 +8,8 @@ import {
   CheckCircle,
   RotateCw,
   Timer,
+  Pause,
+  Play,
 } from "lucide-react-native";
 
 export interface CircuitInfo {
@@ -23,11 +25,13 @@ interface LiveWorkoutHeaderProps {
   session: WorkoutSession;
   onFinish: () => void;
   onCancel: () => void;
+  onTogglePause?: () => void;
   circuitInfo?: CircuitInfo;
 }
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
+  onTogglePause,
   circuitInfo,
 }) => {
   const { theme } = useTheme();
@@ -160,16 +164,61 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       </View>
 
       <View style={styles.statsRow}>
-        {/* Timer */}
-        <View style={styles.statBox}>
-          <Clock size={14} color={session.hasStarted === false ? theme.textMuted : theme.accent} />
-          <Text style={[styles.statValue, { color: session.hasStarted === false ? theme.textMuted : theme.text }]}>
-            {formatDuration(session.durationSeconds)}
+        {/* Timer avec Pause / Reprendre */}
+        <TouchableOpacity
+          activeOpacity={session.hasStarted !== false ? 0.7 : 1}
+          onPress={() => {
+            if (session.hasStarted !== false && onTogglePause) {
+              onTogglePause();
+            }
+          }}
+          style={styles.statBox}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            {session.hasStarted === false ? (
+              <Clock size={14} color={theme.textMuted} />
+            ) : session.isPaused ? (
+              <Play size={14} color={theme.warning || "#f59e0b"} fill={theme.warning || "#f59e0b"} />
+            ) : (
+              <Pause size={14} color={theme.accent} />
+            )}
+            <Text
+              style={[
+                styles.statValue,
+                {
+                  color:
+                    session.hasStarted === false
+                      ? theme.textMuted
+                      : session.isPaused
+                      ? theme.warning || "#f59e0b"
+                      : theme.text,
+                },
+              ]}
+            >
+              {formatDuration(session.durationSeconds)}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.statLabel,
+              {
+                color:
+                  session.hasStarted === false
+                    ? theme.warning || "#f59e0b"
+                    : session.isPaused
+                    ? theme.warning || "#f59e0b"
+                    : theme.textMuted,
+                fontWeight: session.isPaused ? "800" : "600",
+              },
+            ]}
+          >
+            {session.hasStarted === false
+              ? "Non démarrée"
+              : session.isPaused
+              ? "En pause ⏸"
+              : "Temps ⏸"}
           </Text>
-          <Text style={[styles.statLabel, { color: session.hasStarted === false ? theme.warning || '#f59e0b' : theme.textMuted }]}>
-            {session.hasStarted === false ? 'Non démarrée' : 'Temps'}
-          </Text>
-        </View>
+        </TouchableOpacity>
 
         {/* Volume */}
         <View style={styles.statBox}>

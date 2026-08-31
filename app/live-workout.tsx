@@ -81,6 +81,7 @@ export default function LiveWorkoutScreen() {
     setExerciseSupersetGroup,
     startRestTimer,
     startSessionTimer,
+    togglePauseWorkoutSession,
     updateActiveSessionCircuitStates,
     allExercises,
   } = useWorkout();
@@ -556,6 +557,7 @@ export default function LiveWorkoutScreen() {
             session={activeSession}
             onFinish={handleFinish}
             onCancel={handleCancel}
+            onTogglePause={togglePauseWorkoutSession}
             circuitInfo={circuitInfo}
           />
 
@@ -578,6 +580,31 @@ export default function LiveWorkoutScreen() {
                 </Text>
                 <Text style={styles.startSessionBannerSub}>
                   Préparez vos exercices puis appuyez pour lancer le chrono
+                </Text>
+              </View>
+              <ChevronRight size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
+          {/* Bannière "Séance en pause" si isPaused = true */}
+          {activeSession.hasStarted !== false && activeSession.isPaused && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[
+                styles.startSessionBanner,
+                { backgroundColor: theme.warning || "#f59e0b" },
+              ]}
+              onPress={togglePauseWorkoutSession}
+            >
+              <View style={styles.startSessionIconCircle}>
+                <Play size={18} color={theme.warning || "#f59e0b"} fill={theme.warning || "#f59e0b"} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.startSessionBannerTitle}>
+                  Séance en pause ⏸
+                </Text>
+                <Text style={styles.startSessionBannerSub}>
+                  Le chrono est figé. Appuyez pour reprendre l'entraînement !
                 </Text>
               </View>
               <ChevronRight size={20} color="#FFFFFF" />

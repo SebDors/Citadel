@@ -90,6 +90,7 @@ export interface WorkoutSession {
   blocks?: WorkoutBlock[];
   status: 'in_progress' | 'completed';
   hasStarted?: boolean;
+  isPaused?: boolean;
   isCircuit?: boolean;
   circuitRounds?: number;
   currentCircuitRound?: number;
