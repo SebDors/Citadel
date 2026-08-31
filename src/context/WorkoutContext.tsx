@@ -556,11 +556,20 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
 
     const autoStartTimer = !activeSession.hasStarted && isMarkingCompleted;
+    const shouldResumePause = activeSession.isPaused && isMarkingCompleted;
+
+    let newStartTime = activeSession.startTime;
+    if (autoStartTimer) {
+      newStartTime = new Date().toISOString();
+    } else if (shouldResumePause) {
+      newStartTime = new Date(Date.now() - (activeSession.durationSeconds || 0) * 1000).toISOString();
+    }
 
     const updatedSession: WorkoutSession = {
       ...activeSession,
       hasStarted: autoStartTimer ? true : activeSession.hasStarted,
-      startTime: autoStartTimer ? new Date().toISOString() : activeSession.startTime,
+      isPaused: shouldResumePause ? false : activeSession.isPaused,
+      startTime: newStartTime,
       durationSeconds: autoStartTimer ? 0 : activeSession.durationSeconds,
       blocks: updatedBlocks,
       exercises: updatedExercises,

@@ -164,23 +164,15 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       </View>
 
       <View style={styles.statsRow}>
-        {/* Timer avec Pause / Reprendre */}
-        <TouchableOpacity
-          activeOpacity={session.hasStarted !== false ? 0.7 : 1}
-          onPress={() => {
-            if (session.hasStarted !== false && onTogglePause) {
-              onTogglePause();
-            }
-          }}
-          style={styles.statBox}
-        >
+        {/* Timer avec Bouton Pilule Pause / Reprendre */}
+        <View style={[styles.statBox, session.isPaused && styles.pausedStatBoxContainer]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             {session.hasStarted === false ? (
               <Clock size={14} color={theme.textMuted} />
             ) : session.isPaused ? (
-              <Play size={14} color={theme.warning || "#f59e0b"} fill={theme.warning || "#f59e0b"} />
+              <Pause size={14} color="#f59e0b" />
             ) : (
-              <Pause size={14} color={theme.accent} />
+              <Clock size={14} color={theme.accent} />
             )}
             <Text
               style={[
@@ -190,7 +182,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
                     session.hasStarted === false
                       ? theme.textMuted
                       : session.isPaused
-                      ? theme.warning || "#f59e0b"
+                      ? "#f59e0b"
                       : theme.text,
                 },
               ]}
@@ -198,27 +190,37 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
               {formatDuration(session.durationSeconds)}
             </Text>
           </View>
-          <Text
-            style={[
-              styles.statLabel,
-              {
-                color:
-                  session.hasStarted === false
-                    ? theme.warning || "#f59e0b"
-                    : session.isPaused
-                    ? theme.warning || "#f59e0b"
-                    : theme.textMuted,
-                fontWeight: session.isPaused ? "800" : "600",
-              },
-            ]}
-          >
-            {session.hasStarted === false
-              ? "Non démarrée"
-              : session.isPaused
-              ? "En pause ⏸"
-              : "Temps ⏸"}
-          </Text>
-        </TouchableOpacity>
+
+          {/* Bouton Pilule Interactif Pause / Reprendre */}
+          {session.hasStarted !== false ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onTogglePause && onTogglePause()}
+              style={[
+                styles.pausePillBtn,
+                session.isPaused
+                  ? { backgroundColor: "#f59e0b", borderColor: "#f59e0b" }
+                  : { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              {session.isPaused ? (
+                <>
+                  <Play size={10} color="#FFFFFF" fill="#FFFFFF" />
+                  <Text style={[styles.pausePillText, { color: "#FFFFFF" }]}>REPRENDRE</Text>
+                </>
+              ) : (
+                <>
+                  <Pause size={10} color={theme.textMuted} />
+                  <Text style={[styles.pausePillText, { color: theme.textMuted }]}>PAUSE</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <Text style={[styles.statLabel, { color: theme.warning || "#f59e0b" }]}>
+              Non démarrée
+            </Text>
+          )}
+        </View>
 
         {/* Volume */}
         <View style={styles.statBox}>
@@ -292,6 +294,30 @@ const styles = StyleSheet.create({
   },
   statBox: {
     alignItems: "center",
+    justifyContent: "center",
+  },
+  pausedStatBoxContainer: {
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderColor: "#f59e0b",
+    borderWidth: 1,
+  },
+  pausePillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 3,
+  },
+  pausePillText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
   },
   statValue: {
     fontSize: 13,
