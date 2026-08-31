@@ -10,7 +10,9 @@ const isExpoGo = Constants.appOwnership === 'expo';
 const TIMER_SOUND = require('../../assets/timer_end.wav');
 
 let activeNotificationId: string | null = null;
+let ongoingNotificationId: string | null = null;
 let notificationsInitialized = false;
+let currentAudioPlayer: any = null;
 
 /**
  * Charge expo-notifications dynamiquement (uniquement hors Expo Go).
@@ -41,11 +43,12 @@ export const NotificationService = {
 
     try {
       // Configuration du handler de notifications au premier plan (une seule fois)
+      // shouldPlaySound: false au 1er plan car nous jouons notre propre son audio personnalisé (timer_end.wav) sans doublon
       if (!notificationsInitialized) {
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowAlert: true,
-            shouldPlaySound: true,
+            shouldPlaySound: false,
             shouldSetBadge: false,
             shouldShowBanner: true,
             shouldShowList: true,
@@ -93,7 +96,7 @@ export const NotificationService = {
 
       const title = '⏱️ Repos Terminé !';
       const body = exerciseName
-        ? `Temps de repos pour ${exerciseName} écoulé. Prochaine série !`
+        ? `Temps de repos pour ${exerciseName} écoulé. À vous de jouer !`
         : 'Votre temps de repos est écoulé !';
 
       activeNotificationId = await Notifications.scheduleNotificationAsync({
@@ -114,6 +117,35 @@ export const NotificationService = {
   },
 
   /**
+   * Met à jour ou affiche l'état en direct du décompte de repos dans le volet de notifications.
+   */
+  async updateOngoingNotification(secondsRemaining: number, exerciseName?: string): Promise<void> {
+    const Notifications = await getNotifications();
+    if (!Notifications || secondsRemaining <= 0) return;
+
+    const m = Math.floor(secondsRemaining / 60);
+    const s = secondsRemaining % 60;
+    const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+
+    try {
+      if (ongoingNotificationId) {
+        try { await Notifications.dismissNotificationAsync(ongoingNotificationId); } catch (_) {}
+      }
+      ongoingNotificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `⏱️ Repos en cours : ${timeStr}`,
+          body: exerciseName ? `Prochaine série : ${exerciseName}` : 'Chrono de repos actif',
+          sound: false,
+          data: { type: 'timer_ongoing' },
+        },
+        trigger: null, // Présentation immédiate
+      });
+    } catch (e) {
+      // Ignorer silencieusement si la notif en direct n'est pas disponible
+    }
+  },
+
+  /**
    * Annule toute notification de timer en cours ou programmée.
    * No-op silencieux dans Expo Go.
    */
@@ -122,9 +154,15 @@ export const NotificationService = {
     if (!Notifications) return;
 
     try {
+      if (ongoingNotificationId) {
+        try { await Notifications.dismissNotificationAsync(ongoingNotificationId); } catch (_) {}
+        ongoingNotificationId = null;
+      }
       if (activeNotificationId) {
-        await Notifications.dismissNotificationAsync(activeNotificationId);
-        await Notifications.cancelScheduledNotificationAsync(activeNotificationId);
+        try {
+          await Notifications.dismissNotificationAsync(activeNotificationId);
+          await Notifications.cancelScheduledNotificationAsync(activeNotificationId);
+        } catch (_) {}
         activeNotificationId = null;
       }
       await Notifications.cancelAllScheduledNotificationsAsync();
@@ -134,21 +172,33 @@ export const NotificationService = {
   },
 
   /**
-   * Joue un son d'alerte sonore local (bip double 880 Hz + 1100 Hz) pour la fin du timer de repos.
-   * Utilise expo-audio (SDK 54+).
-   * Fonctionne dans Expo Go ET dans un APK / Development Build.
+   * Joue le son d'alerte (timer_end.wav) une seule fois et garantit l'absence de chevauchement.
    */
   async playTimerEndSound(): Promise<void> {
     try {
-      const { createAudioPlayer } = await import('expo-audio');
+      // Arrêt immédiat de tout lecteur audio en cours
+      if (currentAudioPlayer) {
+        try {
+          currentAudioPlayer.pause();
+          currentAudioPlayer.remove();
+        } catch (_) {}
+        currentAudioPlayer = null;
+      }
 
+      const { createAudioPlayer } = await import('expo-audio');
       const player = createAudioPlayer(TIMER_SOUND);
       player.volume = 1.0;
       player.play();
+      currentAudioPlayer = player;
 
       // Nettoyage après 3s (durée du bip ~0.4s)
       setTimeout(() => {
-        try { player.remove(); } catch (_) {}
+        try {
+          if (currentAudioPlayer === player) {
+            player.remove();
+            currentAudioPlayer = null;
+          }
+        } catch (_) {}
       }, 3000);
     } catch (e) {
       console.warn('[NotificationService] Audio play error:', e);

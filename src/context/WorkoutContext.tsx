@@ -108,8 +108,20 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     secondsRemaining: 0,
   });
 
+  const hasPlayedEndSoundRef = React.useRef(false);
+
+  const handleTimerExpired = () => {
+    if (!hasPlayedEndSoundRef.current) {
+      hasPlayedEndSoundRef.current = true;
+      NotificationService.playTimerEndSound();
+      NotificationService.cancelScheduledNotification();
+    }
+    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+  };
+
   const startRestTimer = (exerciseName: string, seconds: number, nextSetInfo?: NextSetPreview | null) => {
     if (seconds <= 0) return;
+    hasPlayedEndSoundRef.current = false;
     const targetEnd = Date.now() + seconds * 1000;
     setRestTimer({
       active: true,
@@ -122,6 +134,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const dismissRestTimer = () => {
+    hasPlayedEndSoundRef.current = true;
     NotificationService.cancelScheduledNotification();
     setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
   };
@@ -131,10 +144,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newTarget = restTimer.targetEndTime + deltaSeconds * 1000;
     const newRemaining = Math.max(0, Math.ceil((newTarget - Date.now()) / 1000));
     if (newRemaining <= 0) {
-      NotificationService.playTimerEndSound();
-      NotificationService.cancelScheduledNotification();
-      setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+      handleTimerExpired();
     } else {
+      hasPlayedEndSoundRef.current = false;
       setRestTimer((prev) => ({
         ...prev,
         targetEndTime: newTarget,
@@ -166,9 +178,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.ceil((restTimer.targetEndTime! - Date.now()) / 1000));
       if (remaining <= 0) {
-        NotificationService.playTimerEndSound();
-        NotificationService.cancelScheduledNotification();
-        setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+        handleTimerExpired();
         clearInterval(interval);
       } else {
         setRestTimer((prev) => ({ ...prev, secondsRemaining: remaining }));
@@ -181,17 +191,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Gestion du Cycle de Vie AppState (Arrière-plan -> Premier plan)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        if (restTimer.active && restTimer.targetEndTime) {
-          const remainingMs = restTimer.targetEndTime - Date.now();
-          if (remainingMs <= 0) {
-            NotificationService.playTimerEndSound();
-            NotificationService.cancelScheduledNotification();
-            setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
-          } else {
-            const remainingSec = Math.ceil(remainingMs / 1000);
-            setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
-          }
+      if (!restTimer.active || !restTimer.targetEndTime) return;
+
+      const remainingMs = restTimer.targetEndTime - Date.now();
+      if (remainingMs <= 0) {
+        handleTimerExpired();
+      } else {
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
+        if (nextAppState === 'background' || nextAppState === 'inactive') {
+          NotificationService.updateOngoingNotification(remainingSec, restTimer.exerciseName);
         }
       }
     });
@@ -199,7 +208,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       subscription.remove();
     };
-  }, [restTimer.active, restTimer.targetEndTime]);
+  }, [restTimer.active, restTimer.targetEndTime, restTimer.exerciseName]);
 
   // Durée de la séance en cours (ne tourne que si la séance est officiellement lancée et non en pause)
   useEffect(() => {
