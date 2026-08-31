@@ -43,12 +43,14 @@ export interface WorkoutContextType {
   addSet: (exerciseId: string) => void;
   removeSet: (exerciseId: string, setId: string) => void;
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number) => void;
+  addBatchExercisesToActiveWorkout: (items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
   removeExercise: (exerciseId: string) => void;
   duplicateExercise: (exerciseId: string) => void;
   updateExerciseRestTime: (exerciseId: string, newRestSeconds: number) => void;
   setExerciseSupersetGroup: (exerciseId: string, supersetGroup?: string) => void;
   updateActiveSessionCircuitStates: (states: Record<string, any>) => void;
   addExerciseToCircuit: (blockId: string, exerciseName: string, primaryMuscle: string, targetMuscles?: string[]) => void;
+  addBatchExercisesToCircuit: (blockId: string, items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles?: string[] }>) => void;
   addMeasurement: (measurement: BodyMeasurement) => Promise<void>;
   deleteMeasurement: (id: string) => Promise<void>;
   updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
@@ -688,44 +690,56 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveCurrentWorkout(updatedSession);
   };
 
-  const addExerciseToActiveWorkout = (
-    exerciseName: string,
-    primaryMuscle: string,
-    targetMuscles: string[],
-    restSeconds: number = 75
+  const addBatchExercisesToActiveWorkout = (
+    items: Array<{
+      exerciseName: string;
+      primaryMuscle: string;
+      targetMuscles: string[];
+      restSeconds?: number;
+    }>
   ) => {
-    if (!activeSession) return;
+    if (!activeSession || items.length === 0) return;
 
-    const newEx: WorkoutExercise = {
-      id: `ex_${Date.now()}`,
-      exerciseId: exerciseName.toLowerCase().replace(/\s+/g, '_'),
-      exerciseName,
-      primaryMuscle,
-      targetMuscles,
-      restSeconds,
-      sets: [
-        {
-          id: `s_${Date.now()}_1`,
-          setNumber: 1,
-          type: 'normal',
-          weightKg: undefined,
-          reps: undefined,
-          rir: undefined,
-          completed: false,
-        },
-      ],
-    };
+    const now = Date.now();
+    const newExercises: WorkoutExercise[] = [];
+    const newSingleBlocks: SingleExerciseBlock[] = [];
 
-    const newBlock: SingleExerciseBlock = {
-      id: `blk_single_${newEx.id}`,
-      type: 'single',
-      exercise: newEx,
-    };
+    items.forEach((item, index) => {
+      const uniqueId = `ex_${now}_${index}_${Math.random().toString(36).substr(2, 4)}`;
+      const newEx: WorkoutExercise = {
+        id: uniqueId,
+        exerciseId: item.exerciseName.toLowerCase().replace(/\s+/g, '_'),
+        exerciseName: item.exerciseName,
+        primaryMuscle: item.primaryMuscle,
+        targetMuscles: item.targetMuscles,
+        restSeconds: item.restSeconds || 75,
+        sets: [
+          {
+            id: `s_${now}_${index}_1`,
+            setNumber: 1,
+            type: 'normal',
+            weightKg: undefined,
+            reps: undefined,
+            rir: undefined,
+            completed: false,
+          },
+        ],
+      };
 
-    const updatedExercises = [...(activeSession.exercises || []), newEx];
+      const newBlock: SingleExerciseBlock = {
+        id: `blk_single_${newEx.id}`,
+        type: 'single',
+        exercise: newEx,
+      };
+
+      newExercises.push(newEx);
+      newSingleBlocks.push(newBlock);
+    });
+
+    const updatedExercises = [...(activeSession.exercises || []), ...newExercises];
     const updatedBlocks = activeSession.blocks
-      ? [...activeSession.blocks, newBlock]
-      : [newBlock];
+      ? [...activeSession.blocks, ...newSingleBlocks]
+      : [...newSingleBlocks];
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -743,6 +757,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setActiveSession(updatedSession);
     StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const addExerciseToActiveWorkout = (
+    exerciseName: string,
+    primaryMuscle: string,
+    targetMuscles: string[],
+    restSeconds: number = 75
+  ) => {
+    addBatchExercisesToActiveWorkout([
+      { exerciseName, primaryMuscle, targetMuscles, restSeconds },
+    ]);
   };
 
   const removeExercise = (exerciseId: string) => {
@@ -910,28 +935,31 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addExerciseToCircuit = (
+  const addBatchExercisesToCircuit = (
     blockId: string,
-    exerciseName: string,
-    primaryMuscle: string,
-    targetMuscles?: string[]
+    items: Array<{
+      exerciseName: string;
+      primaryMuscle: string;
+      targetMuscles?: string[];
+    }>
   ) => {
-    if (!activeSession || !activeSession.blocks) return;
+    if (!activeSession || !activeSession.blocks || items.length === 0) return;
 
-    const newExerciseItem: CircuitExerciseItem = {
-      id: `circ_ex_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      exerciseName,
-      primaryMuscle,
-      targetMuscles,
+    const now = Date.now();
+    const newItems: CircuitExerciseItem[] = items.map((item, index) => ({
+      id: `circ_ex_${now}_${index}_${Math.random().toString(36).substr(2, 4)}`,
+      exerciseName: item.exerciseName,
+      primaryMuscle: item.primaryMuscle,
+      targetMuscles: item.targetMuscles,
       targetValue: 10,
       targetType: 'reps',
-    };
+    }));
 
     const updatedBlocks = activeSession.blocks.map((block) => {
       if (block.id === blockId && block.type === 'circuit') {
         return {
           ...block,
-          exercises: [...block.exercises, newExerciseItem],
+          exercises: [...block.exercises, ...newItems],
         };
       }
       return block;
@@ -954,6 +982,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setActiveSession(updatedSession);
     StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const addExerciseToCircuit = (
+    blockId: string,
+    exerciseName: string,
+    primaryMuscle: string,
+    targetMuscles?: string[]
+  ) => {
+    addBatchExercisesToCircuit(blockId, [
+      { exerciseName, primaryMuscle, targetMuscles },
+    ]);
   };
 
   const finishWorkout = async () => {
@@ -1198,12 +1237,14 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addSet,
         removeSet,
         addExerciseToActiveWorkout,
+        addBatchExercisesToActiveWorkout,
         removeExercise,
         duplicateExercise,
         updateExerciseRestTime,
         setExerciseSupersetGroup,
         updateActiveSessionCircuitStates,
         addExerciseToCircuit,
+        addBatchExercisesToCircuit,
         addMeasurement,
         deleteMeasurement,
         updateUserProfile,

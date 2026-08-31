@@ -74,7 +74,9 @@ export default function LiveWorkoutScreen() {
     addSet,
     removeSet,
     addExerciseToActiveWorkout,
+    addBatchExercisesToActiveWorkout,
     addExerciseToCircuit,
+    addBatchExercisesToCircuit,
     removeExercise,
     duplicateExercise,
     updateExerciseRestTime,
@@ -367,23 +369,23 @@ export default function LiveWorkoutScreen() {
     );
 
     if (targetCircuitBlockId) {
-      selectedExercises.forEach((ex) => {
-        addExerciseToCircuit(
-          targetCircuitBlockId,
-          ex.name,
-          ex.primaryMuscle,
-          ex.targetMuscles,
-        );
-      });
+      addBatchExercisesToCircuit(
+        targetCircuitBlockId,
+        selectedExercises.map((ex) => ({
+          exerciseName: ex.name,
+          primaryMuscle: ex.primaryMuscle,
+          targetMuscles: ex.targetMuscles,
+        })),
+      );
     } else {
-      selectedExercises.forEach((ex) => {
-        addExerciseToActiveWorkout(
-          ex.name,
-          ex.primaryMuscle,
-          ex.targetMuscles,
-          ex.defaultRestSeconds,
-        );
-      });
+      addBatchExercisesToActiveWorkout(
+        selectedExercises.map((ex) => ({
+          exerciseName: ex.name,
+          primaryMuscle: ex.primaryMuscle,
+          targetMuscles: ex.targetMuscles,
+          restSeconds: ex.defaultRestSeconds,
+        })),
+      );
     }
 
     handleCloseModal();
