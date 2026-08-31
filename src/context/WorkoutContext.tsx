@@ -44,6 +44,7 @@ export interface WorkoutContextType {
   removeSet: (exerciseId: string, setId: string) => void;
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number) => void;
   addBatchExercisesToActiveWorkout: (items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
+  addCircuitToActiveWorkout: () => void;
   removeExercise: (exerciseId: string) => void;
   duplicateExercise: (exerciseId: string) => void;
   updateExerciseRestTime: (exerciseId: string, newRestSeconds: number) => void;
@@ -779,6 +780,44 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ]);
   };
 
+  const addCircuitToActiveWorkout = () => {
+    if (!activeSession) return;
+
+    const currentBlocks = getSessionBlocks(activeSession);
+    const circuitCount = currentBlocks.filter((b) => b.type === 'circuit').length;
+
+    const newCircuitBlock: CircuitBlock = {
+      id: `cb_${Date.now()}`,
+      type: 'circuit',
+      title: `Circuit ${circuitCount + 1}`,
+      circuitType: 'rounds',
+      rounds: 3,
+      amrapDurationMinutes: 12,
+      restBetweenRoundsSeconds: 60,
+      exercises: [],
+    };
+
+    const updatedBlocks = [...currentBlocks, newCircuitBlock];
+
+    let totalSets = 0;
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        totalSets += b.exercise.sets.length;
+      } else if (b.type === 'circuit') {
+        totalSets += b.rounds * b.exercises.length;
+      }
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+      totalSetsCount: totalSets,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
   const removeExercise = (exerciseId: string) => {
     if (!activeSession) return;
 
@@ -1247,6 +1286,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         removeSet,
         addExerciseToActiveWorkout,
         addBatchExercisesToActiveWorkout,
+        addCircuitToActiveWorkout,
         removeExercise,
         duplicateExercise,
         updateExerciseRestTime,

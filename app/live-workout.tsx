@@ -46,6 +46,7 @@ import {
   Pause,
   Clock,
   X,
+  Zap,
 } from "lucide-react-native";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
@@ -88,6 +89,7 @@ export default function LiveWorkoutScreen() {
     removeSet,
     addExerciseToActiveWorkout,
     addBatchExercisesToActiveWorkout,
+    addCircuitToActiveWorkout,
     addExerciseToCircuit,
     addBatchExercisesToCircuit,
     removeExercise,
@@ -1204,17 +1206,48 @@ export default function LiveWorkoutScreen() {
           return null;
         })}
 
-        {/* Bouton Ajouter un exercice à la séance */}
-        <Button
-          title="Ajouter un exercice à la séance"
-          variant="outline"
-          onPress={() => {
-            setTargetCircuitBlockId(null);
-            setShowAddExModal(true);
-          }}
-          icon={<Plus size={18} color={theme.accent} />}
-          style={{ marginTop: 14 }}
-        />
+        {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE (+ EXERCICE & + CIRCUIT) */}
+        <View style={styles.twinButtonsRow}>
+          {/* [Exercice] (Contour pointillé accent) */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.twinBtn,
+              {
+                borderColor: theme.accent,
+                backgroundColor: theme.cardBg,
+              },
+            ]}
+            onPress={() => {
+              setTargetCircuitBlockId(null);
+              setShowAddExModal(true);
+            }}
+          >
+            <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.twinBtnText, { color: theme.accent }]}>
+              Exercice
+            </Text>
+          </TouchableOpacity>
+
+          {/* [Circuit] (Contour pointillé accent) */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.twinBtn,
+              {
+                borderColor: theme.accent,
+                backgroundColor: theme.surface,
+              },
+            ]}
+            onPress={addCircuitToActiveWorkout}
+          >
+            <Plus size={16} color={theme.accent} style={{ marginRight: 4 }} />
+            <Zap size={16} color={theme.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.twinBtnText, { color: theme.accent }]}>
+              Circuit
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Bouton Terminer l'entraînement (Cliquable à tout moment, vert/accent si tous les blocs sont complétés) */}
         <Button
@@ -1946,6 +1979,26 @@ const styles = StyleSheet.create({
   },
   addCircuitExBtnText: {
     fontSize: 13,
+    fontWeight: "800",
+  },
+  twinButtonsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  twinBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+  },
+  twinBtnText: {
+    fontSize: 14,
     fontWeight: "800",
   },
 });
