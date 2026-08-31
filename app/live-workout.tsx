@@ -594,12 +594,12 @@ export default function LiveWorkoutScreen() {
               activeOpacity={0.85}
               style={[
                 styles.startSessionBanner,
-                { backgroundColor: theme.warning || "#f59e0b" },
+                { backgroundColor: theme.secondary },
               ]}
               onPress={togglePauseWorkoutSession}
             >
               <View style={styles.startSessionIconCircle}>
-                <Play size={18} color={theme.warning || "#f59e0b"} fill={theme.warning || "#f59e0b"} />
+                <Play size={18} color={theme.secondary} fill={theme.secondary} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.startSessionBannerTitle}>
