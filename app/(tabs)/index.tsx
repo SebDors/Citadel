@@ -53,6 +53,9 @@ import {
 import { StorageService } from "../../src/services/storage";
 
 function getActiveBannerSubtitle(session: WorkoutSession): string {
+  if (session.hasStarted === false) {
+    return "Séance en préparation · 00:00";
+  }
   const blocks = getSessionBlocks(session);
   const circuitBlock = blocks.find(
     (b): b is CircuitBlock => b.type === "circuit",

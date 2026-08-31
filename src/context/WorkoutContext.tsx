@@ -34,6 +34,7 @@ export interface WorkoutContextType {
   loading: boolean;
   activeSession: WorkoutSession | null;
   startWorkout: (template?: WorkoutTemplate) => void;
+  startSessionTimer: () => void;
   finishWorkout: () => Promise<void>;
   cancelWorkout: () => void;
   updateSet: (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => void;
@@ -196,13 +197,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [restTimer.active, restTimer.targetEndTime]);
 
-  // Durée de la séance en cours
+  // Durée de la séance en cours (ne tourne que si la séance est officiellement lancée)
   useEffect(() => {
-    if (!activeSession || activeSession.status !== 'in_progress') return;
+    if (!activeSession || activeSession.status !== 'in_progress' || !activeSession.hasStarted) return;
 
     const interval = setInterval(() => {
       setActiveSession((prev) => {
-        if (!prev) return null;
+        if (!prev || !prev.hasStarted) return prev;
         const start = new Date(prev.startTime).getTime();
         const duration = Math.floor((Date.now() - start) / 1000);
         return { ...prev, durationSeconds: duration };
@@ -210,7 +211,21 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeSession?.status, activeSession?.startTime]);
+  }, [activeSession?.status, activeSession?.startTime, activeSession?.hasStarted]);
+
+  const startSessionTimer = () => {
+    setActiveSession((prev) => {
+      if (!prev) return null;
+      const updated: WorkoutSession = {
+        ...prev,
+        hasStarted: true,
+        startTime: new Date().toISOString(),
+        durationSeconds: 0,
+      };
+      StorageService.saveCurrentWorkout(updated);
+      return updated;
+    });
+  };
 
   const startWorkout = (template?: WorkoutTemplate) => {
     const blocks = template ? getTemplateBlocks(template) : [];
@@ -272,6 +287,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       completedSetsCount: 0,
       totalSetsCount: totalSets,
       status: 'in_progress',
+      hasStarted: template ? true : false,
       isCircuit: template?.isCircuit,
       circuitRounds: template?.circuitRounds || 3,
       currentCircuitRound: 1,
@@ -511,8 +527,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updatedBlocks
     );
 
+    const autoStartTimer = !activeSession.hasStarted && isMarkingCompleted;
+
     const updatedSession: WorkoutSession = {
       ...activeSession,
+      hasStarted: autoStartTimer ? true : activeSession.hasStarted,
+      startTime: autoStartTimer ? new Date().toISOString() : activeSession.startTime,
+      durationSeconds: autoStartTimer ? 0 : activeSession.durationSeconds,
       blocks: updatedBlocks,
       exercises: updatedExercises,
       totalVolumeKg: volume,
@@ -1142,6 +1163,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loading,
         activeSession,
         startWorkout,
+        startSessionTimer,
         finishWorkout,
         cancelWorkout,
         updateSet,

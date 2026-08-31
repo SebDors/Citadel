@@ -162,12 +162,12 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       <View style={styles.statsRow}>
         {/* Timer */}
         <View style={styles.statBox}>
-          <Clock size={14} color={theme.accent} />
-          <Text style={[styles.statValue, { color: theme.text }]}>
+          <Clock size={14} color={session.hasStarted === false ? theme.textMuted : theme.accent} />
+          <Text style={[styles.statValue, { color: session.hasStarted === false ? theme.textMuted : theme.text }]}>
             {formatDuration(session.durationSeconds)}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-            Temps
+          <Text style={[styles.statLabel, { color: session.hasStarted === false ? theme.warning || '#f59e0b' : theme.textMuted }]}>
+            {session.hasStarted === false ? 'Non démarrée' : 'Temps'}
           </Text>
         </View>
 

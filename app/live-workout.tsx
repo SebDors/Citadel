@@ -40,6 +40,7 @@ import {
   Search,
   SkipForward,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Play,
   Clock,
@@ -79,6 +80,7 @@ export default function LiveWorkoutScreen() {
     updateExerciseRestTime,
     setExerciseSupersetGroup,
     startRestTimer,
+    startSessionTimer,
     updateActiveSessionCircuitStates,
     allExercises,
   } = useWorkout();
@@ -556,6 +558,31 @@ export default function LiveWorkoutScreen() {
             onCancel={handleCancel}
             circuitInfo={circuitInfo}
           />
+
+          {/* Bannière "Commencer la séance" si la séance est en préparation (hasStarted = false) */}
+          {activeSession.hasStarted === false && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[
+                styles.startSessionBanner,
+                { backgroundColor: theme.accent },
+              ]}
+              onPress={startSessionTimer}
+            >
+              <View style={styles.startSessionIconCircle}>
+                <Play size={18} color={theme.accent} fill={theme.accent} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.startSessionBannerTitle}>
+                  Commencer la séance
+                </Text>
+                <Text style={styles.startSessionBannerSub}>
+                  Préparez vos exercices puis appuyez pour lancer le chrono
+                </Text>
+              </View>
+              <ChevronRight size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
@@ -1662,6 +1689,38 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     zIndex: 10,
     elevation: 4,
+  },
+  startSessionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  startSessionIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  startSessionBannerTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  startSessionBannerSub: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 2,
   },
   addCircuitExBtnText: {
     fontSize: 13,
