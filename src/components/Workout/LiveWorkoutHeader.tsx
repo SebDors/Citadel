@@ -1,16 +1,8 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
-import {
-  Clock,
-  Dumbbell,
-  CheckCircle,
-  RotateCw,
-  Timer,
-  Pause,
-  Play,
-} from "lucide-react-native";
+import { CheckCircle, RotateCw, Timer } from "lucide-react-native";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -23,56 +15,17 @@ export interface CircuitInfo {
 
 interface LiveWorkoutHeaderProps {
   session: WorkoutSession;
-  onFinish: () => void;
-  onCancel: () => void;
+  onFinish?: () => void;
+  onCancel?: () => void;
   onTogglePause?: () => void;
   circuitInfo?: CircuitInfo;
 }
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
-  onTogglePause,
   circuitInfo,
 }) => {
   const { theme } = useTheme();
-
-  const progressPercent = useMemo(() => {
-    if (circuitInfo?.isCircuit) {
-      if (circuitInfo.isAmrap) {
-        const totalSecs = (circuitInfo.amrapDurationMinutes || 12) * 60;
-        const elapsed = totalSecs - (circuitInfo.amrapSecondsLeft || 0);
-        return Math.min(
-          100,
-          Math.max(0, Math.round((elapsed / totalSecs) * 100)),
-        );
-      }
-      return Math.min(
-        100,
-        Math.max(
-          0,
-          Math.round(
-            (circuitInfo.currentRound / Math.max(1, circuitInfo.totalRounds)) *
-              100,
-          ),
-        ),
-      );
-    }
-    const total = session.totalSetsCount || 1;
-    const completed = session.completedSetsCount || 0;
-    return Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
-  }, [session, circuitInfo]);
-
-  const formatDuration = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-    if (hrs > 0) {
-      return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
-    }
-    return `${pad(mins)}:${pad(secs)}`;
-  };
 
   const formatMinutesSeconds = (totalSeconds: number = 0): string => {
     const m = Math.floor(totalSeconds / 60);
@@ -80,42 +33,48 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const renderThirdStatBox = () => {
+  const renderSetsBadge = () => {
     if (circuitInfo?.isCircuit) {
       if (circuitInfo.isAmrap) {
         return (
-          <View style={styles.statBox}>
-            <Timer size={14} color={theme.accent} />
-            <Text style={[styles.statValue, { color: theme.text }]}>
+          <View
+            style={[
+              styles.setsPillBadge,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+          >
+            <Timer size={13} color={theme.accent} />
+            <Text style={[styles.setsPillText, { color: theme.text }]}>
               {formatMinutesSeconds(circuitInfo.amrapSecondsLeft ?? 0)}
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-              Temps restant
             </Text>
           </View>
         );
       }
       return (
-        <View style={styles.statBox}>
-          <RotateCw size={14} color={theme.accent} />
-          <Text style={[styles.statValue, { color: theme.text }]}>
-            {circuitInfo.currentRound} / {circuitInfo.totalRounds}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-            Tours
+        <View
+          style={[
+            styles.setsPillBadge,
+            { backgroundColor: theme.cardBg, borderColor: theme.border },
+          ]}
+        >
+          <RotateCw size={13} color={theme.accent} />
+          <Text style={[styles.setsPillText, { color: theme.text }]}>
+            {circuitInfo.currentRound}/{circuitInfo.totalRounds} tours
           </Text>
         </View>
       );
     }
 
     return (
-      <View style={styles.statBox}>
-        <CheckCircle size={14} color={theme.accent} />
-        <Text style={[styles.statValue, { color: theme.text }]}>
-          {session.completedSetsCount} / {session.totalSetsCount}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-          Séries
+      <View
+        style={[
+          styles.setsPillBadge,
+          { backgroundColor: theme.cardBg, borderColor: theme.border },
+        ]}
+      >
+        <CheckCircle size={13} color={theme.accent} />
+        <Text style={[styles.setsPillText, { color: theme.text }]}>
+          {session.completedSetsCount || 0}/{session.totalSetsCount || 0} séries
         </Text>
       </View>
     );
@@ -128,7 +87,8 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
         { backgroundColor: theme.surface, borderColor: theme.border },
       ]}
     >
-      <View style={styles.topRow}>
+      <View style={styles.singleRow}>
+        {/* Titre de la séance à Gauche */}
         <View style={styles.titleBox}>
           <Text
             style={[styles.title, { color: theme.text }]}
@@ -139,101 +99,10 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           </Text>
         </View>
 
-        {/* Badge de Progression % dynamique dans le coin supérieur droit */}
-        <View
-          style={[
-            styles.progressBadge,
-            { backgroundColor: theme.cardBg, borderColor: theme.border },
-          ]}
-        >
-          <Text style={[styles.progressPercentText, { color: theme.accent }]}>
-            {progressPercent}%
-          </Text>
-          <View style={[styles.miniTrack, { backgroundColor: theme.border }]}>
-            <View
-              style={[
-                styles.miniFill,
-                {
-                  backgroundColor: theme.accent,
-                  width: `${progressPercent}%`,
-                },
-              ]}
-            />
-          </View>
+        {/* Badge pilule des séries avec mention 'séries' à Droite */}
+        <View style={styles.rightGroup}>
+          {renderSetsBadge()}
         </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        {/* Timer Cliquable */}
-        <TouchableOpacity
-          activeOpacity={session.hasStarted !== false ? 0.7 : 1}
-          onPress={() => {
-            if (session.hasStarted !== false && onTogglePause) {
-              onTogglePause();
-            }
-          }}
-          style={styles.statBox}
-        >
-          <Clock
-            size={14}
-            color={
-              session.hasStarted === false
-                ? theme.textMuted
-                : session.isPaused
-                ? theme.secondary
-                : theme.accent
-            }
-          />
-          <Text
-            style={[
-              styles.statValue,
-              {
-                color:
-                  session.hasStarted === false
-                    ? theme.textMuted
-                    : session.isPaused
-                    ? theme.secondary
-                    : theme.text,
-              },
-            ]}
-          >
-            {formatDuration(session.durationSeconds)}
-          </Text>
-          <Text
-            style={[
-              styles.statLabel,
-              {
-                color:
-                  session.hasStarted === false
-                    ? theme.secondary
-                    : session.isPaused
-                    ? theme.secondary
-                    : theme.textMuted,
-                fontWeight: session.isPaused ? "800" : "600",
-              },
-            ]}
-          >
-            {session.hasStarted === false
-              ? "Non démarrée"
-              : session.isPaused
-              ? "En pause"
-              : "Temps"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Volume */}
-        <View style={styles.statBox}>
-          <Dumbbell size={14} color={theme.secondary} />
-          <Text style={[styles.statValue, { color: theme.text }]}>
-            {session.totalVolumeKg} kg
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-            Volume
-          </Text>
-        </View>
-
-        {/* 3ème stat: Tours / Temps restant / Séries */}
-        {renderThirdStatBox()}
       </View>
     </View>
   );
@@ -241,67 +110,46 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
     marginBottom: 0,
+    elevation: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
-  topRow: {
+  singleRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    justifyContent: "space-between",
   },
   titleBox: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 17,
+    fontWeight: "900",
+    textAlign: "left",
   },
-  progressBadge: {
+  rightGroup: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  setsPillBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    alignItems: "center",
-    minWidth: 54,
   },
-  progressPercentText: {
-    fontSize: 11,
-    fontWeight: "900",
-    marginBottom: 2,
-  },
-  miniTrack: {
-    width: 44,
-    height: 3,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  miniFill: {
-    height: "100%",
-    borderRadius: 2,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
-  },
-  statBox: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statValue: {
-    fontSize: 13,
+  setsPillText: {
+    fontSize: 11.5,
     fontWeight: "800",
-    marginTop: 1,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: "600",
   },
 });

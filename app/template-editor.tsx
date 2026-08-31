@@ -803,7 +803,7 @@ export default function TemplateEditorScreen() {
 
         {/* LISTE SÉQUENTIELLE DES BLOCS */}
         {selectedBlocks.map((block, blockIdx) => {
-          // --- CASE 1: CARTE CONTENEUR CIRCUIT (STYLE VIOLET EPILOG) ---
+          // --- CASE 1: CARTE CONTENEUR CIRCUIT ---
           if (block.type === 'circuit') {
             return (
               <View
@@ -1219,7 +1219,7 @@ export default function TemplateEditorScreen() {
           );
         })}
 
-        {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE (FIDÈLE À EPILOG) */}
+        {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE */}
         <View style={styles.twinButtonsRow}>
           {/* [Exercice] (Contour vert/accent pointillé) */}
           <TouchableOpacity
@@ -1815,7 +1815,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // --- CARTE CONTENEUR CIRCUIT (STYLE VIOLET EPILOG) ---
+  // --- CARTE CONTENEUR CIRCUIT ---
   circuitContainer: {
     borderRadius: 16,
     borderWidth: 1.5,

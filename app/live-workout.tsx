@@ -43,6 +43,7 @@ import {
   ChevronRight,
   ChevronUp,
   Play,
+  Pause,
   Clock,
   X,
 } from "lucide-react-native";
@@ -51,6 +52,18 @@ const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+const formatDuration = (seconds: number = 0): string => {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  if (hrs > 0) {
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  }
+  return `${pad(mins)}:${pad(secs)}`;
 };
 
 interface CircuitState {
@@ -82,6 +95,7 @@ export default function LiveWorkoutScreen() {
     updateExerciseRestTime,
     setExerciseSupersetGroup,
     startRestTimer,
+    restTimer,
     startSessionTimer,
     togglePauseWorkoutSession,
     updateActiveSessionCircuitStates,
@@ -249,10 +263,14 @@ export default function LiveWorkoutScreen() {
     if (!q) {
       const selected = allExercises
         .filter((ex) => selectedExerciseIds.has(ex.id))
-        .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "fr", { sensitivity: "base" }),
+        );
       const unselected = allExercises
         .filter((ex) => !selectedExerciseIds.has(ex.id))
-        .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "fr", { sensitivity: "base" }),
+        );
       return [...selected, ...unselected];
     }
     return allExercises
@@ -263,7 +281,9 @@ export default function LiveWorkoutScreen() {
           normalizeString(ex.category).includes(q) ||
           ex.targetMuscles.some((m) => normalizeString(m).includes(q)),
       )
-      .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, "fr", { sensitivity: "base" }),
+      );
   }, [allExercises, searchQuery, selectedExerciseIds]);
 
   const circuitInfo = useMemo(() => {
@@ -599,11 +619,15 @@ export default function LiveWorkoutScreen() {
               onPress={togglePauseWorkoutSession}
             >
               <View style={styles.startSessionIconCircle}>
-                <Play size={18} color={theme.secondary} fill={theme.secondary} />
+                <Play
+                  size={18}
+                  color={theme.secondary}
+                  fill={theme.secondary}
+                />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.startSessionBannerTitle}>
-                  Séance en pause ⏸
+                  Séance en pause
                 </Text>
                 <Text style={styles.startSessionBannerSub}>
                   Le chrono est figé. Appuyez pour reprendre l'entraînement !
@@ -660,18 +684,18 @@ export default function LiveWorkoutScreen() {
                   { backgroundColor: theme.cardBg, borderColor: theme.border },
                 ]}
               >
-                {/* En-tête Moteur Violet avec Badge C */}
-                <View style={styles.epilogHeaderRow}>
+                {/* En-tête Circuit avec Badge C */}
+                <View style={styles.circuitHeaderRow}>
                   <View
                     style={[
-                      styles.epilogBadge,
+                      styles.circuitBadge,
                       { backgroundColor: theme.accent },
                     ]}
                   >
-                    <Text style={styles.epilogBadgeText}>C</Text>
+                    <Text style={styles.circuitBadgeText}>C</Text>
                   </View>
                   <View style={{ marginLeft: 8 }}>
-                    <Text style={[styles.epilogTag, { color: theme.accent }]}>
+                    <Text style={[styles.circuitTag, { color: theme.accent }]}>
                       CIRCUIT
                     </Text>
                   </View>
@@ -1256,7 +1280,10 @@ export default function LiveWorkoutScreen() {
                     ? "Ajouter au circuit"
                     : "Sélectionner un exercice"}
                 </Text>
-                <TouchableOpacity onPress={handleCloseModal} style={{ padding: 4 }}>
+                <TouchableOpacity
+                  onPress={handleCloseModal}
+                  style={{ padding: 4 }}
+                >
                   <X size={20} color={theme.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -1265,7 +1292,11 @@ export default function LiveWorkoutScreen() {
               <View
                 style={[
                   styles.searchBarBox,
-                  { backgroundColor: theme.surface, borderColor: theme.border, marginTop: 8 },
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    marginTop: 8,
+                  },
                 ]}
               >
                 <Search
@@ -1283,9 +1314,14 @@ export default function LiveWorkoutScreen() {
                 />
               </View>
 
-              <ScrollView style={{ maxHeight: 270 }} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                style={{ maxHeight: 270 }}
+                keyboardShouldPersistTaps="handled"
+              >
                 {filteredDatabase.length === 0 ? (
-                  <Text style={[styles.noResultText, { color: theme.textMuted }]}>
+                  <Text
+                    style={[styles.noResultText, { color: theme.textMuted }]}
+                  >
                     Aucun exercice trouvé
                   </Text>
                 ) : (
@@ -1307,13 +1343,19 @@ export default function LiveWorkoutScreen() {
                             style={[
                               styles.dbExName,
                               { color: theme.text },
-                              isSelected && { fontWeight: "900", color: theme.accent },
+                              isSelected && {
+                                fontWeight: "900",
+                                color: theme.accent,
+                              },
                             ]}
                           >
                             {ex.name}
                           </Text>
                           <Text
-                            style={[styles.dbExMuscle, { color: theme.textMuted }]}
+                            style={[
+                              styles.dbExMuscle,
+                              { color: theme.textMuted },
+                            ]}
                           >
                             {ex.primaryMuscle} • {ex.category}
                           </Text>
@@ -1323,12 +1365,18 @@ export default function LiveWorkoutScreen() {
                           style={[
                             styles.checkboxBox,
                             {
-                              borderColor: isSelected ? theme.accent : theme.border,
-                              backgroundColor: isSelected ? theme.accent : "transparent",
+                              borderColor: isSelected
+                                ? theme.accent
+                                : theme.border,
+                              backgroundColor: isSelected
+                                ? theme.accent
+                                : "transparent",
                             },
                           ]}
                         >
-                          {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                          {isSelected && (
+                            <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                          )}
                         </View>
                       </TouchableOpacity>
                     );
@@ -1370,6 +1418,110 @@ export default function LiveWorkoutScreen() {
         }}
       />
 
+      {/* 3. Card Sticky Bottom Timer Bar */}
+      <View
+        style={[
+          styles.bottomTimerBar,
+          {
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+            bottom: restTimer.active ? 78 : 22,
+          },
+        ]}
+      >
+        {/* Gauche : Icône Horloge + Timer (mm:ss ou hh:mm:ss) */}
+        <TouchableOpacity
+          activeOpacity={activeSession.hasStarted !== false ? 0.7 : 1}
+          onPress={() => {
+            if (activeSession.hasStarted !== false) {
+              togglePauseWorkoutSession();
+            }
+          }}
+          style={styles.bottomTimerLeftRow}
+        >
+          <Clock
+            size={18}
+            color={
+              activeSession.hasStarted === false
+                ? theme.textMuted
+                : activeSession.isPaused
+                  ? theme.secondary
+                  : theme.accent
+            }
+          />
+          <View style={{ marginLeft: 9 }}>
+            <Text
+              style={[
+                styles.bottomTimerValueText,
+                {
+                  color:
+                    activeSession.hasStarted === false
+                      ? theme.textMuted
+                      : activeSession.isPaused
+                        ? theme.secondary
+                        : theme.text,
+                },
+              ]}
+            >
+              {formatDuration(activeSession.durationSeconds)}
+            </Text>
+            <Text
+              style={[
+                styles.bottomTimerLabelText,
+                {
+                  color:
+                    activeSession.hasStarted === false
+                      ? theme.textMuted
+                      : activeSession.isPaused
+                        ? theme.secondary
+                        : theme.textMuted,
+                  fontWeight: activeSession.isPaused ? "800" : "600",
+                },
+              ]}
+            >
+              {activeSession.hasStarted === false
+                ? "Séance non démarrée"
+                : activeSession.isPaused
+                  ? "En pause"
+                  : "Temps écoulé"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Droite : Bouton Logo Pause / Reprendre (Bouton circulaire sans texte) */}
+        {activeSession.hasStarted !== false ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[
+              styles.bottomPauseCircleBtn,
+              {
+                backgroundColor: activeSession.isPaused
+                  ? theme.secondary
+                  : theme.accent,
+              },
+            ]}
+            onPress={togglePauseWorkoutSession}
+          >
+            {activeSession.isPaused ? (
+              <Play size={17} color="#FFFFFF" fill="#FFFFFF" />
+            ) : (
+              <Pause size={17} color="#FFFFFF" fill="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[
+              styles.bottomPauseCircleBtn,
+              { backgroundColor: theme.accent },
+            ]}
+            onPress={startSessionTimer}
+          >
+            <Play size={17} color="#FFFFFF" fill="#FFFFFF" />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* Floating Rest Timer Bar */}
       <RestTimerBar />
     </SafeAreaView>
@@ -1404,7 +1556,47 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 14,
     paddingTop: 0,
-    paddingBottom: 100,
+    paddingBottom: 130,
+  },
+  bottomTimerBar: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    elevation: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    zIndex: 90,
+  },
+  bottomTimerLeftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  bottomTimerValueText: {
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  bottomTimerLabelText: {
+    fontSize: 9.5,
+    fontWeight: "600",
+  },
+  bottomPauseCircleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 10,
   },
   emptyContainer: {
     flex: 1,
@@ -1423,24 +1615,24 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginBottom: 16,
   },
-  epilogHeaderRow: {
+  circuitHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 8,
   },
-  epilogBadge: {
+  circuitBadge: {
     width: 24,
     height: 24,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  epilogBadgeText: {
+  circuitBadgeText: {
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "900",
   },
-  epilogTag: {
+  circuitTag: {
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
@@ -1716,6 +1908,7 @@ const styles = StyleSheet.create({
   stickyHeaderWrapper: {
     paddingTop: 10,
     paddingBottom: 8,
+    marginHorizontal: 10,
     zIndex: 10,
     elevation: 4,
   },

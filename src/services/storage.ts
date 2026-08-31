@@ -3,8 +3,10 @@ import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, Worko
 import { INITIAL_MOCK_DATA } from './mockData';
 import { SharedExercise } from '../constants/exerciseDatabase';
 
-const STORAGE_KEY = '@warriorfit_app_data_v1';
-const COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
+const STORAGE_KEY = '@citadel_app_data_v1';
+const LEGACY_STORAGE_KEY = '@warriorfit_app_data_v1';
+const COLLAPSED_CARDS_KEY = '@citadel_collapsed_cards_v1';
+const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
 
 export const StorageService = {
   /**
@@ -13,7 +15,12 @@ export const StorageService = {
    */
   async loadData(): Promise<FitTrackerData> {
     try {
-      const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+      let jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+      if (jsonValue === null) {
+        // Fallback pour migrer les données préexistantes de l'ancienne clé warriorfit
+        jsonValue = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+      }
+
       if (jsonValue !== null) {
         const parsed = JSON.parse(jsonValue) as FitTrackerData;
         if (!parsed.folders) {
