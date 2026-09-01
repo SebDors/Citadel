@@ -11,6 +11,7 @@ import {
   StatusBar as RNStatusBar,
   Alert,
   KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../src/context/ThemeContext';
@@ -51,6 +52,7 @@ import {
   ChevronUp,
   ChevronDown,
   Repeat,
+  Sparkles,
 } from 'lucide-react-native';
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
@@ -96,6 +98,30 @@ export default function TemplateEditorScreen() {
     blockId: string;
     exIdx?: number;
   } | null>(null);
+
+  // Animation de surbrillance guidée
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [data?.hasCompletedOnboarding, data?.hasCreatedFirstSession]);
 
   // Charger le template existant si édition
   useEffect(() => {
@@ -754,8 +780,12 @@ export default function TemplateEditorScreen() {
           style={[
             styles.input,
             { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface },
+            data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && !title.trim() && {
+              borderColor: theme.accent,
+              borderWidth: 2.5,
+            },
           ]}
-          placeholder="ex: Upper B, Push, Legs..."
+          placeholder="ex: Ma Séance FullBody..."
           placeholderTextColor={theme.textMuted}
           value={title}
           onChangeText={setTitle}
@@ -1223,7 +1253,14 @@ export default function TemplateEditorScreen() {
         })}
 
         {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE */}
-        <View style={styles.twinButtonsRow}>
+        <Animated.View
+          style={[
+            styles.twinButtonsRow,
+            data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && title.trim() && selectedBlocks.length === 0 && {
+              transform: [{ scale: pulseAnim }],
+            },
+          ]}
+        >
           {/* [Exercice] (Contour vert/accent pointillé) */}
           <TouchableOpacity
             style={[
@@ -1231,6 +1268,9 @@ export default function TemplateEditorScreen() {
               {
                 borderColor: theme.accent,
                 backgroundColor: isDark ? 'rgba(156, 176, 128, 0.08)' : 'rgba(235, 125, 0, 0.08)',
+              },
+              data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && title.trim() && selectedBlocks.length === 0 && {
+                borderWidth: 2.5,
               },
             ]}
             onPress={() => {
@@ -1257,7 +1297,26 @@ export default function TemplateEditorScreen() {
             <Zap size={16} color={theme.accent} style={{ marginRight: 6 }} />
             <Text style={[styles.twinBtnText, { color: theme.accent }]}>Circuit</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
+
+        {/* Card Flottante d'Onboarding Pas-à-Pas pendant la Création de Séance */}
+        {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
+          <View style={[styles.floatingOnboardingCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+            <View style={styles.floatingOnboardingHeader}>
+              <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.floatingOnboardingTitle, { color: theme.accent }]}>
+                💡 Tutoriel de création de séance
+              </Text>
+            </View>
+            <Text style={[styles.floatingOnboardingText, { color: theme.text }]}>
+              {!title.trim()
+                ? "1. Entrez le nom de votre programme dans le champ 'Nom du programme' ci-dessus (mis en surbrillance)."
+                : selectedBlocks.length === 0
+                ? "2. Cliquez sur le bouton '+ Exercice' ci-dessous pour choisir les exercices de votre séance."
+                : "3. Prenez ceux que vous voulez, modifiez le temps de repos ou les séries si besoin, puis cliquez sur 'Enregistrer' !"}
+            </Text>
+          </View>
+        )}
 
         {/* Bouton Enregistrer */}
         <Button
@@ -1265,7 +1324,7 @@ export default function TemplateEditorScreen() {
           variant="primary"
           onPress={handleSave}
           disabled={isSaveDisabled}
-          style={{ marginTop: 24, marginBottom: 40 }}
+          style={{ marginTop: 18, marginBottom: 40 }}
         />
       </ScrollView>
 
@@ -2262,5 +2321,26 @@ const styles = StyleSheet.create({
   },
   dbItemMuscle: {
     fontSize: 11,
+  },
+  floatingOnboardingCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  floatingOnboardingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  floatingOnboardingTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  floatingOnboardingText: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
   },
 });
