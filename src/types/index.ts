@@ -150,6 +150,8 @@ export interface FitTrackerData {
   customExercises?: SharedExercise[];
   deletedExerciseIds?: string[];
   currentWorkout?: WorkoutSession | null;
+  hasCompletedOnboarding?: boolean;
+  hasCreatedFirstSession?: boolean;
 }
 
 /**

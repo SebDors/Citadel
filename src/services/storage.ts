@@ -435,5 +435,50 @@ export const StorageService = {
     await this.saveData(INITIAL_MOCK_DATA);
     return INITIAL_MOCK_DATA;
   },
+
+  async completeOnboarding(profileData?: { name?: string; currentWeightKg?: number }): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCompletedOnboarding: true,
+      profile: {
+        ...currentData.profile,
+        name: profileData?.name?.trim() || currentData.profile.name || 'Athlète',
+        currentWeightKg: profileData?.currentWeightKg || currentData.profile.currentWeightKg || 0,
+      },
+    };
+    if (profileData?.currentWeightKg && profileData.currentWeightKg > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const newM: BodyMeasurement = {
+        id: `m_onboarding_${Date.now()}`,
+        date: today,
+        weightKg: profileData.currentWeightKg,
+      };
+      updatedData.measurements = [newM, ...(updatedData.measurements || [])];
+    }
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  async markFirstSessionCreated(): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCreatedFirstSession: true,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  async resetOnboarding(): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCompletedOnboarding: false,
+      hasCreatedFirstSession: false,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
 };
 

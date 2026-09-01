@@ -38,8 +38,10 @@ import {
   FolderInput,
   BookOpen,
   Dumbbell,
+  Sparkles,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
+import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
 import {
   WorkoutSession,
   WorkoutTemplate,
@@ -115,6 +117,7 @@ export default function WorkoutTab() {
     deleteFolder,
     toggleFolderCollapse,
     moveTemplateToFolder,
+    completeOnboarding,
     allExercises,
   } = useWorkout();
   const { theme } = useTheme();
@@ -443,6 +446,52 @@ export default function WorkoutTab() {
           </View>
         )}
 
+        {/* Bannière de Guidage Étape 1/2 : Création première séance */}
+        {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
+          <View
+            style={[
+              styles.guidedBanner,
+              { backgroundColor: theme.cardBg, borderColor: theme.accent },
+            ]}
+          >
+            <View style={styles.guidedBannerHeader}>
+              <View style={[styles.guidedStepBadge, { backgroundColor: theme.accent }]}>
+                <Sparkles size={13} color="#FFFFFF" />
+                <Text style={styles.guidedStepText}>Étape 1/2 : Créez votre première séance test !</Text>
+              </View>
+            </View>
+            <Text style={[styles.guidedBannerTitle, { color: theme.text }]}>
+              Construisez votre premier programme
+            </Text>
+            <Text style={[styles.guidedBannerSub, { color: theme.textMuted }]}>
+              Cliquez sur le bouton lumineux <Text style={{ fontWeight: '800', color: theme.text }}>"+ Séance"</Text> ci-dessous pour ajouter vos premiers exercices.
+            </Text>
+          </View>
+        )}
+
+        {/* Bannière de Guidage Étape 2/2 : Lancement de la première séance */}
+        {data?.hasCompletedOnboarding && data?.hasCreatedFirstSession && (data?.history || []).length === 0 && !activeSession && (
+          <View
+            style={[
+              styles.guidedBanner,
+              { backgroundColor: theme.cardBg, borderColor: theme.primary },
+            ]}
+          >
+            <View style={styles.guidedBannerHeader}>
+              <View style={[styles.guidedStepBadge, { backgroundColor: theme.primary }]}>
+                <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+                <Text style={styles.guidedStepText}>Étape 2/2 : Lancez votre Entraînement !</Text>
+              </View>
+            </View>
+            <Text style={[styles.guidedBannerTitle, { color: theme.text }]}>
+              Votre séance test est prête !
+            </Text>
+            <Text style={[styles.guidedBannerSub, { color: theme.textMuted }]}>
+              Cliquez sur le bouton <Text style={{ fontWeight: '800', color: theme.primary }}>"Démarrer"</Text> sur la carte de votre séance pour votre premier test en direct.
+            </Text>
+          </View>
+        )}
+
         {/* Top Action Buttons (Side by Side) */}
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
@@ -464,6 +513,10 @@ export default function WorkoutTab() {
             style={[
               styles.createActionBox,
               { backgroundColor: theme.surface, borderColor: theme.border },
+              data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && {
+                borderColor: theme.accent,
+                borderWidth: 2,
+              },
             ]}
             onPress={() => router.push("/template-editor")}
           >
@@ -1111,6 +1164,12 @@ export default function WorkoutTab() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* ---------------- MODALE DE PREMIÈRE UTILISATION (ONBOARDING) ---------------- */}
+      <OnboardingModal
+        visible={!data?.hasCompletedOnboarding}
+        onComplete={completeOnboarding}
+      />
     </SafeAreaView>
   );
 }
@@ -1474,5 +1533,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
+  },
+  guidedBanner: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 12,
+  },
+  guidedBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  guidedStepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  guidedStepText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  guidedBannerTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  guidedBannerSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 17,
   },
 });

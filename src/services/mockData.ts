@@ -14,4 +14,6 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
   customExercises: [],
   deletedExerciseIds: [],
   currentWorkout: null,
+  hasCompletedOnboarding: false,
+  hasCreatedFirstSession: false,
 };

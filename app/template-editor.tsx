@@ -62,7 +62,7 @@ const formatMinutesSeconds = (totalSeconds: number): string => {
 export default function TemplateEditorScreen() {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
-  const { data, saveTemplate, allExercises } = useWorkout();
+  const { data, saveTemplate, markFirstSessionCreated, allExercises } = useWorkout();
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -688,6 +688,9 @@ export default function TemplateEditorScreen() {
     };
 
     await saveTemplate(newTemplate);
+    if (markFirstSessionCreated) {
+      await markFirstSessionCreated();
+    }
     router.back();
   };
 
