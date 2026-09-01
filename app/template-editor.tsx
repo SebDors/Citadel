@@ -54,7 +54,11 @@ import {
   ChevronDown,
   Repeat,
   Sparkles,
+  ArrowUpDown,
+  ChevronsUp,
+  ChevronsDown,
 } from 'lucide-react-native';
+import { ReorderBlocksModal } from '../src/components/Workout/ReorderBlocksModal';
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -100,6 +104,9 @@ export default function TemplateEditorScreen() {
     blockId: string;
     exIdx?: number;
   } | null>(null);
+
+  // Modale de réorganisation
+  const [showReorderModal, setShowReorderModal] = useState(false);
 
   // Animation de surbrillance guidée
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -443,17 +450,22 @@ export default function TemplateEditorScreen() {
   // --- ACTIONS DU MENU D'OPTIONS (...) ---
 
   // Monter / Descendre un bloc dans selectedBlocks
-  const handleMoveBlock = (blockId: string, direction: 'up' | 'down') => {
+  const handleMoveBlock = (blockId: string, direction: 'up' | 'down' | 'top' | 'bottom') => {
     const blockIdx = selectedBlocks.findIndex((b) => b.id === blockId);
     if (blockIdx < 0) return;
-    const newIndex = direction === 'up' ? blockIdx - 1 : blockIdx + 1;
-    if (newIndex < 0 || newIndex >= selectedBlocks.length) return;
+    
+    let newIndex = blockIdx;
+    if (direction === 'up') newIndex = blockIdx - 1;
+    else if (direction === 'down') newIndex = blockIdx + 1;
+    else if (direction === 'top') newIndex = 0;
+    else if (direction === 'bottom') newIndex = selectedBlocks.length - 1;
+
+    if (newIndex < 0 || newIndex >= selectedBlocks.length || newIndex === blockIdx) return;
 
     setSelectedBlocks((prev) => {
       const updated = [...prev];
-      const temp = updated[blockIdx];
-      updated[blockIdx] = updated[newIndex];
-      updated[newIndex] = temp;
+      const [movedBlock] = updated.splice(blockIdx, 1);
+      updated.splice(newIndex, 0, movedBlock);
       return updated;
     });
     setActiveBlockOptions(null);
@@ -812,7 +824,11 @@ export default function TemplateEditorScreen() {
         <Text style={[styles.topBarTitle, { color: theme.text }]}>
           {templateIdParam ? 'Modifier la séance' : 'Créer une séance'}
         </Text>
-        <View style={{ width: 60 }} />
+        <View style={{ flexDirection: 'row', width: 60, justifyContent: 'flex-end' }}>
+          <TouchableOpacity onPress={() => setShowReorderModal(true)} style={{ padding: 4 }}>
+            <ArrowUpDown size={20} color={theme.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -1407,6 +1423,22 @@ export default function TemplateEditorScreen() {
 
                 <TouchableOpacity
                   style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'top')}
+                >
+                  <ChevronsUp size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en haut</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'bottom')}
+                >
+                  <ChevronsDown size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en bas</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
                   onPress={() => handleDuplicateCircuitBlock(activeBlockOptions.blockId)}
                 >
                   <Copy size={16} color={theme.text} style={{ marginRight: 8 }} />
@@ -1513,6 +1545,22 @@ export default function TemplateEditorScreen() {
                 >
                   <ArrowDown size={16} color={theme.text} style={{ marginRight: 8 }} />
                   <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre l'exercice</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'top')}
+                >
+                  <ChevronsUp size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en haut</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'bottom')}
+                >
+                  <ChevronsDown size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en bas</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1808,6 +1856,13 @@ export default function TemplateEditorScreen() {
         onSuccess={(created) => {
           setSelectedExerciseIds((prev) => new Set(prev).add(created.id));
         }}
+      />
+
+      <ReorderBlocksModal
+        visible={showReorderModal}
+        onClose={() => setShowReorderModal(false)}
+        blocks={selectedBlocks}
+        onReorder={setSelectedBlocks}
       />
     </View>
   );

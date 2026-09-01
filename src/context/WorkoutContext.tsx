@@ -44,6 +44,7 @@ export interface WorkoutContextType {
   removeSet: (exerciseId: string, setId: string) => void;
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number) => void;
   addBatchExercisesToActiveWorkout: (items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
+  reorderActiveSessionBlocks: (newBlocks: WorkoutBlock[]) => void;
   addCircuitToActiveWorkout: () => void;
   removeExercise: (exerciseId: string) => void;
   duplicateExercise: (exerciseId: string) => void;
@@ -813,6 +814,28 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ]);
   };
 
+  const reorderActiveSessionBlocks = (newBlocks: WorkoutBlock[]) => {
+    if (!activeSession) return;
+
+    let totalSets = 0;
+    newBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        totalSets += b.exercise.sets.length;
+      } else if (b.type === 'circuit') {
+        totalSets += (b.rounds || 3) * b.exercises.length;
+      }
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: newBlocks,
+      totalSetsCount: totalSets,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
   const addCircuitToActiveWorkout = () => {
     if (!activeSession) return;
 
@@ -1319,6 +1342,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         removeSet,
         addExerciseToActiveWorkout,
         addBatchExercisesToActiveWorkout,
+        reorderActiveSessionBlocks,
         addCircuitToActiveWorkout,
         removeExercise,
         duplicateExercise,

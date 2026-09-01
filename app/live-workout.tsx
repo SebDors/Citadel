@@ -50,7 +50,9 @@ import {
   Zap,
   Sparkles,
   Trophy,
+  ArrowUpDown,
 } from "lucide-react-native";
+import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -113,6 +115,7 @@ export default function LiveWorkoutScreen() {
 
   const [showAddExModal, setShowAddExModal] = useState(false);
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
+  const [showReorderModal, setShowReorderModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
@@ -121,6 +124,8 @@ export default function LiveWorkoutScreen() {
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(
     new Set(),
   );
+  
+  const { reorderActiveSessionBlocks } = useWorkout();
 
   const isInitialMount = useRef(true);
 
@@ -626,7 +631,11 @@ export default function LiveWorkoutScreen() {
         <Text style={[styles.topBarTitle, { color: theme.text }]}>
           Workout Tracker
         </Text>
-        <View style={{ width: 60 }} />
+        <View style={{ flexDirection: 'row', width: 60, justifyContent: 'flex-end' }}>
+          <TouchableOpacity onPress={() => setShowReorderModal(true)} style={{ padding: 4 }}>
+            <ArrowUpDown size={20} color={theme.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -1671,6 +1680,13 @@ export default function LiveWorkoutScreen() {
           </View>
         </View>
       </Modal>
+
+      <ReorderBlocksModal
+        visible={showReorderModal}
+        onClose={() => setShowReorderModal(false)}
+        blocks={blocks}
+        onReorder={reorderActiveSessionBlocks}
+      />
     </SafeAreaView>
   );
 }
