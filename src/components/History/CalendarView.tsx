@@ -13,6 +13,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
+import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +23,7 @@ import {
   Dumbbell,
   Layers,
   RotateCw,
+  BookmarkPlus,
 } from 'lucide-react-native';
 
 interface CalendarViewProps {
@@ -46,6 +48,7 @@ const MONTHS_NAMES = [
 export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const { theme } = useTheme();
   const { deleteWorkoutSession } = useWorkout();
+  const router = useRouter();
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
@@ -314,15 +317,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                             </Text>
                           ) : null}
                         </View>
-
-                        <TouchableOpacity
-                          style={[styles.deleteIconButton, { backgroundColor: theme.cardBg }]}
-                          onPress={() => handleDeleteSession(session.id)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityLabel="Supprimer la séance"
-                        >
-                          <Trash2 size={18} color={theme.danger} />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                            onPress={() => {
+                              setModalVisible(false);
+                              router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } });
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Enregistrer comme modèle"
+                          >
+                            <BookmarkPlus size={18} color={theme.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg }]}
+                            onPress={() => handleDeleteSession(session.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Supprimer la séance"
+                          >
+                            <Trash2 size={18} color={theme.danger} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   );
@@ -508,7 +523,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  deleteIconButton: {
+  actionIconButton: {
     padding: 10,
     borderRadius: 10,
   },

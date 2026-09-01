@@ -31,6 +31,7 @@ import {
   CircuitBlock,
   CircuitExerciseItem,
   getTemplateBlocks,
+  getSessionBlocks,
   calculateEstimatedWorkoutMinutes,
 } from '../src/types';
 import {
@@ -69,6 +70,7 @@ export default function TemplateEditorScreen() {
   const params = useLocalSearchParams();
 
   const templateIdParam = params.id as string | undefined;
+  const fromSessionIdParam = params.fromSessionId as string | undefined;
 
   const [title, setTitle] = useState('');
   const [defaultRestSeconds, setDefaultRestSeconds] = useState<number>(75);
@@ -123,7 +125,7 @@ export default function TemplateEditorScreen() {
     }
   }, [data?.hasCompletedOnboarding, data?.hasCreatedFirstSession]);
 
-  // Charger le template existant si édition
+  // Charger le template existant si édition ou depuis une séance passée
   useEffect(() => {
     if (templateIdParam && data?.templates) {
       const existing = data.templates.find((t) => t.id === templateIdParam);
@@ -133,8 +135,48 @@ export default function TemplateEditorScreen() {
         const blocks = getTemplateBlocks(existing);
         setSelectedBlocks(JSON.parse(JSON.stringify(blocks)));
       }
+    } else if (fromSessionIdParam && data?.history) {
+      const pastSession = data.history.find((s) => s.id === fromSessionIdParam);
+      if (pastSession) {
+        setTitle(pastSession.title === "Entraînement libre" ? "Mon Programme Libre" : pastSession.title);
+        // On récupère `getSessionBlocks` depuis types. On l'a déjà importé indirectement via getTemplateBlocks ? Wait.
+        // Wait, getSessionBlocks is imported but maybe not in this file. Ah, getTemplateBlocks is imported. I will need to import getSessionBlocks if it isn't. Let's check imports.
+        // I will add the getSessionBlocks import in a separate replace_file_content if needed.
+        // In my current file view, getSessionBlocks is imported? I can check line 33. Yes, getSessionBlocks is already in the imported list from '../src/types'.
+        const pastBlocks = getSessionBlocks(pastSession);
+        
+        // Dupliquer proprement ces blocs
+        const newBlocks = pastBlocks.map(block => {
+          if (block.type === 'single') {
+            return {
+              ...block,
+              id: `blk_single_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              exercise: {
+                ...block.exercise,
+                id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                sets: block.exercise.sets.map(set => ({
+                  ...set,
+                  id: `s_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                  completed: false,
+                })),
+              },
+            };
+          } else if (block.type === 'circuit') {
+            return {
+              ...block,
+              id: `blk_circuit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              exercises: block.exercises.map(ex => ({
+                ...ex,
+                id: `circ_ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              })),
+            };
+          }
+          return block;
+        });
+        setSelectedBlocks(newBlocks as WorkoutBlock[]);
+      }
     }
-  }, [templateIdParam, data?.templates]);
+  }, [templateIdParam, fromSessionIdParam, data?.templates, data?.history]);
 
   // Durée estimée de la séance
   const estimatedMinutes = calculateEstimatedWorkoutMinutes(selectedBlocks);

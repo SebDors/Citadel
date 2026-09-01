@@ -6,7 +6,8 @@ import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
-import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw, BookmarkPlus } from 'lucide-react-native';
 
 interface ActivitySummaryCardProps {
   session?: WorkoutSession;
@@ -22,6 +23,7 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   const { theme } = useTheme();
   const { deleteWorkoutSession } = useWorkout();
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleDelete = (sessionId: string) => {
     setSessionToDelete(sessionId);
@@ -81,15 +83,24 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
               {formattedDate}
             </Text>
           </View>
-
-          <TouchableOpacity
-            style={[styles.deleteBtn, { backgroundColor: theme.surface }]}
-            onPress={() => handleDelete(session.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Supprimer la séance"
-          >
-            <Trash2 size={16} color={theme.danger} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface, marginRight: 8 }]}
+              onPress={() => router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } })}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Enregistrer comme modèle"
+            >
+              <BookmarkPlus size={16} color={theme.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface }]}
+              onPress={() => handleDelete(session.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Supprimer la séance"
+            >
+              <Trash2 size={16} color={theme.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Métriques clés sur une ligne compacte */}
@@ -276,7 +287,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
     textTransform: 'capitalize',
   },
-  deleteBtn: {
+  actionBtn: {
     padding: 8,
     borderRadius: 8,
     alignItems: 'center',
