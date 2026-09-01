@@ -134,7 +134,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       targetEndTime: targetEnd,
       secondsRemaining: seconds,
     });
-    NotificationService.scheduleTimerExpirationNotification(seconds, exerciseName);
+    NotificationService.scheduleTimerExpirationNotification(seconds, exerciseName, nextSetInfo);
   };
 
   const dismissRestTimer = () => {
@@ -156,7 +156,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         targetEndTime: newTarget,
         secondsRemaining: newRemaining,
       }));
-      NotificationService.scheduleTimerExpirationNotification(newRemaining, restTimer.exerciseName);
+      NotificationService.scheduleTimerExpirationNotification(newRemaining, restTimer.exerciseName, restTimer.nextSetInfo);
     }
   };
 
@@ -226,9 +226,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         const remainingSec = Math.ceil(remainingMs / 1000);
         setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
-        if (nextAppState === 'background' || nextAppState === 'inactive') {
-          NotificationService.updateOngoingNotification(remainingSec, restTimer.exerciseName);
-        }
       }
     });
 

@@ -83,10 +83,15 @@ export const NotificationService = {
   },
 
   /**
-   * Programme une notification locale qui se déclenchera exactement à la fin du timer de repos.
+   * Programme une unique notification locale qui se déclenchera à la fin du timer (timer = 0)
+   * avec le nom du prochain exercice à effectuer.
    * No-op silencieux dans Expo Go.
    */
-  async scheduleTimerExpirationNotification(seconds: number, exerciseName?: string): Promise<void> {
+  async scheduleTimerExpirationNotification(
+    seconds: number,
+    exerciseName?: string,
+    nextSetInfo?: { exerciseName: string; setNumber: number; isNextExercise: boolean } | null,
+  ): Promise<void> {
     const Notifications = await getNotifications();
     if (!Notifications) return;
 
@@ -94,10 +99,18 @@ export const NotificationService = {
       await this.cancelScheduledNotification();
       if (seconds <= 0) return;
 
-      const title = '⏱️ Repos Terminé !';
-      const body = exerciseName
-        ? `Temps de repos pour ${exerciseName} écoulé. À vous de jouer !`
-        : 'Votre temps de repos est écoulé !';
+      const title = 'Repos terminé !';
+
+      let body = 'Votre temps de repos est écoulé !';
+      if (nextSetInfo?.exerciseName) {
+        if (nextSetInfo.isNextExercise) {
+          body = `Prochain exercice : ${nextSetInfo.exerciseName} (Série ${nextSetInfo.setNumber})`;
+        } else {
+          body = `Prochaine série : ${nextSetInfo.exerciseName} (Série ${nextSetInfo.setNumber})`;
+        }
+      } else if (exerciseName) {
+        body = `Prochain exercice : ${exerciseName}`;
+      }
 
       activeNotificationId = await Notifications.scheduleNotificationAsync({
         content: {
@@ -117,32 +130,10 @@ export const NotificationService = {
   },
 
   /**
-   * Met à jour ou affiche l'état en direct du décompte de repos dans le volet de notifications.
+   * Désactivé : Seule la notification d'expiration à 0 est conservée.
    */
-  async updateOngoingNotification(secondsRemaining: number, exerciseName?: string): Promise<void> {
-    const Notifications = await getNotifications();
-    if (!Notifications || secondsRemaining <= 0) return;
-
-    const m = Math.floor(secondsRemaining / 60);
-    const s = secondsRemaining % 60;
-    const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
-
-    try {
-      if (ongoingNotificationId) {
-        try { await Notifications.dismissNotificationAsync(ongoingNotificationId); } catch (_) {}
-      }
-      ongoingNotificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `⏱️ Repos en cours : ${timeStr}`,
-          body: exerciseName ? `Prochaine série : ${exerciseName}` : 'Chrono de repos actif',
-          sound: false,
-          data: { type: 'timer_ongoing' },
-        },
-        trigger: null, // Présentation immédiate
-      });
-    } catch (e) {
-      // Ignorer silencieusement si la notif en direct n'est pas disponible
-    }
+  async updateOngoingNotification(): Promise<void> {
+    // No-op
   },
 
   /**
