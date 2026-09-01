@@ -19,6 +19,7 @@ import { Button } from "../../src/components/UI/Button";
 import { Card } from "../../src/components/UI/Card";
 import { RestTimerBar } from "../../src/components/Workout/RestTimerBar";
 import { useRouter } from "expo-router";
+import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import {
   Play,
   Plus,
@@ -412,10 +413,11 @@ export default function WorkoutTab() {
   };
 
   return (
-    <SafeAreaView
-      edges={["top", "left", "right"]}
-      style={[styles.safeArea, { backgroundColor: theme.background }]}
-    >
+    <TabSwipeWrapper tabIndex={0}>
+      <SafeAreaView
+        edges={["top", "left", "right"]}
+        style={[styles.safeArea, { backgroundColor: theme.background }]}
+      >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header Title */}
         <View style={styles.pageHeader}>
@@ -1194,7 +1196,8 @@ export default function WorkoutTab() {
         visible={!data?.hasCompletedOnboarding}
         onComplete={completeOnboarding}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </TabSwipeWrapper>
   );
 }
 

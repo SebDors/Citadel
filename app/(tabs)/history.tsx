@@ -6,6 +6,7 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { CalendarView } from '../../src/components/History/CalendarView';
 import { ActivitySummaryCard } from '../../src/components/History/ActivitySummaryCard';
 import { Calendar } from 'lucide-react-native';
+import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 
 export default function HistoryTab() {
   const { data, deleteWorkoutSession } = useWorkout();
@@ -14,7 +15,8 @@ export default function HistoryTab() {
   const historyList = data?.history || [];
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <TabSwipeWrapper tabIndex={1}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header */}
         <View style={styles.header}>
@@ -51,6 +53,7 @@ export default function HistoryTab() {
         )}
       </ScrollView>
     </SafeAreaView>
+    </TabSwipeWrapper>
   );
 }
 
