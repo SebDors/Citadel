@@ -656,7 +656,7 @@ export default function LiveWorkoutScreen() {
               <Text style={[styles.guidedLiveText, { color: theme.text }]}>
                 1. Renseignez vos poids (kg) et répétitions pour chaque série.{"\n"}
                 2. Cochez la case <Text style={{ fontWeight: '800', color: theme.primary }}>✓</Text> à droite pour valider chaque série.{"\n"}
-                3. Une fois fini, cliquez sur <Text style={{ fontWeight: '800', color: theme.text }}>"Terminer"</Text> en haut à droite !
+                3. Une fois fini, cliquez sur <Text style={{ fontWeight: '800', color: theme.text }}>"Terminer la séance"</Text> en bas de la page !
               </Text>
             </View>
           )}
