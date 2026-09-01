@@ -1305,7 +1305,7 @@ export default function TemplateEditorScreen() {
             <View style={styles.floatingOnboardingHeader}>
               <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
               <Text style={[styles.floatingOnboardingTitle, { color: theme.accent }]}>
-                💡 Tutoriel de création de séance
+                Tutoriel de création de séance
               </Text>
             </View>
             <Text style={[styles.floatingOnboardingText, { color: theme.text }]}>

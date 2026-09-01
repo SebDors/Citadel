@@ -287,7 +287,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
             )}
 
             <Button
-              title={currentSlide === 2 ? "Commencer l'aventure 🚀" : "Suivant"}
+              title={currentSlide === 2 ? "Commencer l'aventure" : "Suivant"}
               variant="primary"
               disabled={isNextDisabled}
               onPress={handleNext}

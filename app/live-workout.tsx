@@ -335,11 +335,11 @@ export default function LiveWorkoutScreen() {
                 </View>
 
                 <Text style={[styles.celebrationBadge, { color: theme.accent, backgroundColor: theme.surface }]}>
-                  🏆 PREMIÈRE SÉANCE TERMINÉE
+                  PREMIÈRE SÉANCE TERMINÉE
                 </Text>
 
                 <Text style={[styles.celebrationTitle, { color: theme.text }]}>
-                  Bravo {data?.profile?.name || 'Athlète'} ! 🎉
+                  Bravo {data?.profile?.name || 'Athlète'} !
                 </Text>
 
                 <Text style={[styles.celebrationDesc, { color: theme.textMuted }]}>
@@ -347,11 +347,11 @@ export default function LiveWorkoutScreen() {
                 </Text>
 
                 <Text style={[styles.celebrationSub, { color: theme.text }]}>
-                  🔥 Bon courage pour vos futurs entraînements !
+                  Bon courage pour vos futurs entraînements !
                 </Text>
 
                 <Button
-                  title="Retour à l'accueil 🏠"
+                  title="Retour à l'accueil"
                   variant="primary"
                   onPress={() => {
                     setShowCelebrationModal(false);
@@ -705,7 +705,7 @@ export default function LiveWorkoutScreen() {
             <View style={styles.guidedLiveHeader}>
               <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
               <Text style={[styles.guidedLiveTitle, { color: theme.accent }]}>
-                ⚡ Guide 1er Entraînement (Étape 2/2)
+                Guide 1er Entraînement (Étape 2/2)
               </Text>
             </View>
             <Text style={[styles.guidedLiveText, { color: theme.text }]}>
@@ -1644,11 +1644,11 @@ export default function LiveWorkoutScreen() {
             </View>
 
             <Text style={[styles.celebrationBadge, { color: theme.accent, backgroundColor: theme.surface }]}>
-              🏆 PREMIÈRE SÉANCE TERMINÉE
+              PREMIÈRE SÉANCE TERMINÉE
             </Text>
 
             <Text style={[styles.celebrationTitle, { color: theme.text }]}>
-              Bravo {data?.profile?.name || 'Athlète'} ! 🎉
+              Bravo {data?.profile?.name || 'Athlète'} !
             </Text>
 
             <Text style={[styles.celebrationDesc, { color: theme.textMuted }]}>
@@ -1656,11 +1656,11 @@ export default function LiveWorkoutScreen() {
             </Text>
 
             <Text style={[styles.celebrationSub, { color: theme.text }]}>
-              🔥 Bon courage pour vos futurs entraînements !
+              Bon courage pour vos futurs entraînements !
             </Text>
 
             <Button
-              title="Retour à l'accueil 🏠"
+              title="Retour à l'accueil"
               variant="primary"
               onPress={() => {
                 setShowCelebrationModal(false);
