@@ -25,6 +25,7 @@ import {
 } from "../src/constants/exerciseDatabase";
 import { normalizeString } from "../src/utils/stringUtils";
 import { CreateExerciseModal } from "../src/components/Workout/CreateExerciseModal";
+import { ConfettiEffect } from "../src/components/UI/ConfettiEffect";
 import {
   getSessionBlocks,
   WorkoutBlock,
@@ -322,8 +323,52 @@ export default function LiveWorkoutScreen() {
   }, [blocks, circuitStates, activeSession]);
 
   if (!activeSession) {
+    if (showCelebrationModal) {
+      return (
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+          <Modal visible transparent animationType="fade">
+            <View style={styles.celebrationOverlay}>
+              <ConfettiEffect />
+              <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+                <View style={[styles.celebrationIconCircle, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
+                  <Trophy size={44} color={theme.accent} />
+                </View>
+
+                <Text style={[styles.celebrationBadge, { color: theme.accent, backgroundColor: theme.surface }]}>
+                  🏆 PREMIÈRE SÉANCE TERMINÉE
+                </Text>
+
+                <Text style={[styles.celebrationTitle, { color: theme.text }]}>
+                  Bravo {data?.profile?.name || 'Athlète'} ! 🎉
+                </Text>
+
+                <Text style={[styles.celebrationDesc, { color: theme.textMuted }]}>
+                  Vous avez franchi le tout premier pas dans Citadel. Vos statistiques, votre volume d'entraînement et vos repères 1RM sont désormais enregistrés.
+                </Text>
+
+                <Text style={[styles.celebrationSub, { color: theme.text }]}>
+                  🔥 Bon courage pour vos futurs entraînements !
+                </Text>
+
+                <Button
+                  title="Retour à l'accueil 🏠"
+                  variant="primary"
+                  onPress={() => {
+                    setShowCelebrationModal(false);
+                    router.replace("/(tabs)");
+                  }}
+                  style={{ marginTop: 18, width: '100%' }}
+                />
+              </View>
+            </View>
+          </Modal>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView
+        edges={["top", "left", "right"]}
         style={[
           styles.safeArea,
           {
@@ -338,6 +383,9 @@ export default function LiveWorkoutScreen() {
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             Aucune séance en cours
+          </Text>
+          <Text style={[styles.emptySub, { color: theme.textMuted }]}>
+            Démarrez une nouvelle séance depuis l'onglet Entraînement.
           </Text>
           <Button
             title="Retour à l'accueil"
@@ -1589,6 +1637,7 @@ export default function LiveWorkoutScreen() {
       {/* ---------------- MODALE FÉLICITATIONS 1ÈRE SÉANCE TERMINÉE ---------------- */}
       <Modal visible={showCelebrationModal} transparent animationType="fade">
         <View style={styles.celebrationOverlay}>
+          <ConfettiEffect />
           <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
             <View style={[styles.celebrationIconCircle, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
               <Trophy size={44} color={theme.accent} />
@@ -1705,7 +1754,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: "800",
-    marginBottom: 16,
+    marginBottom: 6,
+  },
+  emptySub: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 20,
   },
   circuitContainer: {
     padding: 14,
@@ -2133,7 +2188,7 @@ const styles = StyleSheet.create({
   },
   celebrationSub: {
     fontSize: 14,
-    fontWeight: '800',
-    textAlign: 'center',
+    fontWeight: "800",
+    textAlign: "center",
   },
 });
