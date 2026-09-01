@@ -59,6 +59,7 @@ export const StorageService = {
       ...currentData,
       history: updatedHistory,
       currentWorkout: null,
+      hasCompletedFirstWorkout: true,
       profile: {
         ...currentData.profile,
         totalWorkouts: currentData.profile.totalWorkouts + 1,
@@ -476,6 +477,7 @@ export const StorageService = {
       ...currentData,
       hasCompletedOnboarding: false,
       hasCreatedFirstSession: false,
+      hasCompletedFirstWorkout: false,
     };
     await this.saveData(updatedData);
     return updatedData;

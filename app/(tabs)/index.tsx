@@ -485,7 +485,7 @@ export default function WorkoutTab() {
         )}
 
         {/* Bannière de Guidage Étape 2/2 : Lancement de la première séance */}
-        {data?.hasCompletedOnboarding && data?.hasCreatedFirstSession && (data?.history || []).length === 0 && !activeSession && (
+        {data?.hasCompletedOnboarding && data?.hasCreatedFirstSession && !data?.hasCompletedFirstWorkout && !activeSession && (
           <View
             style={[
               styles.guidedBanner,

@@ -152,6 +152,7 @@ export interface FitTrackerData {
   currentWorkout?: WorkoutSession | null;
   hasCompletedOnboarding?: boolean;
   hasCreatedFirstSession?: boolean;
+  hasCompletedFirstWorkout?: boolean;
 }
 
 /**
