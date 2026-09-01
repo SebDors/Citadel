@@ -39,7 +39,7 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
             <View style={styles.statItem}>
               <Scale size={14} color={theme.textMuted} />
               <Text style={[styles.statText, { color: theme.textMuted }]}>
-                {profile.currentWeightKg && profile.currentWeightKg > 0 ? `${profile.currentWeightKg} kg` : '-- kg'}
+                {profile.currentWeightKg && profile.currentWeightKg > 0 ? `${profile.currentWeightKg.toFixed(1)} kg` : '-- kg'}
               </Text>
             </View>
 

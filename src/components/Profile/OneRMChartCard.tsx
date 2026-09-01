@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
-import { TrendingUp, Dumbbell } from 'lucide-react-native';
+import { Trophy, Dumbbell } from 'lucide-react-native';
 
 export const OneRMChartCard: React.FC = () => {
   const { theme } = useTheme();
@@ -11,27 +11,33 @@ export const OneRMChartCard: React.FC = () => {
 
   const history = data?.history || [];
 
-  // Calcul dynamique des estimations 1RM depuis l'historique réel
-  const exercises1RM = React.useMemo(() => {
+  // Calcul des derniers Records Personnels (PR) obtenus par exercice
+  const latestPRs = React.useMemo(() => {
     if (history.length === 0) return [];
 
-    const map = new Map<string, { name: string; bestWeight: number; bestReps: number; est1RM: number }>();
+    // Chronologie croissante (de la séance la plus ancienne à la plus récente)
+    const sortedHistory = [...history].sort(
+      (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
 
-    history.forEach((session) => {
+    const prMap = new Map<
+      string,
+      { name: string; weightKg: number; reps: number; date: string }
+    >();
+
+    sortedHistory.forEach((session) => {
       const sessExercises = session.exercises || [];
       sessExercises.forEach((ex) => {
         const name = ex.exerciseName;
         (ex.sets || []).forEach((set) => {
-          if (set.completed && set.weightKg && set.weightKg > 0 && set.reps && set.reps > 0) {
-            // Formule d'Epley : 1RM = Poids * (1 + Reps/30)
-            const e1RM = Math.round(set.weightKg * (1 + set.reps / 30));
-            const existing = map.get(name);
-            if (!existing || e1RM > existing.est1RM) {
-              map.set(name, {
+          if (set.completed && set.weightKg && set.weightKg > 0) {
+            const currentPR = prMap.get(name);
+            if (!currentPR || set.weightKg > currentPR.weightKg) {
+              prMap.set(name, {
                 name,
-                bestWeight: set.weightKg,
-                bestReps: set.reps,
-                est1RM: e1RM,
+                weightKg: set.weightKg,
+                reps: set.reps || 0,
+                date: session.startTime,
               });
             }
           }
@@ -39,40 +45,52 @@ export const OneRMChartCard: React.FC = () => {
       });
     });
 
-    return Array.from(map.values())
-      .sort((a, b) => b.est1RM - a.est1RM)
+    // Tri par date d'obtention du PR (du plus récent au plus ancien)
+    return Array.from(prMap.values())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
   }, [history]);
 
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <TrendingUp size={18} color={theme.accent} />
-        <Text style={[styles.title, { color: theme.text }]}>Progression 1RM Estimé</Text>
+        <Trophy size={18} color={theme.accent} />
+        <Text style={[styles.title, { color: theme.text }]}>Derniers PR (Records Personnels)</Text>
       </View>
 
-      {exercises1RM.length > 0 ? (
-        exercises1RM.map((item, idx) => (
-          <View key={idx} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
-            <View style={styles.itemLeft}>
-              <Dumbbell size={14} color={theme.textMuted} style={{ marginRight: 6 }} />
-              <View>
-                <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
-                <Text style={[styles.itemSub, { color: theme.textMuted }]}>
-                  Meilleure série : {item.bestWeight}kg × {item.bestReps} reps
-                </Text>
+      {latestPRs.length > 0 ? (
+        latestPRs.map((item, idx) => {
+          const formattedDate = new Date(item.date).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          });
+
+          return (
+            <View key={idx} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.itemLeft}>
+                <Dumbbell size={15} color={theme.accent} style={{ marginRight: 10 }} />
+                <View>
+                  <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
+                  <Text style={[styles.itemDate, { color: theme.textMuted }]}>{formattedDate}</Text>
+                </View>
+              </View>
+
+              <View style={styles.itemRight}>
+                <Text style={[styles.prValue, { color: theme.accent }]}>{item.weightKg.toFixed(1)} kg</Text>
+                {item.reps > 0 && (
+                  <Text style={[styles.prSub, { color: theme.textMuted }]}>
+                    {item.reps} rep{item.reps > 1 ? 's' : ''}
+                  </Text>
+                )}
               </View>
             </View>
-
-            <View style={styles.itemRight}>
-              <Text style={[styles.rmValue, { color: theme.accent }]}>{item.est1RM} kg</Text>
-            </View>
-          </View>
-        ))
+          );
+        })
       ) : (
         <View style={styles.noDataBox}>
           <Text style={[styles.noDataText, { color: theme.textMuted }]}>
-            Aucune performance 1RM enregistrée. Complétez vos premières séances pour suivre vos progrès !
+            Aucun record personnel enregistré pour le moment. Complétez vos premières séances pour afficher vos PR !
           </Text>
         </View>
       )}
@@ -98,7 +116,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
   itemLeft: {
@@ -110,17 +128,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  itemSub: {
+  itemDate: {
     fontSize: 11,
     fontWeight: '500',
+    marginTop: 2,
   },
   itemRight: {
     alignItems: 'flex-end',
     marginLeft: 8,
   },
-  rmValue: {
+  prValue: {
     fontSize: 15,
     fontWeight: '900',
+  },
+  prSub: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   noDataBox: {
     paddingVertical: 14,

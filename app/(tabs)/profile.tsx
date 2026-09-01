@@ -24,7 +24,7 @@ export default function ProfileTab() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.text }]}>Profil</Text>
               <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                Progression 1RM et Suivi des Mensurations
+                Derniers PR et Suivi des Mensurations
               </Text>
             </View>
 

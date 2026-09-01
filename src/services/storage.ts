@@ -100,9 +100,9 @@ export const StorageService = {
         id: existing.id,
         date: measurement.date,
         weightKg: measurement.weightKg,
-        chestCm: measurement.chestCm !== undefined ? measurement.chestCm : existing.chestCm,
-        thighCm: measurement.thighCm !== undefined ? measurement.thighCm : existing.thighCm,
-        bicepsCm: measurement.bicepsCm !== undefined ? measurement.bicepsCm : existing.bicepsCm,
+        chestCm: measurement.chestCm,
+        thighCm: measurement.thighCm,
+        bicepsCm: measurement.bicepsCm,
       };
       updatedMeasurements = [...currentData.measurements];
       updatedMeasurements[existingIndex] = merged;

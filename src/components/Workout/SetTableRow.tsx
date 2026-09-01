@@ -4,6 +4,7 @@ import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { Check, Trash2, X, Plus, CornerDownRight } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
+import { parseFloatFrench } from '../../utils/numberUtils';
 
 interface SetTableRowProps {
   set: WorkoutSet;
@@ -58,8 +59,8 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     if (target.type === 'main') {
       const field = target.field;
       if (field === 'weightKg') {
-        const num = valStr === '' || valStr === '.' ? undefined : parseFloat(valStr);
-        onUpdate('weightKg', num !== undefined && !isNaN(num) ? num : undefined);
+        const num = parseFloatFrench(valStr);
+        onUpdate('weightKg', num);
       } else if (field === 'reps') {
         const num = valStr === '' ? undefined : parseInt(valStr, 10);
         onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
@@ -75,9 +76,9 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       }
     } else if (target.type === 'drop') {
       const { stepId, field } = target;
-      const num = valStr === '' || valStr === '.' ? undefined : parseFloat(valStr);
+      const num = field === 'weightKg' ? parseFloatFrench(valStr) : (valStr === '' ? undefined : parseInt(valStr, 10));
       const current = set.dropSteps || [];
-      const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num !== undefined && !isNaN(num) ? num : undefined } : s));
+      const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num } : s));
       onUpdate('dropSteps', next);
     }
   }, [onUpdate, set.dropSteps]);

@@ -135,7 +135,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
           </Text>
           <View style={styles.calloutValueRow}>
             <Text style={[styles.calloutValue, { color: theme.text }]}>
-              {latestPoint.value} {activeConfig.unit}
+              {latestPoint.value.toFixed(1)} {activeConfig.unit}
             </Text>
             {delta !== null && (
               <Text

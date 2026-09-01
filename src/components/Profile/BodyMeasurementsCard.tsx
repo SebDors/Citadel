@@ -12,11 +12,13 @@ import {
 } from 'react-native';
 import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { parseFloatFrench } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import {
   Activity,
   Plus,
+  Edit2,
   Trash2,
   Calendar as CalendarIcon,
   X,
@@ -80,14 +82,17 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   const [thigh, setThigh] = useState('');
   const [biceps, setBiceps] = useState('');
 
+  // Editing measurement state
+  const [editingMeasurementId, setEditingMeasurementId] = useState<string | null>(null);
+
   // Set inputs when selected date changes
   const updateInputsForDate = (dateStr: string) => {
     const existing = (measurements || []).find((m) => m.date === dateStr);
     if (existing) {
       setWeight(existing.weightKg ? String(existing.weightKg) : '');
-      setChest(existing.chestCm ? String(existing.chestCm) : '');
-      setThigh(existing.thighCm ? String(existing.thighCm) : '');
-      setBiceps(existing.bicepsCm ? String(existing.bicepsCm) : '');
+      setChest(existing.chestCm !== undefined ? String(existing.chestCm) : '');
+      setThigh(existing.thighCm !== undefined ? String(existing.thighCm) : '');
+      setBiceps(existing.bicepsCm !== undefined ? String(existing.bicepsCm) : '');
     } else {
       setWeight('');
       setChest('');
@@ -97,6 +102,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   };
 
   const handleOpenModal = () => {
+    setEditingMeasurementId(null);
     const currentDate = new Date();
     const currentISO = getISOString(currentDate);
     setSelectedDateStr(currentISO);
@@ -104,6 +110,22 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     setCalYear(currentDate.getFullYear());
     setIsCalendarOpen(false); // Calendrier replié par défaut
     updateInputsForDate(currentISO);
+    setModalVisible(true);
+  };
+
+  const handleEditMeasurement = (m: BodyMeasurement) => {
+    setEditingMeasurementId(m.id);
+    setSelectedDateStr(m.date);
+    const parts = m.date.split('-').map(Number);
+    if (parts.length === 3) {
+      setCalYear(parts[0]);
+      setCalMonth(parts[1] - 1);
+    }
+    setIsCalendarOpen(false);
+    setWeight(m.weightKg ? String(m.weightKg) : '');
+    setChest(m.chestCm !== undefined ? String(m.chestCm) : '');
+    setThigh(m.thighCm !== undefined ? String(m.thighCm) : '');
+    setBiceps(m.bicepsCm !== undefined ? String(m.bicepsCm) : '');
     setModalVisible(true);
   };
 
@@ -132,19 +154,20 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   };
 
   const handleSave = () => {
-    const w = parseFloat(weight);
-    if (isNaN(w) || w <= 0) return;
+    const w = parseFloatFrench(weight);
+    if (!w || w <= 0) return;
 
     const newM: BodyMeasurement = {
-      id: `m_${Date.now()}`,
+      id: editingMeasurementId || `m_${Date.now()}`,
       date: selectedDateStr,
       weightKg: w,
-      chestCm: chest ? parseFloat(chest) : undefined,
-      thighCm: thigh ? parseFloat(thigh) : undefined,
-      bicepsCm: biceps ? parseFloat(biceps) : undefined,
+      chestCm: parseFloatFrench(chest),
+      thighCm: parseFloatFrench(thigh),
+      bicepsCm: parseFloatFrench(biceps),
     };
 
     onAddMeasurement(newM);
+    setEditingMeasurementId(null);
     setModalVisible(false);
   };
 
@@ -206,12 +229,23 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
               {formatDateToListDisplay(m.date)}
             </Text>
             <View style={styles.mStats}>
-              <Text style={[styles.mVal, { color: theme.text }]}>{m.weightKg} kg</Text>
-              {m.chestCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {m.chestCm}cm</Text>}
-              {m.thighCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>C: {m.thighCm}cm</Text>}
-              {m.bicepsCm && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {m.bicepsCm}cm</Text>}
+              <Text style={[styles.mVal, { color: theme.text }]}>{m.weightKg ? m.weightKg.toFixed(1) : ''} kg</Text>
+              {m.chestCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {m.chestCm.toFixed(1)}cm</Text>}
+              {m.thighCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>C: {m.thighCm.toFixed(1)}cm</Text>}
+              {m.bicepsCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {m.bicepsCm.toFixed(1)}cm</Text>}
 
-              <TouchableOpacity onPress={() => onDeleteMeasurement(m.id)} style={{ marginLeft: 10 }}>
+              <TouchableOpacity
+                onPress={() => handleEditMeasurement(m)}
+                style={{ marginLeft: 10, marginRight: 2 }}
+                accessibilityLabel="Modifier cette mesure"
+              >
+                <Edit2 size={15} color={theme.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onDeleteMeasurement(m.id)}
+                style={{ marginLeft: 6 }}
+                accessibilityLabel="Supprimer cette mesure"
+              >
                 <Trash2 size={15} color={theme.danger} />
               </TouchableOpacity>
             </View>
@@ -243,7 +277,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                 {/* Header Modale */}
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: theme.text }]}>
-                    Ajouter / Modifier une mesure
+                    {editingMeasurementId ? 'Modifier la mesure' : 'Saisir vos Mensurations'}
                   </Text>
                   <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
                     <X size={20} color={theme.textMuted} />
