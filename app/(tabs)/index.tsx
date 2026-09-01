@@ -37,6 +37,7 @@ import {
   Check,
   FolderInput,
   BookOpen,
+  Dumbbell,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import {
@@ -595,6 +596,24 @@ export default function WorkoutTab() {
               </Text>
             )}
             {unassignedTemplates.map((tpl) => renderTemplateCard(tpl))}
+          </View>
+        )}
+
+        {/* État vide si aucun dossier ni programme */}
+        {folders.length === 0 && (data?.templates || []).length === 0 && (
+          <View
+            style={[
+              styles.emptyStateBox,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+          >
+            <Dumbbell size={32} color={theme.textMuted} style={{ marginBottom: 8 }} />
+            <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
+              Aucun programme enregistré
+            </Text>
+            <Text style={[styles.emptyStateSub, { color: theme.textMuted }]}>
+              Créez votre première séance personnalisée avec le bouton "+ Séance" ou lancez un entraînement libre !
+            </Text>
           </View>
         )}
 
@@ -1437,5 +1456,23 @@ const styles = StyleSheet.create({
   createNewFolderText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  emptyStateBox: {
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 14,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  emptyStateSub: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
   },
 });
