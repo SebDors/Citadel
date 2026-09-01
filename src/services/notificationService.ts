@@ -5,9 +5,9 @@ import Constants from 'expo-constants';
 // On n'importe JAMAIS le module statiquement — uniquement en dynamic import conditionnel.
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// Son local embarqué dans les assets (WAV 44100 Hz, bip double 880 Hz + 1100 Hz)
+// Son local embarqué dans les assets (Bell_ring.mp3)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const TIMER_SOUND = require('../../assets/timer_end.wav');
+const TIMER_SOUND = require('../../assets/Bell_ring.mp3');
 
 let activeNotificationId: string | null = null;
 let ongoingNotificationId: string | null = null;
@@ -42,16 +42,16 @@ export const NotificationService = {
     if (!Notifications) return false;
 
     try {
-      // Configuration du handler de notifications au premier plan (une seule fois)
-      // shouldPlaySound: false au 1er plan car nous jouons notre propre son audio personnalisé (timer_end.wav) sans doublon
+      // Configuration du handler de notifications au premier plan
       if (!notificationsInitialized) {
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowAlert: true,
-            shouldPlaySound: false,
+            shouldPlaySound: true,
             shouldSetBadge: false,
             shouldShowBanner: true,
             shouldShowList: true,
+            priority: Notifications.AndroidNotificationPriority.MAX,
           }),
         });
         notificationsInitialized = true;
@@ -64,6 +64,10 @@ export const NotificationService = {
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#618764',
           sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
         });
       }
 
@@ -71,7 +75,13 @@ export const NotificationService = {
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+          },
+        });
         finalStatus = status;
       }
 
@@ -83,10 +93,15 @@ export const NotificationService = {
   },
 
   /**
-   * Programme une notification locale qui se déclenchera exactement à la fin du timer de repos.
+   * Programme une unique notification locale qui se déclenchera à la fin du timer (timer = 0)
+   * avec le nom du prochain exercice à effectuer.
    * No-op silencieux dans Expo Go.
    */
-  async scheduleTimerExpirationNotification(seconds: number, exerciseName?: string): Promise<void> {
+  async scheduleTimerExpirationNotification(
+    seconds: number,
+    exerciseName?: string,
+    nextSetInfo?: { exerciseName: string; setNumber: number; isNextExercise: boolean } | null,
+  ): Promise<void> {
     const Notifications = await getNotifications();
     if (!Notifications) return;
 
@@ -94,16 +109,26 @@ export const NotificationService = {
       await this.cancelScheduledNotification();
       if (seconds <= 0) return;
 
-      const title = '⏱️ Repos Terminé !';
-      const body = exerciseName
-        ? `Temps de repos pour ${exerciseName} écoulé. À vous de jouer !`
-        : 'Votre temps de repos est écoulé !';
+      const title = 'Repos terminé !';
+
+      let body = 'Votre temps de repos est écoulé !';
+      if (nextSetInfo?.exerciseName) {
+        if (nextSetInfo.isNextExercise) {
+          body = `Prochain exercice : ${nextSetInfo.exerciseName} (Série ${nextSetInfo.setNumber})`;
+        } else {
+          body = `Prochaine série : ${nextSetInfo.exerciseName} (Série ${nextSetInfo.setNumber})`;
+        }
+      } else if (exerciseName) {
+        body = `Prochain exercice : ${exerciseName}`;
+      }
 
       activeNotificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
           sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          interruptionLevel: 'timeSensitive',
           data: { type: 'timer_expiration' },
         },
         trigger: {
@@ -117,32 +142,10 @@ export const NotificationService = {
   },
 
   /**
-   * Met à jour ou affiche l'état en direct du décompte de repos dans le volet de notifications.
+   * Désactivé : Seule la notification d'expiration à 0 est conservée.
    */
-  async updateOngoingNotification(secondsRemaining: number, exerciseName?: string): Promise<void> {
-    const Notifications = await getNotifications();
-    if (!Notifications || secondsRemaining <= 0) return;
-
-    const m = Math.floor(secondsRemaining / 60);
-    const s = secondsRemaining % 60;
-    const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
-
-    try {
-      if (ongoingNotificationId) {
-        try { await Notifications.dismissNotificationAsync(ongoingNotificationId); } catch (_) {}
-      }
-      ongoingNotificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `⏱️ Repos en cours : ${timeStr}`,
-          body: exerciseName ? `Prochaine série : ${exerciseName}` : 'Chrono de repos actif',
-          sound: false,
-          data: { type: 'timer_ongoing' },
-        },
-        trigger: null, // Présentation immédiate
-      });
-    } catch (e) {
-      // Ignorer silencieusement si la notif en direct n'est pas disponible
-    }
+  async updateOngoingNotification(): Promise<void> {
+    // No-op
   },
 
   /**

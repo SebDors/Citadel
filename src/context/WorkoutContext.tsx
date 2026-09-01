@@ -20,6 +20,7 @@ import {
 } from '../types';
 import { StorageService } from '../services/storage';
 import { NotificationService } from '../services/notificationService';
+import { normalizeString } from '../utils/stringUtils';
 
 export interface NextSetPreview {
   exerciseName: string;
@@ -44,6 +45,7 @@ export interface WorkoutContextType {
   removeSet: (exerciseId: string, setId: string) => void;
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number) => void;
   addBatchExercisesToActiveWorkout: (items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
+  reorderActiveSessionBlocks: (newBlocks: WorkoutBlock[]) => void;
   addCircuitToActiveWorkout: () => void;
   removeExercise: (exerciseId: string) => void;
   duplicateExercise: (exerciseId: string) => void;
@@ -64,10 +66,16 @@ export interface WorkoutContextType {
   deleteFolder: (folderId: string) => Promise<void>;
   toggleFolderCollapse: (folderId: string) => Promise<void>;
   moveTemplateToFolder: (templateId: string, targetFolderId: string | null) => Promise<void>;
+  logPastWorkout: (session: WorkoutSession) => Promise<void>;
   deleteWorkoutSession: (sessionId: string) => Promise<void>;
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
+  resetAllData: () => Promise<void>;
+  importFullData: (newData: FitTrackerData) => Promise<void>;
+  completeOnboarding: (profileData?: { name?: string; currentWeightKg?: number }) => Promise<void>;
+  markFirstSessionCreated: () => Promise<void>;
+  resetOnboarding: () => Promise<void>;
   // Base d'exercices personnalisés
   customExercises: SharedExercise[];
   allExercises: SharedExercise[];
@@ -88,6 +96,113 @@ export interface WorkoutContextType {
 }
 
 const WorkoutContext = createContext<WorkoutContextType>({} as WorkoutContextType);
+
+function formatSetPerf(set: WorkoutSet): string {
+  if (set.weightKg !== undefined && set.weightKg > 0 && set.reps !== undefined && set.reps > 0) {
+    return `${set.weightKg}kg × ${set.reps}`;
+  }
+  if (set.weightKg !== undefined && set.weightKg > 0) {
+    return `${set.weightKg}kg`;
+  }
+  if (set.reps !== undefined && set.reps > 0) {
+    return `${set.reps} reps`;
+  }
+  return '-';
+}
+
+function getPreviousSetPerformance(
+  history: WorkoutSession[],
+  exerciseName: string,
+  setIndex: number
+): string | undefined {
+  if (!history || history.length === 0 || !exerciseName) return undefined;
+
+  const targetName = normalizeString(exerciseName);
+
+  for (const session of history) {
+    // 1. Blocks (SingleExerciseBlock)
+    const blocks = session.blocks || [];
+    for (const block of blocks) {
+      if (block.type === 'single') {
+        const ex = block.exercise;
+        if (normalizeString(ex.exerciseName) === targetName) {
+          const completedSets = (ex.sets || []).filter(
+            (s) => s.completed && (s.weightKg !== undefined || s.reps !== undefined)
+          );
+          if (completedSets.length === 0) continue;
+
+          const targetSet =
+            completedSets.find((s) => s.setNumber === setIndex) ||
+            completedSets[setIndex - 1] ||
+            completedSets[completedSets.length - 1];
+
+          if (targetSet) {
+            return formatSetPerf(targetSet);
+          }
+        }
+      }
+    }
+
+    // 2. Legacy exercises list
+    const exercises = session.exercises || [];
+    for (const ex of exercises) {
+      if (normalizeString(ex.exerciseName) === targetName) {
+        const completedSets = (ex.sets || []).filter(
+          (s) => s.completed && (s.weightKg !== undefined || s.reps !== undefined)
+        );
+        if (completedSets.length === 0) continue;
+
+        const targetSet =
+          completedSets.find((s) => s.setNumber === setIndex) ||
+          completedSets[setIndex - 1] ||
+          completedSets[completedSets.length - 1];
+
+        if (targetSet) {
+          return formatSetPerf(targetSet);
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function enrichSessionWithPreviousPerformances(
+  session: WorkoutSession,
+  history: WorkoutSession[]
+): WorkoutSession {
+  if (!session) return session;
+
+  const updatedBlocks = session.blocks
+    ? session.blocks.map((block) => {
+        if (block.type === 'single') {
+          const ex = block.exercise;
+          const updatedSets = ex.sets.map((s) => ({
+            ...s,
+            previous: getPreviousSetPerformance(history, ex.exerciseName, s.setNumber) || s.previous,
+          }));
+          return { ...block, exercise: { ...ex, sets: updatedSets } };
+        }
+        return block;
+      })
+    : undefined;
+
+  const updatedExercises = session.exercises
+    ? session.exercises.map((ex) => {
+        const updatedSets = ex.sets.map((s) => ({
+          ...s,
+          previous: getPreviousSetPerformance(history, ex.exerciseName, s.setNumber) || s.previous,
+        }));
+        return { ...ex, sets: updatedSets };
+      })
+    : undefined;
+
+  return {
+    ...session,
+    blocks: updatedBlocks,
+    exercises: updatedExercises,
+  };
+}
 
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<FitTrackerData | null>(null);
@@ -130,7 +245,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       targetEndTime: targetEnd,
       secondsRemaining: seconds,
     });
-    NotificationService.scheduleTimerExpirationNotification(seconds, exerciseName);
+    NotificationService.scheduleTimerExpirationNotification(seconds, exerciseName, nextSetInfo);
   };
 
   const dismissRestTimer = () => {
@@ -152,7 +267,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         targetEndTime: newTarget,
         secondsRemaining: newRemaining,
       }));
-      NotificationService.scheduleTimerExpirationNotification(newRemaining, restTimer.exerciseName);
+      NotificationService.scheduleTimerExpirationNotification(newRemaining, restTimer.exerciseName, restTimer.nextSetInfo);
     }
   };
 
@@ -161,9 +276,41 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const loaded = await StorageService.loadData();
     setData(loaded);
     if (loaded.currentWorkout) {
-      setActiveSession(loaded.currentWorkout);
+      const enriched = enrichSessionWithPreviousPerformances(loaded.currentWorkout, loaded.history || []);
+      setActiveSession(enriched);
     }
     setLoading(false);
+  };
+
+  const resetAllData = async () => {
+    setLoading(true);
+    const reset = await StorageService.resetAllData();
+    setData(reset);
+    setActiveSession(null);
+    setLoading(false);
+  };
+
+  const importFullData = async (newData: FitTrackerData) => {
+    setLoading(true);
+    const imported = await StorageService.importFullData(newData);
+    setData(imported);
+    setActiveSession(imported.currentWorkout || null);
+    setLoading(false);
+  };
+
+  const completeOnboarding = async (profileData?: { name?: string; currentWeightKg?: number }) => {
+    const updated = await StorageService.completeOnboarding(profileData);
+    setData(updated);
+  };
+
+  const markFirstSessionCreated = async () => {
+    const updated = await StorageService.markFirstSessionCreated();
+    setData(updated);
+  };
+
+  const resetOnboarding = async () => {
+    const updated = await StorageService.resetOnboarding();
+    setData(updated);
   };
 
   useEffect(() => {
@@ -199,9 +346,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         const remainingSec = Math.ceil(remainingMs / 1000);
         setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
-        if (nextAppState === 'background' || nextAppState === 'inactive') {
-          NotificationService.updateOngoingNotification(remainingSec, restTimer.exerciseName);
-        }
       }
     });
 
@@ -334,8 +478,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       exercises: legacyExercises,
     };
 
-    setActiveSession(newSession);
-    StorageService.saveCurrentWorkout(newSession);
+    const enrichedSession = enrichSessionWithPreviousPerformances(newSession, data?.history || []);
+
+    setActiveSession(enrichedSession);
+    StorageService.saveCurrentWorkout(enrichedSession);
   };
 
   const calculateVolumeAndCompletedCount = (
@@ -605,15 +751,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (ex.id !== exerciseId) return ex;
 
       const lastSet = ex.sets[ex.sets.length - 1];
+      const nextSetNum = ex.sets.length + 1;
+      const prevPerf = getPreviousSetPerformance(data?.history || [], ex.exerciseName, nextSetNum);
       const newSet: WorkoutSet = {
         id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        setNumber: ex.sets.length + 1,
+        setNumber: nextSetNum,
         type: lastSet ? lastSet.type : 'normal',
         weightKg: undefined,
         reps: undefined,
         rir: undefined,
         completed: false,
-        previous: lastSet?.previous || undefined,
+        previous: prevPerf || lastSet?.previous || undefined,
       };
 
       return { ...ex, sets: [...ex.sets, newSet] };
@@ -623,15 +771,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ? activeSession.blocks.map((block) => {
           if (block.type === 'single' && block.exercise.id === exerciseId) {
             const lastSet = block.exercise.sets[block.exercise.sets.length - 1];
+            const nextSetNum = block.exercise.sets.length + 1;
+            const prevPerf = getPreviousSetPerformance(data?.history || [], block.exercise.exerciseName, nextSetNum);
             const newSet: WorkoutSet = {
               id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-              setNumber: block.exercise.sets.length + 1,
+              setNumber: nextSetNum,
               type: lastSet ? lastSet.type : 'normal',
               weightKg: undefined,
               reps: undefined,
               rir: undefined,
               completed: false,
-              previous: lastSet?.previous || undefined,
+              previous: prevPerf || lastSet?.previous || undefined,
             };
 
             return {
@@ -741,6 +891,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             reps: undefined,
             rir: undefined,
             completed: false,
+            previous: getPreviousSetPerformance(data?.history || [], item.exerciseName, 1),
           },
         ],
       };
@@ -787,6 +938,28 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addBatchExercisesToActiveWorkout([
       { exerciseName, primaryMuscle, targetMuscles, restSeconds },
     ]);
+  };
+
+  const reorderActiveSessionBlocks = (newBlocks: WorkoutBlock[]) => {
+    if (!activeSession) return;
+
+    let totalSets = 0;
+    newBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        totalSets += b.exercise.sets.length;
+      } else if (b.type === 'circuit') {
+        totalSets += (b.rounds || 3) * b.exercises.length;
+      }
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: newBlocks,
+      totalSetsCount: totalSets,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const addCircuitToActiveWorkout = () => {
@@ -1227,6 +1400,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const logPastWorkout = async (session: WorkoutSession) => {
+    const updated = await StorageService.logPastWorkout(session);
+    setData(updated);
+  };
+
   const deleteWorkoutSession = async (sessionId: string) => {
     const updated = await StorageService.deleteWorkoutSession(sessionId);
     setData(updated);
@@ -1295,6 +1473,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         removeSet,
         addExerciseToActiveWorkout,
         addBatchExercisesToActiveWorkout,
+        reorderActiveSessionBlocks,
         addCircuitToActiveWorkout,
         removeExercise,
         duplicateExercise,
@@ -1315,10 +1494,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteFolder,
         toggleFolderCollapse,
         moveTemplateToFolder,
+        logPastWorkout,
         deleteWorkoutSession,
         deleteExerciseFromSession,
         deleteSetFromSession,
         reloadAllData,
+        resetAllData,
+        importFullData,
+        completeOnboarding,
+        markFirstSessionCreated,
+        resetOnboarding,
         customExercises,
         allExercises,
         addCustomExercise,

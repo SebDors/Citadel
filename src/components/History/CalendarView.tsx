@@ -13,6 +13,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
+import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,7 +23,12 @@ import {
   Dumbbell,
   Layers,
   RotateCw,
+  BookmarkPlus,
+  Eye,
+  Plus,
 } from 'lucide-react-native';
+import { PastSessionDetailModal } from './PastSessionDetailModal';
+import { LogPastWorkoutModal } from './LogPastWorkoutModal';
 
 interface CalendarViewProps {
   history: WorkoutSession[];
@@ -46,6 +52,7 @@ const MONTHS_NAMES = [
 export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const { theme } = useTheme();
   const { deleteWorkoutSession } = useWorkout();
+  const router = useRouter();
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
@@ -56,7 +63,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   // État de la modale pour le jour sélectionné
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [logPastModalVisible, setLogPastModalVisible] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [selectedDetailSession, setSelectedDetailSession] = useState<WorkoutSession | null>(null);
 
   const isCurrentMonthView =
     currentMonthIndex === now.getMonth() && currentYear === now.getFullYear();
@@ -92,7 +101,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const workoutDates = history.map((s) => s.startTime.split('T')[0]);
 
   const handleDayPress = (dateStr: string, hasWorkout: boolean) => {
-    if (!hasWorkout) return;
     setSelectedDate(dateStr);
     setModalVisible(true);
   };
@@ -157,7 +165,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           return (
             <TouchableOpacity
               key={d}
-              disabled={!hasWorkout}
               onPress={() => handleDayPress(dateStr, hasWorkout)}
               style={[
                 styles.dayCell,
@@ -274,12 +281,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                     >
                       {/* Session Header: Details & Delete Session Button */}
                       <View style={styles.sessionCardHeader}>
-                        <View style={styles.sessionInfo}>
+                        <TouchableOpacity
+                          style={styles.sessionInfo}
+                          activeOpacity={0.7}
+                          onPress={() => setSelectedDetailSession(session)}
+                        >
                           <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
                             {session.title}
                           </Text>
 
                           <View style={styles.statsRow}>
+                            <View style={styles.statBadge}>
+                              <Clock size={14} color={theme.accent} />
+                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                À {new Date(session.startTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </Text>
+                            </View>
+
                             <View style={styles.statBadge}>
                               <Clock size={14} color={theme.textMuted} />
                               <Text style={[styles.statBadgeText, { color: theme.text }]}>
@@ -313,25 +331,62 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                               {summaryStr}
                             </Text>
                           ) : null}
-                        </View>
-
-                        <TouchableOpacity
-                          style={[styles.deleteIconButton, { backgroundColor: theme.cardBg }]}
-                          onPress={() => handleDeleteSession(session.id)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityLabel="Supprimer la séance"
-                        >
-                          <Trash2 size={18} color={theme.danger} />
                         </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                            onPress={() => setSelectedDetailSession(session)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Voir le détail de la séance"
+                          >
+                            <Eye size={18} color={theme.accent} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                            onPress={() => {
+                              setModalVisible(false);
+                              router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } });
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Enregistrer comme modèle"
+                          >
+                            <BookmarkPlus size={18} color={theme.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg }]}
+                            onPress={() => handleDeleteSession(session.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Supprimer la séance"
+                          >
+                            <Trash2 size={18} color={theme.danger} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   );
                 })
               )}
+              
+              <Button
+                title="Consigner une séance passée"
+                variant="primary"
+                icon={<Plus size={16} color="#FFFFFF" />}
+                style={{ marginTop: 16 }}
+                onPress={() => {
+                  setModalVisible(false);
+                  setLogPastModalVisible(true);
+                }}
+              />
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      <LogPastWorkoutModal
+        visible={logPastModalVisible}
+        onClose={() => setLogPastModalVisible(false)}
+        initialDate={selectedDate || undefined}
+      />
 
       {/* Modal de confirmation de suppression de séance personnalisée */}
       <Modal visible={!!sessionToDelete} transparent animationType="fade" onRequestClose={() => setSessionToDelete(null)}>
@@ -363,6 +418,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modale de détail en lecture seule de la séance */}
+      <PastSessionDetailModal
+        visible={!!selectedDetailSession}
+        session={selectedDetailSession}
+        onClose={() => setSelectedDetailSession(null)}
+      />
     </Card>
   );
 };
@@ -508,7 +570,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  deleteIconButton: {
+  actionIconButton: {
     padding: 10,
     borderRadius: 10,
   },

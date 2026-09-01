@@ -6,7 +6,9 @@ import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
-import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw, BookmarkPlus, Eye } from 'lucide-react-native';
+import { PastSessionDetailModal } from './PastSessionDetailModal';
 
 interface ActivitySummaryCardProps {
   session?: WorkoutSession;
@@ -22,6 +24,7 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   const { theme } = useTheme();
   const { deleteWorkoutSession } = useWorkout();
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleDelete = (sessionId: string) => {
     setSessionToDelete(sessionId);
@@ -34,6 +37,11 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
       day: 'numeric',
       month: 'short',
       year: 'numeric',
+    });
+
+    const formattedTime = new Date(session.startTime).toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
     });
 
     const blocks = getSessionBlocks(session);
@@ -69,27 +77,50 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
     const exercisesStr = blockSummaries.join(' · ');
     const targetMusclesList = Array.from(targetMusclesSet);
 
+    const [showDetail, setShowDetail] = useState(false);
+
     return (
       <Card style={styles.cardMargin}>
         {/* Header de la séance + Bouton de suppression 🗑️ */}
         <View style={styles.sessionHeaderRow}>
-          <View style={styles.sessionTitleBox}>
+          <TouchableOpacity
+            style={styles.sessionTitleBox}
+            activeOpacity={0.7}
+            onPress={() => setShowDetail(true)}
+          >
             <Text style={[styles.sessionTitle, { color: theme.text }]} numberOfLines={1}>
               {session.title}
             </Text>
             <Text style={[styles.sessionDateText, { color: theme.textMuted }]}>
-              {formattedDate}
+              {formattedDate} · {formattedTime}
             </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.deleteBtn, { backgroundColor: theme.surface }]}
-            onPress={() => handleDelete(session.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Supprimer la séance"
-          >
-            <Trash2 size={16} color={theme.danger} />
           </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface, marginRight: 8 }]}
+              onPress={() => setShowDetail(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Voir le détail de la séance"
+            >
+              <Eye size={16} color={theme.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface, marginRight: 8 }]}
+              onPress={() => router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } })}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Enregistrer comme modèle"
+            >
+              <BookmarkPlus size={16} color={theme.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface }]}
+              onPress={() => handleDelete(session.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Supprimer la séance"
+            >
+              <Trash2 size={16} color={theme.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Métriques clés sur une ligne compacte */}
@@ -187,6 +218,13 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Modale de détail en lecture seule de la séance */}
+        <PastSessionDetailModal
+          visible={showDetail}
+          session={session}
+          onClose={() => setShowDetail(false)}
+        />
       </Card>
     );
   }
@@ -276,7 +314,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
     textTransform: 'capitalize',
   },
-  deleteBtn: {
+  actionBtn: {
     padding: 8,
     borderRadius: 8,
     alignItems: 'center',

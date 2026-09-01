@@ -38,6 +38,14 @@ export const StorageService = {
   },
 
   /**
+   * Importe et écrase toutes les données avec une nouvelle sauvegarde.
+   */
+  async importFullData(newData: FitTrackerData): Promise<FitTrackerData> {
+    await this.saveData(newData);
+    return newData;
+  },
+
+  /**
    * Sauvegarde globale de l'état applicatif.
    */
   async saveData(data: FitTrackerData): Promise<void> {
@@ -59,6 +67,7 @@ export const StorageService = {
       ...currentData,
       history: updatedHistory,
       currentWorkout: null,
+      hasCompletedFirstWorkout: true,
       profile: {
         ...currentData.profile,
         totalWorkouts: currentData.profile.totalWorkouts + 1,
@@ -67,6 +76,26 @@ export const StorageService = {
     await this.saveData(updatedData);
     return updatedData;
   },
+
+  /**
+   * Enregistre une séance passée rétroactive.
+   */
+  async logPastWorkout(session: WorkoutSession): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedHistory = [session, ...currentData.history];
+    updatedHistory.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      history: updatedHistory,
+      profile: {
+        ...currentData.profile,
+        totalWorkouts: (currentData.profile.totalWorkouts || 0) + 1,
+      },
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
 
   /**
    * Sauvegarde ou met à jour la séance en cours (en direct).
@@ -99,9 +128,9 @@ export const StorageService = {
         id: existing.id,
         date: measurement.date,
         weightKg: measurement.weightKg,
-        chestCm: measurement.chestCm !== undefined ? measurement.chestCm : existing.chestCm,
-        thighCm: measurement.thighCm !== undefined ? measurement.thighCm : existing.thighCm,
-        bicepsCm: measurement.bicepsCm !== undefined ? measurement.bicepsCm : existing.bicepsCm,
+        chestCm: measurement.chestCm,
+        thighCm: measurement.thighCm,
+        bicepsCm: measurement.bicepsCm,
       };
       updatedMeasurements = [...currentData.measurements];
       updatedMeasurements[existingIndex] = merged;
@@ -418,6 +447,68 @@ export const StorageService = {
     } catch (e) {
       console.error('Erreur lors de la sauvegarde de collapsedCards:', e);
     }
+  },
+
+  /**
+   * Efface toutes les données de stockage local pour repartir sur une application neuve.
+   */
+  async resetAllData(): Promise<FitTrackerData> {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+      await AsyncStorage.removeItem(COLLAPSED_CARDS_KEY);
+      await AsyncStorage.removeItem(LEGACY_COLLAPSED_CARDS_KEY);
+    } catch (e) {
+      console.error('Erreur lors de la réinitialisation des données:', e);
+    }
+    await this.saveData(INITIAL_MOCK_DATA);
+    return INITIAL_MOCK_DATA;
+  },
+
+  async completeOnboarding(profileData?: { name?: string; currentWeightKg?: number }): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCompletedOnboarding: true,
+      profile: {
+        ...currentData.profile,
+        name: profileData?.name?.trim() || currentData.profile.name || 'Athlète',
+        currentWeightKg: profileData?.currentWeightKg || currentData.profile.currentWeightKg || 0,
+      },
+    };
+    if (profileData?.currentWeightKg && profileData.currentWeightKg > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const newM: BodyMeasurement = {
+        id: `m_onboarding_${Date.now()}`,
+        date: today,
+        weightKg: profileData.currentWeightKg,
+      };
+      updatedData.measurements = [newM, ...(updatedData.measurements || [])];
+    }
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  async markFirstSessionCreated(): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCreatedFirstSession: true,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  async resetOnboarding(): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCompletedOnboarding: false,
+      hasCreatedFirstSession: false,
+      hasCompletedFirstWorkout: false,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
   },
 };
 

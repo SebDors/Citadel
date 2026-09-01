@@ -1,56 +1,97 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Platform, StatusBar as RNStatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useWorkout } from '../../src/context/WorkoutContext';
-import { useTheme } from '../../src/context/ThemeContext';
-import { CalendarView } from '../../src/components/History/CalendarView';
-import { ActivitySummaryCard } from '../../src/components/History/ActivitySummaryCard';
-import { Calendar } from 'lucide-react-native';
+import React from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Platform,
+  StatusBar as RNStatusBar,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useWorkout } from "../../src/context/WorkoutContext";
+import { useTheme } from "../../src/context/ThemeContext";
+import { CalendarView } from "../../src/components/History/CalendarView";
+import { ActivitySummaryCard } from "../../src/components/History/ActivitySummaryCard";
+import { Calendar, Plus, Clock } from "lucide-react-native";
+import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
+import { LogPastWorkoutModal } from "../../src/components/History/LogPastWorkoutModal";
+import { TouchableOpacity } from "react-native";
 
 export default function HistoryTab() {
   const { data, deleteWorkoutSession } = useWorkout();
   const { theme } = useTheme();
+  const [logModalVisible, setLogModalVisible] = React.useState(false);
 
   const historyList = data?.history || [];
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Page Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>Historique</Text>
-          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            Calendrier d'assiduité et séances passées
-          </Text>
-        </View>
+    <TabSwipeWrapper tabIndex={1}>
+      <SafeAreaView
+        edges={["top", "left", "right"]}
+        style={[styles.safeArea, { backgroundColor: theme.background }]}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Page Header */}
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <Text style={[styles.title, { color: theme.text }]}>
+                Historique
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.headerBtn, { backgroundColor: theme.accent }]}
+                onPress={() => setLogModalVisible(true)}
+              >
+                <Plus size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={[styles.headerBtnText, { color: "#FFFFFF" }]}>
+                  Séance passée
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+              Calendrier d'assiduité et séances passées
+            </Text>
+          </View>
 
-        {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
-        <CalendarView history={historyList} />
+          {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
+          <CalendarView history={historyList} />
 
-        {/* 2. Bloc de Statistiques (Milieu de page) */}
-        <ActivitySummaryCard history={historyList} />
+          {/* 2. Bloc de Statistiques (Milieu de page) */}
+          <ActivitySummaryCard history={historyList} />
 
-        {/* 3. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
-        <View style={styles.listSectionHeader}>
-          <Calendar size={18} color={theme.accent} style={{ marginRight: 6 }} />
-          <Text style={[styles.listTitle, { color: theme.text }]}>Dernières Séances Effectuées</Text>
-        </View>
-
-        {historyList.length === 0 ? (
-          <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-            Aucune séance terminée pour le moment.
-          </Text>
-        ) : (
-          historyList.map((session) => (
-            <ActivitySummaryCard
-              key={session.id}
-              session={session}
-              onDeleteSession={deleteWorkoutSession}
+          {/* 3. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
+          <View style={styles.listSectionHeader}>
+            <Calendar
+              size={18}
+              color={theme.accent}
+              style={{ marginRight: 6 }}
             />
-          ))
-        )}
-      </ScrollView>
-    </SafeAreaView>
+            <Text style={[styles.listTitle, { color: theme.text }]}>
+              Dernières Séances Effectuées
+            </Text>
+          </View>
+
+          {historyList.length === 0 ? (
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+              Aucune séance terminée pour le moment.
+            </Text>
+          ) : (
+            historyList.map((session) => (
+              <ActivitySummaryCard
+                key={session.id}
+                session={session}
+                onDeleteSession={deleteWorkoutSession}
+              />
+            ))
+          )}
+        </ScrollView>
+
+        <LogPastWorkoutModal
+          visible={logModalVisible}
+          onClose={() => setLogModalVisible(false)}
+        />
+      </SafeAreaView>
+    </TabSwipeWrapper>
   );
 }
 
@@ -67,28 +108,46 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 10,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  headerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  headerBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginLeft: 4,
+  },
   title: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: "900",
   },
   subtitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   listSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 16,
     marginBottom: 10,
   },
   listTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   emptyText: {
     fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
+    fontStyle: "italic",
+    textAlign: "center",
     marginVertical: 20,
   },
 });

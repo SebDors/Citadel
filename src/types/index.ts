@@ -55,6 +55,7 @@ export interface CircuitExerciseItem {
   targetMuscles?: string[];
   targetValue: number;
   targetType: 'reps' | 'time';
+  setType?: SetType;
 }
 
 export interface CircuitBlock {
@@ -150,6 +151,9 @@ export interface FitTrackerData {
   customExercises?: SharedExercise[];
   deletedExerciseIds?: string[];
   currentWorkout?: WorkoutSession | null;
+  hasCompletedOnboarding?: boolean;
+  hasCreatedFirstSession?: boolean;
+  hasCompletedFirstWorkout?: boolean;
 }
 
 /**

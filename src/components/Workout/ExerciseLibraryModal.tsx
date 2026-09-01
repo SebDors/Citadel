@@ -235,7 +235,7 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
             {/* Note d'information */}
             <View style={[styles.confirmNoteBox, { backgroundColor: theme.surface }]}>
               <Text style={[styles.confirmNoteText, { color: theme.textMuted }]}>
-                💡 Vos séances passées et modèles conserveront cet exercice dans l'historique sans altération.
+                Vos séances passées et modèles conserveront cet exercice dans l'historique sans altération.
               </Text>
             </View>
 

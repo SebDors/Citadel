@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   Alert,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWorkout } from "../../src/context/WorkoutContext";
@@ -18,6 +19,7 @@ import { Button } from "../../src/components/UI/Button";
 import { Card } from "../../src/components/UI/Card";
 import { RestTimerBar } from "../../src/components/Workout/RestTimerBar";
 import { useRouter } from "expo-router";
+import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import {
   Play,
   Plus,
@@ -37,8 +39,11 @@ import {
   Check,
   FolderInput,
   BookOpen,
+  Dumbbell,
+  Sparkles,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
+import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
 import {
   WorkoutSession,
   WorkoutTemplate,
@@ -59,7 +64,7 @@ function getActiveBannerSubtitle(session: WorkoutSession): string {
   if (session.isPaused) {
     const mins = Math.floor((session.durationSeconds || 0) / 60);
     const secs = (session.durationSeconds || 0) % 60;
-    const timeStr = `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
+    const timeStr = `${mins < 10 ? "0" + mins : mins}:${secs < 10 ? "0" + secs : secs}`;
     return `Séance en pause ⏸ · ${timeStr}`;
   }
   const blocks = getSessionBlocks(session);
@@ -104,6 +109,7 @@ function getActiveBannerSubtitle(session: WorkoutSession): string {
 export default function WorkoutTab() {
   const {
     data,
+    loading,
     activeSession,
     startWorkout,
     duplicateTemplate,
@@ -114,6 +120,7 @@ export default function WorkoutTab() {
     deleteFolder,
     toggleFolderCollapse,
     moveTemplateToFolder,
+    completeOnboarding,
     allExercises,
   } = useWorkout();
   const { theme } = useTheme();
@@ -143,15 +150,29 @@ export default function WorkoutTab() {
     {},
   );
 
+  // Animation de pulsation du bouton + Séance pendant le guidage première séance
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    const loadCollapsedState = async () => {
-      const saved = await StorageService.loadCollapsedCards();
-      if (saved) {
-        setCollapsedCards(saved);
-      }
-    };
-    loadCollapsedState();
-  }, []);
+    if (data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.06,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [data?.hasCompletedOnboarding, data?.hasCreatedFirstSession]);
 
   const toggleCardCollapse = (id: string) => {
     setCollapsedCards((prev) => {
@@ -266,7 +287,11 @@ export default function WorkoutTab() {
     if (isCompact) {
       return (
         <Card key={tpl.id} style={[styles.programCard, { padding: 10 }]}>
-          <View style={styles.compactCardRow}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => toggleCardCollapse(tpl.id)}
+            style={styles.compactCardRow}
+          >
             <View style={styles.compactTitleArea}>
               <Text
                 style={[styles.templateTitle, { color: theme.text }]}
@@ -280,23 +305,34 @@ export default function WorkoutTab() {
             </View>
 
             <View style={styles.compactActionsRow}>
-              <Button
-                title="Démarrer"
-                variant="primary"
-                onPress={() => handleStartTemplate(tpl.id)}
-                icon={<Play size={12} color="#FFFFFF" fill="#FFFFFF" />}
-                style={styles.compactStartBtn}
-                textStyle={styles.compactStartBtnText}
-              />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleStartTemplate(tpl.id);
+                }}
+              >
+                <Button
+                  title="Démarrer"
+                  variant="primary"
+                  onPress={() => handleStartTemplate(tpl.id)}
+                  icon={<Play size={12} color="#FFFFFF" fill="#FFFFFF" />}
+                  style={styles.compactStartBtn}
+                  textStyle={styles.compactStartBtnText}
+                />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.iconBtn}
-                onPress={() => toggleCardCollapse(tpl.id)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleCardCollapse(tpl.id);
+                }}
                 accessibilityLabel="Déplier la séance"
               >
                 <ChevronDown size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
-          </View>
+          </TouchableOpacity>
         </Card>
       );
     }
@@ -304,7 +340,11 @@ export default function WorkoutTab() {
     return (
       <Card key={tpl.id} style={[styles.programCard, { padding: 12 }]}>
         {/* Card Header: Title + Graph Icon + Options + Collapse Toggle */}
-        <View style={styles.cardHeader}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => toggleCardCollapse(tpl.id)}
+          style={styles.cardHeader}
+        >
           <View style={styles.cardTitleArea}>
             <Text
               style={[styles.templateTitle, { color: theme.text }]}
@@ -320,30 +360,37 @@ export default function WorkoutTab() {
           <View style={styles.cardHeaderIcons}>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() =>
+              onPress={(e) => {
+                e.stopPropagation();
                 router.push({
                   pathname: "/workout-analytics",
                   params: { id: tpl.id },
-                })
-              }
+                });
+              }}
             >
               <TrendingUp size={17} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => handleOpenTemplateMenu(tpl)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenTemplateMenu(tpl);
+              }}
             >
               <MoreHorizontal size={19} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => toggleCardCollapse(tpl.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleCardCollapse(tpl.id);
+              }}
               accessibilityLabel="Réduire la séance"
             >
               <ChevronUp size={18} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Inline Exercises List */}
         <Text
@@ -393,706 +440,846 @@ export default function WorkoutTab() {
   };
 
   return (
-    <SafeAreaView
-      edges={["top", "left", "right"]}
-      style={[styles.safeArea, { backgroundColor: theme.background }]}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header Title */}
-        <View style={styles.pageHeader}>
-          <Text style={[styles.appTitle, { color: theme.text }]}>
-            Entraînement
-          </Text>
-        </View>
+    <TabSwipeWrapper tabIndex={0}>
+      <SafeAreaView
+        edges={["top", "left", "right"]}
+        style={[styles.safeArea, { backgroundColor: theme.background }]}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Header Title */}
+          <View style={styles.pageHeader}>
+            <Text style={[styles.appTitle, { color: theme.text }]}>
+              Entraînement
+            </Text>
+          </View>
 
-        {/* Active Workout Banner */}
-        {activeSession && (
-          <View
-            style={[
-              styles.activeBanner,
-              { backgroundColor: theme.cardBg, borderColor: theme.accent },
-            ]}
-          >
-            <View style={styles.activeBannerInfo}>
-              <Flame
-                size={20}
-                color={theme.accent}
-                style={{ marginRight: 8 }}
+          {/* Active Workout Banner */}
+          {activeSession && (
+            <View
+              style={[
+                styles.activeBanner,
+                { backgroundColor: theme.cardBg, borderColor: theme.accent },
+              ]}
+            >
+              <View style={styles.activeBannerInfo}>
+                <Flame
+                  size={20}
+                  color={theme.accent}
+                  style={{ marginRight: 8 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.activeBannerTitle, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    Séance en cours : {activeSession.title}
+                  </Text>
+                  <Text
+                    style={[styles.activeBannerSub, { color: theme.textMuted }]}
+                  >
+                    {getActiveBannerSubtitle(activeSession)}
+                  </Text>
+                </View>
+              </View>
+              <Button
+                title="Reprendre"
+                variant="primary"
+                onPress={() => router.push("/live-workout")}
+                style={styles.resumeBtn}
               />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.activeBannerTitle, { color: theme.text }]}
-                  numberOfLines={1}
+            </View>
+          )}
+
+          {/* Bannière de Guidage Étape 1/2 : Création première séance */}
+          {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
+            <View
+              style={[
+                styles.guidedBanner,
+                { backgroundColor: theme.cardBg, borderColor: theme.accent },
+              ]}
+            >
+              <View style={styles.guidedBannerHeader}>
+                <View
+                  style={[
+                    styles.guidedStepBadge,
+                    { backgroundColor: theme.accent },
+                  ]}
                 >
-                  Séance en cours : {activeSession.title}
+                  <Sparkles size={13} color="#FFFFFF" />
+                  <Text style={styles.guidedStepText}>
+                    Étape 1/2 : Créez votre première séance test !
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.guidedBannerTitle, { color: theme.text }]}>
+                Construisez votre premier programme
+              </Text>
+              <Text
+                style={[styles.guidedBannerSub, { color: theme.textMuted }]}
+              >
+                Cliquez sur le bouton lumineux{" "}
+                <Text style={{ fontWeight: "800", color: theme.text }}>
+                  "+ Séance"
+                </Text>{" "}
+                ci-dessous pour ajouter vos premiers exercices.
+              </Text>
+            </View>
+          )}
+
+          {/* Bannière de Guidage Étape 2/2 : Lancement de la première séance */}
+          {data?.hasCompletedOnboarding &&
+            data?.hasCreatedFirstSession &&
+            !data?.hasCompletedFirstWorkout &&
+            !activeSession && (
+              <View
+                style={[
+                  styles.guidedBanner,
+                  { backgroundColor: theme.cardBg, borderColor: theme.primary },
+                ]}
+              >
+                <View style={styles.guidedBannerHeader}>
+                  <View
+                    style={[
+                      styles.guidedStepBadge,
+                      { backgroundColor: theme.primary },
+                    ]}
+                  >
+                    <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+                    <Text style={styles.guidedStepText}>
+                      Étape 2/2 : Lancez votre Entraînement !
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.guidedBannerTitle, { color: theme.text }]}>
+                  Votre séance test est prête !
                 </Text>
                 <Text
-                  style={[styles.activeBannerSub, { color: theme.textMuted }]}
+                  style={[styles.guidedBannerSub, { color: theme.textMuted }]}
                 >
-                  {getActiveBannerSubtitle(activeSession)}
+                  Cliquez sur le bouton{" "}
+                  <Text style={{ fontWeight: "800", color: theme.primary }}>
+                    "Démarrer"
+                  </Text>{" "}
+                  sur la carte de votre séance pour votre premier test en
+                  direct.
                 </Text>
               </View>
-            </View>
-            <Button
-              title="Reprendre"
-              variant="primary"
-              onPress={() => router.push("/live-workout")}
-              style={styles.resumeBtn}
-            />
-          </View>
-        )}
+            )}
 
-        {/* Top Action Buttons (Side by Side) */}
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[styles.mainActionBox, { backgroundColor: theme.accent }]}
-            onPress={handleStartFreestyle}
-          >
-            <View style={styles.playIconCircle}>
-              <Play size={16} color={theme.accent} fill={theme.accent} />
-            </View>
-            <View style={{ marginLeft: 10 }}>
-              <Text style={styles.mainActionTitle}>Entraînement libre</Text>
-              <Text style={styles.mainActionSub}>Démarre direct sans plan</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Top Action Buttons (Side by Side) */}
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.mainActionBox, { backgroundColor: theme.accent }]}
+              onPress={handleStartFreestyle}
+            >
+              <View style={styles.playIconCircle}>
+                <Play size={16} color={theme.accent} fill={theme.accent} />
+              </View>
+              <View style={{ marginLeft: 10 }}>
+                <Text style={styles.mainActionTitle}>Entraînement libre</Text>
+                <Text style={styles.mainActionSub}>
+                  Démarre direct sans plan
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[
-              styles.createActionBox,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
-            onPress={() => router.push("/template-editor")}
-          >
-            <Plus size={22} color={theme.text} />
-            <Text style={[styles.createActionTitle, { color: theme.text }]}>
-              SÉANCE
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Section Header with "Nouveau dossier" button */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-            MES DOSSIERS & SÉANCES
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.newFolderBtn,
-              { borderColor: theme.border, backgroundColor: theme.surface },
-            ]}
-            onPress={() => setShowCreateFolderModal(true)}
-          >
-            <FolderPlus
-              size={14}
-              color={theme.accent}
-              style={{ marginRight: 4 }}
-            />
-            <Text style={[styles.newFolderText, { color: theme.accent }]}>
-              Nouveau dossier
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Folders List */}
-        {folders.map((folder) => {
-          const folderTemplates = [...(data?.templates || [])]
-            .filter((t) => folder.templateIds.includes(t.id))
-            .sort((a, b) =>
-              a.title.localeCompare(b.title, "fr", { sensitivity: "base" }),
-            );
-          const isCollapsed = !!folder.isCollapsed;
-
-          return (
-            <View
-              key={folder.id}
+            <Animated.View
               style={[
-                styles.folderContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
+                { flex: 1 },
+                data?.hasCompletedOnboarding &&
+                  !data?.hasCreatedFirstSession && {
+                    transform: [{ scale: pulseAnim }],
+                  },
               ]}
             >
               <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.folderHeader}
-                onPress={() => toggleFolderCollapse(folder.id)}
+                activeOpacity={0.8}
+                style={[
+                  styles.createActionBox,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  data?.hasCompletedOnboarding &&
+                    !data?.hasCreatedFirstSession && {
+                      borderColor: theme.accent,
+                      borderWidth: 2,
+                    },
+                ]}
+                onPress={() => router.push("/template-editor")}
               >
-                <View style={styles.folderHeaderLeft}>
-                  <Folder
-                    size={18}
-                    color={theme.accent}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={[styles.folderTitle, { color: theme.text }]}>
-                    {folder.name}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.folderBadgeCount,
-                      { color: theme.textMuted, backgroundColor: theme.cardBg },
-                    ]}
-                  >
-                    {folderTemplates.length}
-                  </Text>
-                </View>
-
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={{ padding: 4, marginRight: 4 }}
-                    onPress={() => {
-                      setSelectedFolder(folder);
-                      setRenameFolderName(folder.name);
-                      setShowRenameFolderModal(true);
-                    }}
-                  >
-                    <Edit2 size={15} color={theme.textMuted} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={{ padding: 4, marginRight: 4 }}
-                    onPress={() => deleteFolder(folder.id)}
-                  >
-                    <Trash2 size={15} color={theme.danger} />
-                  </TouchableOpacity>
-
-                  {isCollapsed ? (
-                    <ChevronRight size={18} color={theme.textMuted} />
-                  ) : (
-                    <ChevronDown size={18} color={theme.textMuted} />
-                  )}
-                </View>
+                <Plus size={22} color={theme.text} />
+                <Text style={[styles.createActionTitle, { color: theme.text }]}>
+                  SÉANCE
+                </Text>
               </TouchableOpacity>
+            </Animated.View>
+          </View>
 
-              {!isCollapsed && (
-                <View style={styles.folderBody}>
-                  {folderTemplates.length === 0 ? (
+          {/* Section Header with "Nouveau dossier" button */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+              MES DOSSIERS & SÉANCES
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.newFolderBtn,
+                { borderColor: theme.border, backgroundColor: theme.surface },
+              ]}
+              onPress={() => setShowCreateFolderModal(true)}
+            >
+              <FolderPlus
+                size={14}
+                color={theme.accent}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.newFolderText, { color: theme.accent }]}>
+                Nouveau dossier
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Folders List */}
+          {folders.map((folder) => {
+            const folderTemplates = [...(data?.templates || [])]
+              .filter((t) => folder.templateIds.includes(t.id))
+              .sort((a, b) =>
+                a.title.localeCompare(b.title, "fr", { sensitivity: "base" }),
+              );
+            const isCollapsed = !!folder.isCollapsed;
+
+            return (
+              <View
+                key={folder.id}
+                style={[
+                  styles.folderContainer,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.folderHeader}
+                  onPress={() => toggleFolderCollapse(folder.id)}
+                >
+                  <View style={styles.folderHeaderLeft}>
+                    <Folder
+                      size={18}
+                      color={theme.accent}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={[styles.folderTitle, { color: theme.text }]}>
+                      {folder.name}
+                    </Text>
                     <Text
                       style={[
-                        styles.emptyFolderText,
-                        { color: theme.textMuted },
+                        styles.folderBadgeCount,
+                        {
+                          color: theme.textMuted,
+                          backgroundColor: theme.cardBg,
+                        },
                       ]}
                     >
-                      Aucune séance dans ce dossier.
+                      {folderTemplates.length}
                     </Text>
-                  ) : (
-                    folderTemplates.map((tpl) => renderTemplateCard(tpl))
-                  )}
-                </View>
-              )}
-            </View>
-          );
-        })}
+                  </View>
 
-        {/* Unassigned Templates Section */}
-        {unassignedTemplates.length > 0 && (
-          <View style={{ marginTop: 8 }}>
-            {folders.length > 0 && (
-              <Text
-                style={[styles.sectionSubTitle, { color: theme.textMuted }]}
-              >
-                AUTRES SÉANCES
-              </Text>
-            )}
-            {unassignedTemplates.map((tpl) => renderTemplateCard(tpl))}
-          </View>
-        )}
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{ padding: 4, marginRight: 4 }}
+                      onPress={() => {
+                        setSelectedFolder(folder);
+                        setRenameFolderName(folder.name);
+                        setShowRenameFolderModal(true);
+                      }}
+                    >
+                      <Edit2 size={15} color={theme.textMuted} />
+                    </TouchableOpacity>
 
-        {/* Carte Accès Bibliothèque d'Exercices */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={[
-            styles.libraryCard,
-            { backgroundColor: theme.cardBg, borderColor: theme.border },
-          ]}
-          onPress={() => setShowLibraryModal(true)}
-        >
-          <View
-            style={[styles.libraryIconBox, { backgroundColor: theme.surface }]}
-          >
-            <BookOpen size={20} color={theme.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
-              <Text style={[styles.libraryTitle, { color: theme.text }]}>
-                Bibliothèque d'Exercices
-              </Text>
-              <View
-                style={[
-                  styles.countBadge,
-                  {
-                    backgroundColor: theme.accent + "22",
-                    borderColor: theme.accent,
-                  },
-                ]}
-              >
-                <Text style={[styles.countBadgeText, { color: theme.accent }]}>
-                  {allExercises.length}
-                </Text>
+                    <TouchableOpacity
+                      style={{ padding: 4, marginRight: 4 }}
+                      onPress={() => deleteFolder(folder.id)}
+                    >
+                      <Trash2 size={15} color={theme.danger} />
+                    </TouchableOpacity>
+
+                    {isCollapsed ? (
+                      <ChevronRight size={18} color={theme.textMuted} />
+                    ) : (
+                      <ChevronDown size={18} color={theme.textMuted} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {!isCollapsed && (
+                  <View style={styles.folderBody}>
+                    {folderTemplates.length === 0 ? (
+                      <Text
+                        style={[
+                          styles.emptyFolderText,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        Aucune séance dans ce dossier.
+                      </Text>
+                    ) : (
+                      folderTemplates.map((tpl) => renderTemplateCard(tpl))
+                    )}
+                  </View>
+                )}
               </View>
+            );
+          })}
+
+          {/* Unassigned Templates Section */}
+          {unassignedTemplates.length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              {folders.length > 0 && (
+                <Text
+                  style={[styles.sectionSubTitle, { color: theme.textMuted }]}
+                >
+                  AUTRES SÉANCES
+                </Text>
+              )}
+              {unassignedTemplates.map((tpl) => renderTemplateCard(tpl))}
             </View>
-            <Text style={[styles.librarySub, { color: theme.textMuted }]}>
-              {allExercises.length} exercices • Consulter, créer et gérer vos
-              exercices
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.textMuted} />
-        </TouchableOpacity>
-      </ScrollView>
+          )}
 
-      {/* Floating Rest Timer Bar */}
-      <RestTimerBar />
+          {/* État vide si aucun dossier ni programme */}
+          {folders.length === 0 && (data?.templates || []).length === 0 && (
+            <View
+              style={[
+                styles.emptyStateBox,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <Dumbbell
+                size={32}
+                color={theme.textMuted}
+                style={{ marginBottom: 8 }}
+              />
+              <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
+                Aucun programme enregistré
+              </Text>
+              <Text style={[styles.emptyStateSub, { color: theme.textMuted }]}>
+                Créez votre première séance personnalisée avec le bouton "+
+                Séance" ou lancez un entraînement libre !
+              </Text>
+            </View>
+          )}
 
-      {/* Modale Bibliothèque d'Exercices */}
-      <ExerciseLibraryModal
-        visible={showLibraryModal}
-        onClose={() => setShowLibraryModal(false)}
-      />
-
-      {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}
-      <Modal
-        visible={showTemplateMenuModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTemplateMenuModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowTemplateMenuModal(false)}
-        >
-          <View
+          {/* Carte Accès Bibliothèque d'Exercices */}
+          <TouchableOpacity
+            activeOpacity={0.7}
             style={[
-              styles.menuModalContent,
+              styles.libraryCard,
               { backgroundColor: theme.cardBg, borderColor: theme.border },
             ]}
+            onPress={() => setShowLibraryModal(true)}
           >
-            <View style={styles.modalMenuHeader}>
-              <Text
-                style={[styles.modalMenuTitle, { color: theme.text }]}
-                numberOfLines={1}
+            <View
+              style={[
+                styles.libraryIconBox,
+                { backgroundColor: theme.surface },
+              ]}
+            >
+              <BookOpen size={20} color={theme.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
-                {selectedTemplate?.title}
+                <Text style={[styles.libraryTitle, { color: theme.text }]}>
+                  Bibliothèque d'Exercices
+                </Text>
+                <View
+                  style={[
+                    styles.countBadge,
+                    {
+                      backgroundColor: theme.accent + "22",
+                      borderColor: theme.accent,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.countBadgeText, { color: theme.accent }]}
+                  >
+                    {allExercises.length}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.librarySub, { color: theme.textMuted }]}>
+                Consulter, créer et gérer vos exercices
               </Text>
-              <TouchableOpacity onPress={() => setShowTemplateMenuModal(false)}>
-                <X size={20} color={theme.text} />
-              </TouchableOpacity>
             </View>
+            <ChevronRight size={18} color={theme.textMuted} />
+          </TouchableOpacity>
+        </ScrollView>
 
-            {/* 1. Démarrer */}
-            <TouchableOpacity
-              style={[
-                styles.menuOptionRow,
-                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
-              ]}
-              onPress={() => {
-                setShowTemplateMenuModal(false);
-                if (selectedTemplate) handleStartTemplate(selectedTemplate.id);
-              }}
-            >
-              <Play size={18} color={theme.accent} fill={theme.accent} />
-              <Text
-                style={[
-                  styles.menuOptionText,
-                  { color: theme.text, fontWeight: "800" },
-                ]}
-              >
-                Démarrer la séance
-              </Text>
-            </TouchableOpacity>
+        {/* Floating Rest Timer Bar */}
+        <RestTimerBar />
 
-            {/* 2. Modifier */}
-            <TouchableOpacity
-              style={[
-                styles.menuOptionRow,
-                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
-              ]}
-              onPress={() => {
-                setShowTemplateMenuModal(false);
-                if (selectedTemplate) {
-                  router.push({
-                    pathname: "/template-editor",
-                    params: { id: selectedTemplate.id },
-                  });
-                }
-              }}
-            >
-              <Edit2 size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>
-                Modifier la séance
-              </Text>
-            </TouchableOpacity>
+        {/* Modale Bibliothèque d'Exercices */}
+        <ExerciseLibraryModal
+          visible={showLibraryModal}
+          onClose={() => setShowLibraryModal(false)}
+        />
 
-            {/* 3. Renommer */}
-            <TouchableOpacity
-              style={[
-                styles.menuOptionRow,
-                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
-              ]}
-              onPress={() => {
-                setShowTemplateMenuModal(false);
-                if (selectedTemplate) {
-                  setRenameTemplateTitle(selectedTemplate.title);
-                  setShowRenameTemplateModal(true);
-                }
-              }}
-            >
-              <Tag size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>
-                Renommer
-              </Text>
-            </TouchableOpacity>
-
-            {/* 4. Dupliquer */}
-            <TouchableOpacity
-              style={[
-                styles.menuOptionRow,
-                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
-              ]}
-              onPress={() => {
-                setShowTemplateMenuModal(false);
-                if (selectedTemplate) {
-                  duplicateTemplate(selectedTemplate.id);
-                }
-              }}
-            >
-              <Copy size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>
-                Dupliquer la séance
-              </Text>
-            </TouchableOpacity>
-
-            {/* Déplacer dans un dossier */}
-            <TouchableOpacity
-              style={[
-                styles.menuOptionRow,
-                { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
-              ]}
-              onPress={() => {
-                setShowTemplateMenuModal(false);
-                setShowMoveFolderModal(true);
-              }}
-            >
-              <FolderPlus size={18} color={theme.text} />
-              <Text style={[styles.menuOptionText, { color: theme.text }]}>
-                Déplacer dans un dossier
-              </Text>
-            </TouchableOpacity>
-
-            {/* Supprimer (sans bordure inférieure) */}
-            <TouchableOpacity
-              style={[styles.menuOptionRow, { borderBottomWidth: 0 }]}
-              onPress={() => {
-                setShowTemplateMenuModal(false);
-                if (selectedTemplate) {
-                  deleteTemplate(selectedTemplate.id);
-                }
-              }}
-            >
-              <Trash2 size={18} color={theme.danger} />
-              <Text style={[styles.menuOptionText, { color: theme.danger }]}>
-                Supprimer la séance
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ---------------- MODALE RENOMMER SÉANCE ---------------- */}
-      <Modal
-        visible={showRenameTemplateModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRenameTemplateModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowRenameTemplateModal(false)}
-        >
-          <View
-            style={[
-              styles.inputModalContent,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Renommer la séance
-            </Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.surface,
-                },
-              ]}
-              value={renameTemplateTitle}
-              onChangeText={setRenameTemplateTitle}
-              placeholder="Nouveau titre..."
-              placeholderTextColor={theme.textMuted}
-              autoFocus
-            />
-            <View style={styles.modalBtnRow}>
-              <Button
-                title="Annuler"
-                variant="outline"
-                onPress={() => setShowRenameTemplateModal(false)}
-                style={{ flex: 1, marginRight: 6 }}
-              />
-              <Button
-                title="Enregistrer"
-                variant="primary"
-                onPress={handleConfirmRenameTemplate}
-                style={{ flex: 1, marginLeft: 6 }}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ---------------- MODALE CRÉATION DOSSIER ---------------- */}
-      <Modal
-        visible={showCreateFolderModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCreateFolderModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowCreateFolderModal(false)}
-        >
-          <View
-            style={[
-              styles.inputModalContent,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Nouveau Dossier
-            </Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.surface,
-                },
-              ]}
-              value={newFolderName}
-              onChangeText={setNewFolderName}
-              placeholder="ex: Prise de masse, Upper/Lower..."
-              placeholderTextColor={theme.textMuted}
-              autoFocus
-            />
-            <View style={styles.modalBtnRow}>
-              <Button
-                title="Annuler"
-                variant="outline"
-                onPress={() => setShowCreateFolderModal(false)}
-                style={{ flex: 1, marginRight: 6 }}
-              />
-              <Button
-                title="Créer"
-                variant="primary"
-                onPress={handleConfirmCreateFolder}
-                style={{ flex: 1, marginLeft: 6 }}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ---------------- MODALE RENOMMER DOSSIER ---------------- */}
-      <Modal
-        visible={showRenameFolderModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRenameFolderModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowRenameFolderModal(false)}
-        >
-          <View
-            style={[
-              styles.inputModalContent,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Renommer le dossier
-            </Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.surface,
-                },
-              ]}
-              value={renameFolderName}
-              onChangeText={setRenameFolderName}
-              placeholder="Nom du dossier..."
-              placeholderTextColor={theme.textMuted}
-              autoFocus
-            />
-            <View style={styles.modalBtnRow}>
-              <Button
-                title="Annuler"
-                variant="outline"
-                onPress={() => setShowRenameFolderModal(false)}
-                style={{ flex: 1, marginRight: 6 }}
-              />
-              <Button
-                title="Enregistrer"
-                variant="primary"
-                onPress={handleConfirmRenameFolder}
-                style={{ flex: 1, marginLeft: 6 }}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ---------------- MODALE DÉPLACER DANS UN DOSSIER ---------------- */}
-      <Modal
-        visible={showMoveFolderModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMoveFolderModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMoveFolderModal(false)}
+        {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}
+        <Modal
+          visible={showTemplateMenuModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTemplateMenuModal(false)}
         >
           <TouchableOpacity
+            style={styles.modalOverlay}
             activeOpacity={1}
-            style={[
-              styles.menuModalContent,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
+            onPress={() => setShowTemplateMenuModal(false)}
           >
-            <View style={styles.modalMenuHeader}>
-              <Text
-                style={[styles.modalMenuTitle, { color: theme.text }]}
-                numberOfLines={1}
-              >
-                Déplacer "{selectedTemplate?.title}"
-              </Text>
-              <TouchableOpacity onPress={() => setShowMoveFolderModal(false)}>
-                <X size={20} color={theme.text} />
-              </TouchableOpacity>
-            </View>
+            <View
+              style={[
+                styles.menuModalContent,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.modalMenuHeader}>
+                <Text
+                  style={[styles.modalMenuTitle, { color: theme.text }]}
+                  numberOfLines={1}
+                >
+                  {selectedTemplate?.title}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowTemplateMenuModal(false)}
+                >
+                  <X size={20} color={theme.text} />
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView style={{ maxHeight: 280 }}>
-              {/* Option Aucun dossier (Hors dossier) */}
+              {/* 1. Démarrer */}
               <TouchableOpacity
                 style={[
                   styles.menuOptionRow,
-                  {
-                    borderBottomColor: theme.border,
-                    justifyContent: "space-between",
-                  },
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
                 ]}
-                onPress={async () => {
+                onPress={() => {
+                  setShowTemplateMenuModal(false);
+                  if (selectedTemplate)
+                    handleStartTemplate(selectedTemplate.id);
+                }}
+              >
+                <Play size={18} color={theme.accent} fill={theme.accent} />
+                <Text
+                  style={[
+                    styles.menuOptionText,
+                    { color: theme.text, fontWeight: "800" },
+                  ]}
+                >
+                  Démarrer la séance
+                </Text>
+              </TouchableOpacity>
+
+              {/* 2. Modifier */}
+              <TouchableOpacity
+                style={[
+                  styles.menuOptionRow,
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
+                ]}
+                onPress={() => {
+                  setShowTemplateMenuModal(false);
                   if (selectedTemplate) {
-                    await moveTemplateToFolder(selectedTemplate.id, null);
-                    setShowMoveFolderModal(false);
+                    router.push({
+                      pathname: "/template-editor",
+                      params: { id: selectedTemplate.id },
+                    });
                   }
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flex: 1,
-                    marginRight: 8,
-                  }}
-                >
-                  <Folder size={18} color={theme.textMuted} />
-                  <Text
-                    style={[styles.menuOptionText, { color: theme.text }]}
-                    numberOfLines={1}
-                  >
-                    Aucun dossier (Hors dossier)
-                  </Text>
-                </View>
-                {isNoFolderSelected && <Check size={18} color={theme.accent} />}
+                <Edit2 size={18} color={theme.text} />
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>
+                  Modifier la séance
+                </Text>
               </TouchableOpacity>
 
-              {/* Dossiers existants */}
-              {folders.map((f) => {
-                const isSelected = currentFolder?.id === f.id;
-                return (
-                  <TouchableOpacity
-                    key={f.id}
-                    style={[
-                      styles.menuOptionRow,
-                      {
-                        borderBottomColor: theme.border,
-                        justifyContent: "space-between",
-                      },
-                    ]}
-                    onPress={async () => {
-                      if (selectedTemplate) {
-                        await moveTemplateToFolder(selectedTemplate.id, f.id);
-                        setShowMoveFolderModal(false);
-                      }
+              {/* 3. Renommer */}
+              <TouchableOpacity
+                style={[
+                  styles.menuOptionRow,
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
+                ]}
+                onPress={() => {
+                  setShowTemplateMenuModal(false);
+                  if (selectedTemplate) {
+                    setRenameTemplateTitle(selectedTemplate.title);
+                    setShowRenameTemplateModal(true);
+                  }
+                }}
+              >
+                <Tag size={18} color={theme.text} />
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>
+                  Renommer
+                </Text>
+              </TouchableOpacity>
+
+              {/* 4. Dupliquer */}
+              <TouchableOpacity
+                style={[
+                  styles.menuOptionRow,
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
+                ]}
+                onPress={() => {
+                  setShowTemplateMenuModal(false);
+                  if (selectedTemplate) {
+                    duplicateTemplate(selectedTemplate.id);
+                  }
+                }}
+              >
+                <Copy size={18} color={theme.text} />
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>
+                  Dupliquer la séance
+                </Text>
+              </TouchableOpacity>
+
+              {/* Déplacer dans un dossier */}
+              <TouchableOpacity
+                style={[
+                  styles.menuOptionRow,
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
+                ]}
+                onPress={() => {
+                  setShowTemplateMenuModal(false);
+                  setShowMoveFolderModal(true);
+                }}
+              >
+                <FolderPlus size={18} color={theme.text} />
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>
+                  Déplacer dans un dossier
+                </Text>
+              </TouchableOpacity>
+
+              {/* Supprimer (sans bordure inférieure) */}
+              <TouchableOpacity
+                style={[styles.menuOptionRow, { borderBottomWidth: 0 }]}
+                onPress={() => {
+                  setShowTemplateMenuModal(false);
+                  if (selectedTemplate) {
+                    deleteTemplate(selectedTemplate.id);
+                  }
+                }}
+              >
+                <Trash2 size={18} color={theme.danger} />
+                <Text style={[styles.menuOptionText, { color: theme.danger }]}>
+                  Supprimer la séance
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ---------------- MODALE RENOMMER SÉANCE ---------------- */}
+        <Modal
+          visible={showRenameTemplateModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowRenameTemplateModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRenameTemplateModal(false)}
+          >
+            <View
+              style={[
+                styles.inputModalContent,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Renommer la séance
+              </Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    color: theme.text,
+                    borderColor: theme.border,
+                    backgroundColor: theme.surface,
+                  },
+                ]}
+                value={renameTemplateTitle}
+                onChangeText={setRenameTemplateTitle}
+                placeholder="Nouveau titre..."
+                placeholderTextColor={theme.textMuted}
+                autoFocus
+              />
+              <View style={styles.modalBtnRow}>
+                <Button
+                  title="Annuler"
+                  variant="outline"
+                  onPress={() => setShowRenameTemplateModal(false)}
+                  style={{ flex: 1, marginRight: 6 }}
+                />
+                <Button
+                  title="Enregistrer"
+                  variant="primary"
+                  onPress={handleConfirmRenameTemplate}
+                  style={{ flex: 1, marginLeft: 6 }}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ---------------- MODALE CRÉATION DOSSIER ---------------- */}
+        <Modal
+          visible={showCreateFolderModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowCreateFolderModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowCreateFolderModal(false)}
+          >
+            <View
+              style={[
+                styles.inputModalContent,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Nouveau Dossier
+              </Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    color: theme.text,
+                    borderColor: theme.border,
+                    backgroundColor: theme.surface,
+                  },
+                ]}
+                value={newFolderName}
+                onChangeText={setNewFolderName}
+                placeholder="ex: Prise de masse, Upper/Lower..."
+                placeholderTextColor={theme.textMuted}
+                autoFocus
+              />
+              <View style={styles.modalBtnRow}>
+                <Button
+                  title="Annuler"
+                  variant="outline"
+                  onPress={() => setShowCreateFolderModal(false)}
+                  style={{ flex: 1, marginRight: 6 }}
+                />
+                <Button
+                  title="Créer"
+                  variant="primary"
+                  onPress={handleConfirmCreateFolder}
+                  style={{ flex: 1, marginLeft: 6 }}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ---------------- MODALE RENOMMER DOSSIER ---------------- */}
+        <Modal
+          visible={showRenameFolderModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowRenameFolderModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRenameFolderModal(false)}
+          >
+            <View
+              style={[
+                styles.inputModalContent,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Renommer le dossier
+              </Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    color: theme.text,
+                    borderColor: theme.border,
+                    backgroundColor: theme.surface,
+                  },
+                ]}
+                value={renameFolderName}
+                onChangeText={setRenameFolderName}
+                placeholder="Nom du dossier..."
+                placeholderTextColor={theme.textMuted}
+                autoFocus
+              />
+              <View style={styles.modalBtnRow}>
+                <Button
+                  title="Annuler"
+                  variant="outline"
+                  onPress={() => setShowRenameFolderModal(false)}
+                  style={{ flex: 1, marginRight: 6 }}
+                />
+                <Button
+                  title="Enregistrer"
+                  variant="primary"
+                  onPress={handleConfirmRenameFolder}
+                  style={{ flex: 1, marginLeft: 6 }}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ---------------- MODALE DÉPLACER DANS UN DOSSIER ---------------- */}
+        <Modal
+          visible={showMoveFolderModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMoveFolderModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowMoveFolderModal(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[
+                styles.menuModalContent,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.modalMenuHeader}>
+                <Text
+                  style={[styles.modalMenuTitle, { color: theme.text }]}
+                  numberOfLines={1}
+                >
+                  Déplacer "{selectedTemplate?.title}"
+                </Text>
+                <TouchableOpacity onPress={() => setShowMoveFolderModal(false)}>
+                  <X size={20} color={theme.text} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: 280 }}>
+                {/* Option Aucun dossier (Hors dossier) */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuOptionRow,
+                    {
+                      borderBottomColor: theme.border,
+                      justifyContent: "space-between",
+                    },
+                  ]}
+                  onPress={async () => {
+                    if (selectedTemplate) {
+                      await moveTemplateToFolder(selectedTemplate.id, null);
+                      setShowMoveFolderModal(false);
+                    }
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      flex: 1,
+                      marginRight: 8,
                     }}
                   >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        flex: 1,
-                        marginRight: 8,
+                    <Folder size={18} color={theme.textMuted} />
+                    <Text
+                      style={[styles.menuOptionText, { color: theme.text }]}
+                      numberOfLines={1}
+                    >
+                      Aucun dossier (Hors dossier)
+                    </Text>
+                  </View>
+                  {isNoFolderSelected && (
+                    <Check size={18} color={theme.accent} />
+                  )}
+                </TouchableOpacity>
+
+                {/* Dossiers existants */}
+                {folders.map((f) => {
+                  const isSelected = currentFolder?.id === f.id;
+                  return (
+                    <TouchableOpacity
+                      key={f.id}
+                      style={[
+                        styles.menuOptionRow,
+                        {
+                          borderBottomColor: theme.border,
+                          justifyContent: "space-between",
+                        },
+                      ]}
+                      onPress={async () => {
+                        if (selectedTemplate) {
+                          await moveTemplateToFolder(selectedTemplate.id, f.id);
+                          setShowMoveFolderModal(false);
+                        }
                       }}
                     >
-                      <Folder size={18} color={theme.accent} />
-                      <Text
-                        style={[styles.menuOptionText, { color: theme.text }]}
-                        numberOfLines={1}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          flex: 1,
+                          marginRight: 8,
+                        }}
                       >
-                        {f.name}
-                      </Text>
-                    </View>
-                    {isSelected && <Check size={18} color={theme.accent} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                        <Folder size={18} color={theme.accent} />
+                        <Text
+                          style={[styles.menuOptionText, { color: theme.text }]}
+                          numberOfLines={1}
+                        >
+                          {f.name}
+                        </Text>
+                      </View>
+                      {isSelected && <Check size={18} color={theme.accent} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-            {/* Bouton + Créer un nouveau dossier */}
-            <TouchableOpacity
-              style={[
-                styles.createNewFolderOption,
-                { borderColor: theme.accent, backgroundColor: theme.surface },
-              ]}
-              onPress={() => {
-                setShowMoveFolderModal(false);
-                setShowCreateFolderModal(true);
-              }}
-            >
-              <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
-              <Text
-                style={[styles.createNewFolderText, { color: theme.accent }]}
+              {/* Bouton + Créer un nouveau dossier */}
+              <TouchableOpacity
+                style={[
+                  styles.createNewFolderOption,
+                  { borderColor: theme.accent, backgroundColor: theme.surface },
+                ]}
+                onPress={() => {
+                  setShowMoveFolderModal(false);
+                  setShowCreateFolderModal(true);
+                }}
               >
-                + Créer un nouveau dossier
-              </Text>
+                <Plus
+                  size={16}
+                  color={theme.accent}
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={[styles.createNewFolderText, { color: theme.accent }]}
+                >
+                  + Créer un nouveau dossier
+                </Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-    </SafeAreaView>
+        </Modal>
+
+        {/* ---------------- MODALE DE PREMIÈRE UTILISATION (ONBOARDING) ---------------- */}
+        <OnboardingModal
+          visible={!loading && !!data && !data.hasCompletedOnboarding}
+          onComplete={completeOnboarding}
+        />
+      </SafeAreaView>
+    </TabSwipeWrapper>
   );
 }
 
@@ -1136,11 +1323,12 @@ const styles = StyleSheet.create({
   },
   actionButtonsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "stretch",
+    gap: 10,
     marginBottom: 14,
   },
   mainActionBox: {
-    flex: 0.66,
+    flex: 1.8,
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
@@ -1164,7 +1352,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   createActionBox: {
-    flex: 0.31,
+    flex: 1,
+    width: "100%",
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
     padding: 12,
@@ -1437,5 +1627,58 @@ const styles = StyleSheet.create({
   createNewFolderText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  emptyStateBox: {
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 14,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  emptyStateSub: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  guidedBanner: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 12,
+  },
+  guidedBannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  guidedStepBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  guidedStepText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  guidedBannerTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  guidedBannerSub: {
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 17,
   },
 });

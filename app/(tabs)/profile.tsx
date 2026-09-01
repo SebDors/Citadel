@@ -8,6 +8,7 @@ import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { ModularMeasurementChartCard } from '../../src/components/Profile/ModularMeasurementChartCard';
 import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
 import { Sun, Moon } from 'lucide-react-native';
+import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 
 export default function ProfileTab() {
   const { data, addMeasurement, deleteMeasurement, updateUserProfile } = useWorkout();
@@ -16,7 +17,8 @@ export default function ProfileTab() {
   if (!data) return null;
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <TabSwipeWrapper tabIndex={2}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header avec bouton de bascule Thème (Soleil / Lune) dans l'angle supérieur droit */}
         <View style={styles.header}>
@@ -24,7 +26,7 @@ export default function ProfileTab() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.text }]}>Profil</Text>
               <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                Progression 1RM et Suivi des Mensurations
+                Derniers PR et Suivi des Mensurations
               </Text>
             </View>
 
@@ -56,6 +58,7 @@ export default function ProfileTab() {
         />
       </ScrollView>
     </SafeAreaView>
+    </TabSwipeWrapper>
   );
 }
 

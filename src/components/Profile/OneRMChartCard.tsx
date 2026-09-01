@@ -1,56 +1,130 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
-import { TrendingUp, Dumbbell } from 'lucide-react-native';
+import { Trophy, Dumbbell } from 'lucide-react-native';
+
+import { getSessionBlocks } from '../../types';
 
 export const OneRMChartCard: React.FC = () => {
   const { theme } = useTheme();
+  const { data } = useWorkout();
 
-  // Exemples d'estimations 1RM calculées sur la meilleure performance (Upper B)
-  // Formule Epley: 1RM = Weight * (1 + Reps/30)
-  // Dips 10kg x 10 @ 78.5kg = (78.5 + 10) * (1 + 10/30) = 88.5 * 1.333 = 118kg
-  const exercises1RM = [
-    { name: 'Dips (+Lest)', bestSet: '+10kg x 10 reps', est1RM: '118 kg', delta: '+4%' },
-    { name: 'Tirage Horizontal', bestSet: '40kg x 9 reps', est1RM: '52 kg', delta: '+2.5%' },
-    { name: 'Low Cable Fly', bestSet: '15kg x 10 reps', est1RM: '20 kg', delta: '+5%' },
-  ];
+  const history = data?.history || [];
+
+  // Calcul des derniers Records Personnels (PR) obtenus par exercice
+  const latestPRs = React.useMemo(() => {
+    if (history.length === 0) return [];
+
+    // Chronologie croissante (de la séance la plus ancienne à la plus récente)
+    const sortedHistory = [...history].sort(
+      (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+
+    const prMap = new Map<
+      string,
+      { name: string; weightKg: number; reps: number; date: string }
+    >();
+
+    const processSetForPR = (exerciseName: string, set: any, sessionDate: string) => {
+      if (set.completed && set.weightKg && set.weightKg > 0) {
+        const repsVal = set.reps || 0;
+        const currentPR = prMap.get(exerciseName);
+
+        const isNewPR =
+          !currentPR ||
+          set.weightKg > currentPR.weightKg ||
+          (set.weightKg === currentPR.weightKg && repsVal > currentPR.reps);
+
+        if (isNewPR) {
+          prMap.set(exerciseName, {
+            name: exerciseName,
+            weightKg: set.weightKg,
+            reps: repsVal,
+            date: sessionDate,
+          });
+        }
+      }
+    };
+
+    sortedHistory.forEach((session) => {
+      const sessionDate = session.startTime;
+      const blocks = getSessionBlocks(session);
+
+      blocks.forEach((block) => {
+        if (block.type === 'single') {
+          (block.exercise.sets || []).forEach((set) => {
+            processSetForPR(block.exercise.exerciseName, set, sessionDate);
+          });
+        }
+      });
+    });
+
+    // Tri par date d'obtention du PR (du plus récent au plus ancien)
+    return Array.from(prMap.values())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [history]);
 
   return (
-    <Card>
+    <Card style={styles.card}>
       <View style={styles.header}>
-        <TrendingUp size={18} color={theme.accent} />
-        <Text style={[styles.title, { color: theme.text }]}>Progression 1RM Estimé</Text>
+        <Trophy size={18} color={theme.accent} />
+        <Text style={[styles.title, { color: theme.text }]}>Derniers PR (Records Personnels)</Text>
       </View>
 
-      {exercises1RM.map((item, idx) => (
-        <View key={idx} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
-          <View style={styles.itemLeft}>
-            <Dumbbell size={14} color={theme.textMuted} style={{ marginRight: 6 }} />
-            <View>
-              <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
-              <Text style={[styles.itemSub, { color: theme.textMuted }]}>{item.bestSet}</Text>
-            </View>
-          </View>
+      {latestPRs.length > 0 ? (
+        latestPRs.map((item, idx) => {
+          const formattedDate = new Date(item.date).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          });
 
-          <View style={styles.itemRight}>
-            <Text style={[styles.rmValue, { color: theme.accent }]}>{item.est1RM}</Text>
-            <Text style={[styles.delta, { color: theme.primary }]}>{item.delta}</Text>
-          </View>
+          return (
+            <View key={idx} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.itemLeft}>
+                <Dumbbell size={15} color={theme.accent} style={{ marginRight: 10 }} />
+                <View>
+                  <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
+                  <Text style={[styles.itemDate, { color: theme.textMuted }]}>{formattedDate}</Text>
+                </View>
+              </View>
+
+              <View style={styles.itemRight}>
+                <Text style={[styles.prValue, { color: theme.accent }]}>{item.weightKg.toFixed(1)} kg</Text>
+                {item.reps > 0 && (
+                  <Text style={[styles.prSub, { color: theme.textMuted }]}>
+                    {item.reps} rep{item.reps > 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+            </View>
+          );
+        })
+      ) : (
+        <View style={styles.noDataBox}>
+          <Text style={[styles.noDataText, { color: theme.textMuted }]}>
+            Aucun record personnel enregistré pour le moment. Complétez vos premières séances pour afficher vos PR !
+          </Text>
         </View>
-      ))}
+      )}
     </Card>
   );
 };
 
 const styles = StyleSheet.create({
+  card: {
+    marginBottom: 14,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     marginLeft: 6,
   },
@@ -58,30 +132,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
   itemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   itemName: {
     fontSize: 14,
     fontWeight: '700',
   },
-  itemSub: {
+  itemDate: {
     fontSize: 11,
     fontWeight: '500',
+    marginTop: 2,
   },
   itemRight: {
     alignItems: 'flex-end',
+    marginLeft: 8,
   },
-  rmValue: {
+  prValue: {
     fontSize: 15,
     fontWeight: '900',
   },
-  delta: {
+  prSub: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
+  },
+  noDataBox: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  noDataText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });

@@ -25,12 +25,14 @@ import {
 } from "../src/constants/exerciseDatabase";
 import { normalizeString } from "../src/utils/stringUtils";
 import { CreateExerciseModal } from "../src/components/Workout/CreateExerciseModal";
+import { ConfettiEffect } from "../src/components/UI/ConfettiEffect";
 import {
   getSessionBlocks,
   WorkoutBlock,
   CircuitBlock,
   SingleExerciseBlock,
   CircuitExerciseItem,
+  SET_TYPES_CONFIG,
 } from "../src/types";
 import {
   Plus,
@@ -47,7 +49,11 @@ import {
   Clock,
   X,
   Zap,
+  Sparkles,
+  Trophy,
+  ArrowUpDown,
 } from "lucide-react-native";
+import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -102,12 +108,15 @@ export default function LiveWorkoutScreen() {
     togglePauseWorkoutSession,
     updateActiveSessionCircuitStates,
     allExercises,
+    data,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [showAddExModal, setShowAddExModal] = useState(false);
+  const [showCelebrationModal, setShowCelebrationModal] = useState(false);
+  const [showReorderModal, setShowReorderModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
@@ -116,6 +125,8 @@ export default function LiveWorkoutScreen() {
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(
     new Set(),
   );
+  
+  const { reorderActiveSessionBlocks } = useWorkout();
 
   const isInitialMount = useRef(true);
 
@@ -318,8 +329,52 @@ export default function LiveWorkoutScreen() {
   }, [blocks, circuitStates, activeSession]);
 
   if (!activeSession) {
+    if (showCelebrationModal) {
+      return (
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+          <Modal visible transparent animationType="fade">
+            <View style={styles.celebrationOverlay}>
+              <ConfettiEffect />
+              <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+                <View style={[styles.celebrationIconCircle, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
+                  <Trophy size={44} color={theme.accent} />
+                </View>
+
+                <Text style={[styles.celebrationBadge, { color: theme.accent, backgroundColor: theme.surface }]}>
+                  PREMIÈRE SÉANCE TERMINÉE
+                </Text>
+
+                <Text style={[styles.celebrationTitle, { color: theme.text }]}>
+                  Bravo {data?.profile?.name || 'Athlète'} !
+                </Text>
+
+                <Text style={[styles.celebrationDesc, { color: theme.textMuted }]}>
+                  Vous avez franchi le tout premier pas dans Citadel. Vos statistiques, votre volume d'entraînement et vos repères 1RM sont désormais enregistrés.
+                </Text>
+
+                <Text style={[styles.celebrationSub, { color: theme.text }]}>
+                  Bon courage pour vos futurs entraînements !
+                </Text>
+
+                <Button
+                  title="Retour à l'accueil"
+                  variant="primary"
+                  onPress={() => {
+                    setShowCelebrationModal(false);
+                    router.replace("/(tabs)");
+                  }}
+                  style={{ marginTop: 18, width: '100%' }}
+                />
+              </View>
+            </View>
+          </Modal>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView
+        edges={["top", "left", "right"]}
         style={[
           styles.safeArea,
           {
@@ -335,6 +390,9 @@ export default function LiveWorkoutScreen() {
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             Aucune séance en cours
           </Text>
+          <Text style={[styles.emptySub, { color: theme.textMuted }]}>
+            Démarrez une nouvelle séance depuis l'onglet Entraînement.
+          </Text>
           <Button
             title="Retour à l'accueil"
             variant="primary"
@@ -346,6 +404,8 @@ export default function LiveWorkoutScreen() {
   }
 
   const handleFinish = async () => {
+    const isFirstEverCompletedSession = !data?.hasCompletedFirstWorkout;
+
     const totalCompletedRounds = Object.values(circuitStates).reduce(
       (sum, state) => sum + (state.completedRoundsCount || 0),
       0,
@@ -356,7 +416,12 @@ export default function LiveWorkoutScreen() {
     }
 
     await finishWorkout();
-    router.replace("/(tabs)/history");
+
+    if (isFirstEverCompletedSession) {
+      setShowCelebrationModal(true);
+    } else {
+      router.replace("/(tabs)/history");
+    }
   };
 
   const handleCancel = () => {
@@ -567,7 +632,11 @@ export default function LiveWorkoutScreen() {
         <Text style={[styles.topBarTitle, { color: theme.text }]}>
           Workout Tracker
         </Text>
-        <View style={{ width: 60 }} />
+        <View style={{ flexDirection: 'row', width: 60, justifyContent: 'flex-end' }}>
+          <TouchableOpacity onPress={() => setShowReorderModal(true)} style={{ padding: 4 }}>
+            <ArrowUpDown size={20} color={theme.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -584,6 +653,23 @@ export default function LiveWorkoutScreen() {
             onTogglePause={togglePauseWorkoutSession}
             circuitInfo={circuitInfo}
           />
+
+          {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
+          {data?.hasCompletedOnboarding && !data?.hasCompletedFirstWorkout && (
+            <View style={[styles.guidedLiveCard, { backgroundColor: theme.cardBg, borderColor: theme.accent, marginTop: 8, marginBottom: 4 }]}>
+              <View style={styles.guidedLiveHeader}>
+                <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
+                <Text style={[styles.guidedLiveTitle, { color: theme.accent }]}>
+                  Guide 1er Entraînement (Étape 2/2)
+                </Text>
+              </View>
+              <Text style={[styles.guidedLiveText, { color: theme.text }]}>
+                1. Renseignez vos poids (kg) et répétitions pour chaque série.{"\n"}
+                2. Cochez la case <Text style={{ fontWeight: '800', color: theme.primary }}>✓</Text> à droite pour valider chaque série.{"\n"}
+                3. Une fois fini, cliquez sur <Text style={{ fontWeight: '800', color: theme.text }}>"Terminer la séance"</Text> en bas de la page !
+              </Text>
+            </View>
+          )}
 
           {/* Bannière "Commencer la séance" si la séance est en préparation (hasStarted = false) */}
           {activeSession.hasStarted === false && (
@@ -879,16 +965,26 @@ export default function LiveWorkoutScreen() {
                               {idx + 1}
                             </Text>
                           </View>
-                          <View style={{ marginLeft: 10 }}>
-                            <Text
-                              style={[
-                                styles.collapsedExName,
-                                { color: theme.text },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {ex.exerciseName}
-                            </Text>
+                          <View style={{ marginLeft: 10, flex: 1 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center" }}>
+                              <Text
+                                style={[
+                                  styles.collapsedExName,
+                                  { color: theme.text },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {ex.exerciseName}
+                              </Text>
+                              {ex.setType && ex.setType !== 'normal' && (() => {
+                                const cfg = SET_TYPES_CONFIG[ex.setType] || SET_TYPES_CONFIG.normal;
+                                return (
+                                  <View style={{ backgroundColor: cfg.color, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
+                                  </View>
+                                );
+                              })()}
+                            </View>
                             <Text
                               style={[
                                 styles.collapsedSub,
@@ -977,14 +1073,24 @@ export default function LiveWorkoutScreen() {
                         </View>
 
                         <View style={{ flex: 1, marginLeft: 10 }}>
-                          <Text
-                            style={[
-                              styles.circuitExName,
-                              { color: theme.text },
-                            ]}
-                          >
-                            {ex.exerciseName}
-                          </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            <Text
+                              style={[
+                                styles.circuitExName,
+                                { color: theme.text },
+                              ]}
+                            >
+                              {ex.exerciseName}
+                            </Text>
+                            {ex.setType && ex.setType !== 'normal' && (() => {
+                              const cfg = SET_TYPES_CONFIG[ex.setType] || SET_TYPES_CONFIG.normal;
+                              return (
+                                <View style={{ backgroundColor: cfg.color, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
+                                </View>
+                              );
+                            })()}
+                          </View>
                           <View
                             style={{
                               flexDirection: "row",
@@ -1557,6 +1663,51 @@ export default function LiveWorkoutScreen() {
 
       {/* Floating Rest Timer Bar */}
       <RestTimerBar />
+
+      {/* ---------------- MODALE FÉLICITATIONS 1ÈRE SÉANCE TERMINÉE ---------------- */}
+      <Modal visible={showCelebrationModal} transparent animationType="fade">
+        <View style={styles.celebrationOverlay}>
+          <ConfettiEffect />
+          <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+            <View style={[styles.celebrationIconCircle, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
+              <Trophy size={44} color={theme.accent} />
+            </View>
+
+            <Text style={[styles.celebrationBadge, { color: theme.accent, backgroundColor: theme.surface }]}>
+              PREMIÈRE SÉANCE TERMINÉE
+            </Text>
+
+            <Text style={[styles.celebrationTitle, { color: theme.text }]}>
+              Bravo {data?.profile?.name || 'Athlète'} !
+            </Text>
+
+            <Text style={[styles.celebrationDesc, { color: theme.textMuted }]}>
+              Vous avez franchi le tout premier pas dans Citadel. Vos statistiques, votre volume d'entraînement et vos repères 1RM sont désormais enregistrés.
+            </Text>
+
+            <Text style={[styles.celebrationSub, { color: theme.text }]}>
+              Bon courage pour vos futurs entraînements !
+            </Text>
+
+            <Button
+              title="Retour à l'accueil"
+              variant="primary"
+              onPress={() => {
+                setShowCelebrationModal(false);
+                router.replace("/(tabs)");
+              }}
+              style={{ marginTop: 18, width: '100%' }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <ReorderBlocksModal
+        visible={showReorderModal}
+        onClose={() => setShowReorderModal(false)}
+        blocks={blocks}
+        onReorder={reorderActiveSessionBlocks}
+      />
     </SafeAreaView>
   );
 }
@@ -1640,7 +1791,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: "800",
-    marginBottom: 16,
+    marginBottom: 6,
+  },
+  emptySub: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 20,
   },
   circuitContainer: {
     padding: 14,
@@ -2000,5 +2157,75 @@ const styles = StyleSheet.create({
   twinBtnText: {
     fontSize: 14,
     fontWeight: "800",
+  },
+  guidedLiveCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 14,
+  },
+  guidedLiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  guidedLiveTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  guidedLiveText: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  celebrationOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  celebrationCard: {
+    width: '90%',
+    borderRadius: 24,
+    borderWidth: 2,
+    padding: 24,
+    alignItems: 'center',
+  },
+  celebrationIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  celebrationBadge: {
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  celebrationTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  celebrationDesc: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  celebrationSub: {
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "center",
   },
 });

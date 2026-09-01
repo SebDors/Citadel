@@ -45,7 +45,7 @@ export const RestTimerBar: React.FC = () => {
             </Text>
           ) : (
             <Text style={[styles.nextSetText, { color: theme.accent }]} numberOfLines={1}>
-              Dernière série terminée ! 🎉
+              Dernière série terminée !
             </Text>
           )}
         </View>
