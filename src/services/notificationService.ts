@@ -42,16 +42,16 @@ export const NotificationService = {
     if (!Notifications) return false;
 
     try {
-      // Configuration du handler de notifications au premier plan (une seule fois)
-      // shouldPlaySound: false au 1er plan car nous jouons notre propre son audio personnalisé (timer_end.wav) sans doublon
+      // Configuration du handler de notifications au premier plan
       if (!notificationsInitialized) {
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowAlert: true,
-            shouldPlaySound: false,
+            shouldPlaySound: true,
             shouldSetBadge: false,
             shouldShowBanner: true,
             shouldShowList: true,
+            priority: Notifications.AndroidNotificationPriority.MAX,
           }),
         });
         notificationsInitialized = true;
@@ -64,6 +64,10 @@ export const NotificationService = {
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#618764',
           sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
         });
       }
 
@@ -71,7 +75,13 @@ export const NotificationService = {
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+          },
+        });
         finalStatus = status;
       }
 
@@ -117,6 +127,8 @@ export const NotificationService = {
           title,
           body,
           sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          interruptionLevel: 'timeSensitive',
           data: { type: 'timer_expiration' },
         },
         trigger: {
