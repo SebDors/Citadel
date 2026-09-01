@@ -286,7 +286,11 @@ export default function WorkoutTab() {
     if (isCompact) {
       return (
         <Card key={tpl.id} style={[styles.programCard, { padding: 10 }]}>
-          <View style={styles.compactCardRow}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => toggleCardCollapse(tpl.id)}
+            style={styles.compactCardRow}
+          >
             <View style={styles.compactTitleArea}>
               <Text
                 style={[styles.templateTitle, { color: theme.text }]}
@@ -300,23 +304,34 @@ export default function WorkoutTab() {
             </View>
 
             <View style={styles.compactActionsRow}>
-              <Button
-                title="Démarrer"
-                variant="primary"
-                onPress={() => handleStartTemplate(tpl.id)}
-                icon={<Play size={12} color="#FFFFFF" fill="#FFFFFF" />}
-                style={styles.compactStartBtn}
-                textStyle={styles.compactStartBtnText}
-              />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleStartTemplate(tpl.id);
+                }}
+              >
+                <Button
+                  title="Démarrer"
+                  variant="primary"
+                  onPress={() => handleStartTemplate(tpl.id)}
+                  icon={<Play size={12} color="#FFFFFF" fill="#FFFFFF" />}
+                  style={styles.compactStartBtn}
+                  textStyle={styles.compactStartBtnText}
+                />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.iconBtn}
-                onPress={() => toggleCardCollapse(tpl.id)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleCardCollapse(tpl.id);
+                }}
                 accessibilityLabel="Déplier la séance"
               >
                 <ChevronDown size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
-          </View>
+          </TouchableOpacity>
         </Card>
       );
     }
@@ -324,7 +339,11 @@ export default function WorkoutTab() {
     return (
       <Card key={tpl.id} style={[styles.programCard, { padding: 12 }]}>
         {/* Card Header: Title + Graph Icon + Options + Collapse Toggle */}
-        <View style={styles.cardHeader}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => toggleCardCollapse(tpl.id)}
+          style={styles.cardHeader}
+        >
           <View style={styles.cardTitleArea}>
             <Text
               style={[styles.templateTitle, { color: theme.text }]}
@@ -340,30 +359,37 @@ export default function WorkoutTab() {
           <View style={styles.cardHeaderIcons}>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() =>
+              onPress={(e) => {
+                e.stopPropagation();
                 router.push({
                   pathname: "/workout-analytics",
                   params: { id: tpl.id },
-                })
-              }
+                });
+              }}
             >
               <TrendingUp size={17} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => handleOpenTemplateMenu(tpl)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenTemplateMenu(tpl);
+              }}
             >
               <MoreHorizontal size={19} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => toggleCardCollapse(tpl.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleCardCollapse(tpl.id);
+              }}
               accessibilityLabel="Réduire la séance"
             >
               <ChevronUp size={18} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Inline Exercises List */}
         <Text

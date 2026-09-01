@@ -1876,14 +1876,6 @@ export default function TemplateEditorScreen() {
 
               {/* Liste des Séries */}
               <View style={styles.setsContainer}>
-                <View style={styles.setsHeaderRow}>
-                  <Text style={[styles.setsTitle, { color: theme.text }]}>
-                    Séries ({ex.sets.length})
-                  </Text>
-                  <Text style={[styles.setsHint, { color: theme.textMuted }]}>
-                    Cliquez sur le badge pour changer le type
-                  </Text>
-                </View>
 
                 {ex.sets.map((set, setIdx) => {
                   const setTypeInfo =
