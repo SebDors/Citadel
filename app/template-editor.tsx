@@ -116,11 +116,17 @@ export default function TemplateEditorScreen() {
   // Modale de réorganisation
   const [showReorderModal, setShowReorderModal] = useState(false);
 
-  // Animation de surbrillance guidée
+  // Animation de surbrillance guidée (uniquement si création d'un tout premier programme neuf, pas lors de l'édition ni de la conversion)
+  const isGuidedOnboardingCreation =
+    !!data?.hasCompletedOnboarding &&
+    !data?.hasCreatedFirstSession &&
+    !templateIdParam &&
+    !fromSessionIdParam;
+
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession) {
+    if (isGuidedOnboardingCreation) {
       const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -138,7 +144,7 @@ export default function TemplateEditorScreen() {
       loop.start();
       return () => loop.stop();
     }
-  }, [data?.hasCompletedOnboarding, data?.hasCreatedFirstSession]);
+  }, [isGuidedOnboardingCreation]);
 
   // Charger le template existant si édition ou depuis une séance passée
   useEffect(() => {
@@ -894,7 +900,7 @@ export default function TemplateEditorScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Card d'Onboarding Pas-à-Pas Placée en Haut de Page */}
-        {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
+        {isGuidedOnboardingCreation && (
           <View style={[styles.floatingOnboardingCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
             <View style={styles.floatingOnboardingHeader}>
               <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
@@ -918,7 +924,7 @@ export default function TemplateEditorScreen() {
           style={[
             styles.input,
             { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface },
-            data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && !title.trim() && {
+            isGuidedOnboardingCreation && !title.trim() && {
               borderColor: theme.accent,
               borderWidth: 2.5,
             },
@@ -1394,7 +1400,7 @@ export default function TemplateEditorScreen() {
         <Animated.View
           style={[
             styles.twinButtonsRow,
-            data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && title.trim() && selectedBlocks.length === 0 && {
+            isGuidedOnboardingCreation && title.trim() && selectedBlocks.length === 0 && {
               transform: [{ scale: pulseAnim }],
             },
           ]}
@@ -1407,7 +1413,7 @@ export default function TemplateEditorScreen() {
                 borderColor: theme.accent,
                 backgroundColor: isDark ? 'rgba(156, 176, 128, 0.08)' : 'rgba(235, 125, 0, 0.08)',
               },
-              data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && title.trim() && selectedBlocks.length === 0 && {
+              isGuidedOnboardingCreation && title.trim() && selectedBlocks.length === 0 && {
                 borderWidth: 2.5,
               },
             ]}

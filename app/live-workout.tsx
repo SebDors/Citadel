@@ -403,7 +403,7 @@ export default function LiveWorkoutScreen() {
   }
 
   const handleFinish = async () => {
-    const isFirstEverCompletedSession = (data?.history || []).length === 0;
+    const isFirstEverCompletedSession = !data?.hasCompletedFirstWorkout;
 
     const totalCompletedRounds = Object.values(circuitStates).reduce(
       (sum, state) => sum + (state.completedRoundsCount || 0),
@@ -654,7 +654,7 @@ export default function LiveWorkoutScreen() {
           />
 
           {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
-          {data?.hasCompletedOnboarding && (data?.history || []).length === 0 && (
+          {data?.hasCompletedOnboarding && !data?.hasCompletedFirstWorkout && (
             <View style={[styles.guidedLiveCard, { backgroundColor: theme.cardBg, borderColor: theme.accent, marginTop: 8, marginBottom: 4 }]}>
               <View style={styles.guidedLiveHeader}>
                 <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
