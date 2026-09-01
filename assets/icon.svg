@@ -3,18 +3,23 @@
 
   <g id="citadel-monogram">
     
+    <!-- Ombre / Côtés extrudés (#2B5748) -->
     <g fill="#2B5748">
+      <!-- Haut-Gauche (Spine C) -->
       <path d="M197 129 L211 143 V161 L197 147 Z"/>
       <path d="M241 147 L255 161 V221 L241 207 Z"/>
       <path d="M217 207 L231 221 H255 L241 207 Z"/>
       <path d="M139 239 L153 253 H231 L217 239 Z"/>
       <polygon points="153,143 211,143 211,161 255,161 255,221 231,221 231,253 153,253"/>
 
-      <path d="M299 129 L313 143 V161 L299 147 Z"/>
-      <path d="M359 129 L373 143 V221 L359 207 Z"/>
-      <path d="M255 207 L269 221 H373 L359 207 Z"/>
-      <polygon points="269,161 313,161 313,143 373,143 373,221 269,221"/>
+      <!-- Haut-Droit (Décalage de 50% : Y=138..198 avec crochet vers le bas Y=216) -->
+      <path d="M359 138 L373 152 V230 L359 216 Z"/>
+      <path d="M299 216 L313 230 H373 L359 216 Z"/>
+      <path d="M255 198 L269 212 H313 L299 198 Z"/>
+      <path d="M299 198 L313 212 V230 L299 216 Z"/>
+      <polygon points="269,212 313,212 313,230 373,230 373,152 359,138 255,198"/>
 
+      <!-- Bas-Gauche (Spine C) -->
       <path d="M217 259 L231 273 V305 L217 291 Z"/>
       <path d="M241 291 L255 305 V365 L241 351 Z"/>
       <path d="M197 351 L211 365 H255 L241 351 Z"/>
@@ -22,29 +27,34 @@
       <path d="M139 369 L153 383 H211 L197 369 Z"/>
       <polygon points="153,273 231,273 231,305 255,305 255,365 211,365 211,383 153,383"/>
 
-      <path d="M359 291 L373 305 V383 L359 369 Z"/>
-      <path d="M299 369 L313 383 H373 L359 369 Z"/>
-      <path d="M299 351 L313 365 V383 L299 369 Z"/>
-      <path d="M255 351 L269 365 H313 L299 351 Z"/>
-      <polygon points="269,305 373,305 373,383 313,383 313,365 269,365"/>
+      <!-- Bas-Droit (Décalage de 50% : Y=300..360 avec crochet vers le haut Y=282) -->
+      <path d="M359 282 L373 296 V374 L359 360 Z"/>
+      <path d="M255 360 L269 374 H373 L359 360 Z"/>
+      <path d="M255 300 L269 314 H313 L299 300 Z"/>
+      <path d="M299 282 L313 296 V314 L299 300 Z"/>
+      <polygon points="269,314 313,314 313,296 373,296 373,374 269,374"/>
     </g>
 
+    <!-- Faces Supérieures (#9CB080) -->
     <g fill="#9CB080">
       <path d="M139 129 H197 V147 H241 V207 H217 V239 H139 Z"/>
 
-      <path d="M255 147 H299 V129 H359 V207 H255 Z"/>
+      <!-- Haut-Droit : Décalage à 50% (Y=138..198) avec extension vers le bas Y=216 -->
+      <path d="M255 138 H359 V216 H299 V198 H255 Z"/>
 
       <path d="M139 259 H217 V291 H241 V351 H197 V369 H139 Z"/>
 
-      <path d="M255 291 H359 V369 H299 V351 H255 Z"/>
+      <!-- Bas-Droit : Décalage à 50% (Y=300..360) avec extension vers le haut Y=282 -->
+      <path d="M255 300 H299 V282 H359 V360 H255 Z"/>
     </g>
 
+    <!-- Détails / Cutouts (#273338) -->
     <g fill="#273338">
       <rect x="169" y="165" width="16" height="44" rx="4"/>
       <rect x="169" y="289" width="16" height="44" rx="4"/>
 
-      <rect x="283" y="167" width="46" height="14" rx="3"/>
-      <rect x="283" y="317" width="46" height="14" rx="3"/>
+      <rect x="283" y="158" width="46" height="14" rx="3"/>
+      <rect x="283" y="310" width="46" height="14" rx="3"/>
     </g>
 
   </g>
