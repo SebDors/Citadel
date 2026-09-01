@@ -66,6 +66,7 @@ export interface WorkoutContextType {
   deleteFolder: (folderId: string) => Promise<void>;
   toggleFolderCollapse: (folderId: string) => Promise<void>;
   moveTemplateToFolder: (templateId: string, targetFolderId: string | null) => Promise<void>;
+  logPastWorkout: (session: WorkoutSession) => Promise<void>;
   deleteWorkoutSession: (sessionId: string) => Promise<void>;
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
@@ -1390,6 +1391,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const logPastWorkout = async (session: WorkoutSession) => {
+    const updated = await StorageService.logPastWorkout(session);
+    setData(updated);
+  };
+
   const deleteWorkoutSession = async (sessionId: string) => {
     const updated = await StorageService.deleteWorkoutSession(sessionId);
     setData(updated);
@@ -1479,6 +1485,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteFolder,
         toggleFolderCollapse,
         moveTemplateToFolder,
+        logPastWorkout,
         deleteWorkoutSession,
         deleteExerciseFromSession,
         deleteSetFromSession,

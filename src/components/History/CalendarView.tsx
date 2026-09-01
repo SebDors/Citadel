@@ -25,8 +25,10 @@ import {
   RotateCw,
   BookmarkPlus,
   Eye,
+  Plus,
 } from 'lucide-react-native';
 import { PastSessionDetailModal } from './PastSessionDetailModal';
+import { LogPastWorkoutModal } from './LogPastWorkoutModal';
 
 interface CalendarViewProps {
   history: WorkoutSession[];
@@ -61,6 +63,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   // État de la modale pour le jour sélectionné
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [logPastModalVisible, setLogPastModalVisible] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkoutSession | null>(null);
 
@@ -98,7 +101,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const workoutDates = history.map((s) => s.startTime.split('T')[0]);
 
   const handleDayPress = (dateStr: string, hasWorkout: boolean) => {
-    if (!hasWorkout) return;
     setSelectedDate(dateStr);
     setModalVisible(true);
   };
@@ -163,7 +165,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           return (
             <TouchableOpacity
               key={d}
-              disabled={!hasWorkout}
               onPress={() => handleDayPress(dateStr, hasWorkout)}
               style={[
                 styles.dayCell,
@@ -358,10 +359,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                   );
                 })
               )}
+              
+              <Button
+                title="Consigner une séance passée"
+                variant="primary"
+                icon={<Plus size={16} color="#FFFFFF" />}
+                style={{ marginTop: 16 }}
+                onPress={() => {
+                  setModalVisible(false);
+                  setLogPastModalVisible(true);
+                }}
+              />
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      <LogPastWorkoutModal
+        visible={logPastModalVisible}
+        onClose={() => setLogPastModalVisible(false)}
+        initialDate={selectedDate || undefined}
+      />
 
       {/* Modal de confirmation de suppression de séance personnalisée */}
       <Modal visible={!!sessionToDelete} transparent animationType="fade" onRequestClose={() => setSessionToDelete(null)}>

@@ -70,6 +70,26 @@ export const StorageService = {
   },
 
   /**
+   * Enregistre une séance passée rétroactive.
+   */
+  async logPastWorkout(session: WorkoutSession): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedHistory = [session, ...currentData.history];
+    updatedHistory.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      history: updatedHistory,
+      profile: {
+        ...currentData.profile,
+        totalWorkouts: (currentData.profile.totalWorkouts || 0) + 1,
+      },
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+
+  /**
    * Sauvegarde ou met à jour la séance en cours (en direct).
    */
   async saveCurrentWorkout(session: WorkoutSession | null): Promise<FitTrackerData> {
