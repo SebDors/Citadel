@@ -47,6 +47,8 @@ import {
   Clock,
   X,
   Zap,
+  Sparkles,
+  Trophy,
 } from "lucide-react-native";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
@@ -102,12 +104,14 @@ export default function LiveWorkoutScreen() {
     togglePauseWorkoutSession,
     updateActiveSessionCircuitStates,
     allExercises,
+    data,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [showAddExModal, setShowAddExModal] = useState(false);
+  const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
@@ -346,6 +350,8 @@ export default function LiveWorkoutScreen() {
   }
 
   const handleFinish = async () => {
+    const isFirstEverCompletedSession = (data?.history || []).length === 0;
+
     const totalCompletedRounds = Object.values(circuitStates).reduce(
       (sum, state) => sum + (state.completedRoundsCount || 0),
       0,
@@ -356,7 +362,12 @@ export default function LiveWorkoutScreen() {
     }
 
     await finishWorkout();
-    router.replace("/(tabs)/history");
+
+    if (isFirstEverCompletedSession) {
+      setShowCelebrationModal(true);
+    } else {
+      router.replace("/(tabs)/history");
+    }
   };
 
   const handleCancel = () => {
@@ -639,6 +650,23 @@ export default function LiveWorkoutScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
+        {data?.hasCompletedOnboarding && (data?.history || []).length === 0 && (
+          <View style={[styles.guidedLiveCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+            <View style={styles.guidedLiveHeader}>
+              <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.guidedLiveTitle, { color: theme.accent }]}>
+                ⚡ Guide 1er Entraînement (Étape 2/2)
+              </Text>
+            </View>
+            <Text style={[styles.guidedLiveText, { color: theme.text }]}>
+              1. Renseignez vos poids (kg) et répétitions pour chaque série.{"\n"}
+              2. Cochez la case <Text style={{ fontWeight: '800', color: theme.primary }}>✓</Text> à droite pour valider chaque série.{"\n"}
+              3. Une fois fini, cliquez sur <Text style={{ fontWeight: '800', color: theme.text }}>"Terminer"</Text> en haut à droite !
+            </Text>
+          </View>
+        )}
 
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
         {blocks.map((block, blockIdx) => {
@@ -1557,6 +1585,43 @@ export default function LiveWorkoutScreen() {
 
       {/* Floating Rest Timer Bar */}
       <RestTimerBar />
+
+      {/* ---------------- MODALE FÉLICITATIONS 1ÈRE SÉANCE TERMINÉE ---------------- */}
+      <Modal visible={showCelebrationModal} transparent animationType="fade">
+        <View style={styles.celebrationOverlay}>
+          <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+            <View style={[styles.celebrationIconCircle, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
+              <Trophy size={44} color={theme.accent} />
+            </View>
+
+            <Text style={[styles.celebrationBadge, { color: theme.accent, backgroundColor: theme.surface }]}>
+              🏆 PREMIÈRE SÉANCE TERMINÉE
+            </Text>
+
+            <Text style={[styles.celebrationTitle, { color: theme.text }]}>
+              Bravo {data?.profile?.name || 'Athlète'} ! 🎉
+            </Text>
+
+            <Text style={[styles.celebrationDesc, { color: theme.textMuted }]}>
+              Vous avez franchi le tout premier pas dans Citadel. Vos statistiques, votre volume d'entraînement et vos repères 1RM sont désormais enregistrés.
+            </Text>
+
+            <Text style={[styles.celebrationSub, { color: theme.text }]}>
+              🔥 Bon courage pour vos futurs entraînements !
+            </Text>
+
+            <Button
+              title="Retour à l'accueil 🏠"
+              variant="primary"
+              onPress={() => {
+                setShowCelebrationModal(false);
+                router.replace("/(tabs)");
+              }}
+              style={{ marginTop: 18, width: '100%' }}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2000,5 +2065,75 @@ const styles = StyleSheet.create({
   twinBtnText: {
     fontSize: 14,
     fontWeight: "800",
+  },
+  guidedLiveCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 14,
+  },
+  guidedLiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  guidedLiveTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  guidedLiveText: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  celebrationOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  celebrationCard: {
+    width: '90%',
+    borderRadius: 24,
+    borderWidth: 2,
+    padding: 24,
+    alignItems: 'center',
+  },
+  celebrationIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  celebrationBadge: {
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  celebrationTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  celebrationDesc: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  celebrationSub: {
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });

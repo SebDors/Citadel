@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   CheckCircle2,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,7 +42,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
   const [name, setName] = useState('');
   const [weightInput, setWeightInput] = useState('');
 
+  const isSlide2Valid = name.trim().length > 0;
+  const isNextDisabled = currentSlide === 1 && !isSlide2Valid;
+
   const handleNext = () => {
+    if (currentSlide === 1 && !isSlide2Valid) return;
+
     if (currentSlide < 2) {
       setCurrentSlide((prev) => prev + 1);
     } else {
@@ -75,7 +81,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
           </Text>
 
           {currentSlide < 2 && (
-            <TouchableOpacity activeOpacity={0.7} onPress={handleFinish} style={styles.skipBtn}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleFinish}
+              disabled={currentSlide === 1 && !isSlide2Valid}
+              style={[styles.skipBtn, currentSlide === 1 && !isSlide2Valid && { opacity: 0.4 }]}
+            >
               <Text style={[styles.skipText, { color: theme.textMuted }]}>Passer</Text>
             </TouchableOpacity>
           )}
@@ -152,17 +163,26 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
 
               <View style={[styles.formCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
                 <View style={styles.fieldGroup}>
-                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Votre Prénom / Pseudo</Text>
-                  <View style={[styles.inputBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Votre Prénom / Pseudo *</Text>
+                  <View style={[styles.inputBox, { backgroundColor: theme.surface, borderColor: isSlide2Valid ? theme.border : theme.accent }]}>
                     <User size={18} color={theme.textMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
-                      placeholder="Ex: Alex"
+                      placeholder="Entrez votre prénom ou pseudo..."
                       placeholderTextColor={theme.textMuted}
                       value={name}
                       onChangeText={setName}
+                      autoFocus
                     />
                   </View>
+                  {!isSlide2Valid && (
+                    <View style={styles.validationHintRow}>
+                      <AlertCircle size={12} color={theme.accent} />
+                      <Text style={[styles.validationHintText, { color: theme.accent }]}>
+                        Le prénom ou pseudo est requis pour continuer.
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.fieldGroup}>
@@ -199,8 +219,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
 
               <View style={styles.tabsOverviewList}>
                 <View style={[styles.tabOverviewCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-                  <View style={[styles.tabOverviewBadge, { backgroundColor: theme.accent }]}>
-                    <Dumbbell size={18} color="#FFFFFF" />
+                  <View style={[styles.tabOverviewBadge, { backgroundColor: theme.surface }]}>
+                    <Dumbbell size={18} color={theme.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.tabOverviewTitle, { color: theme.text }]}>1. Entraînement</Text>
@@ -238,7 +258,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
           )}
         </View>
 
-        {/* Zone Inférieure : Pagination par Points & Boutons d'Action */}
+        {/* Zone Inférieure : Pagination par Points & Boutons d'Action Centrés */}
         <View style={[styles.bottomBar, { borderTopColor: theme.border }]}>
           <View style={styles.paginationDots}>
             {[0, 1, 2].map((idx) => (
@@ -256,7 +276,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
           </View>
 
           <View style={styles.navigationRow}>
-            {currentSlide > 0 ? (
+            {currentSlide > 0 && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handlePrev}
@@ -264,16 +284,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
               >
                 <ChevronLeft size={20} color={theme.text} />
               </TouchableOpacity>
-            ) : (
-              <View style={{ width: 44 }} />
             )}
 
             <Button
               title={currentSlide === 2 ? "Commencer l'aventure 🚀" : "Suivant"}
               variant="primary"
+              disabled={isNextDisabled}
               onPress={handleNext}
               icon={currentSlide === 2 ? <CheckCircle2 size={18} color="#FFFFFF" /> : <ChevronRight size={18} color="#FFFFFF" />}
-              style={{ flex: 1, marginLeft: 12 }}
+              style={[
+                { flex: 1 },
+                currentSlide > 0 && { marginLeft: 12 },
+                isNextDisabled && { opacity: 0.5 },
+              ]}
             />
           </View>
         </View>
@@ -407,6 +430,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 6,
+  },
+  validationHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 4,
+  },
+  validationHintText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   tabsOverviewList: {
     width: '100%',

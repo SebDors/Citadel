@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   Alert,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWorkout } from "../../src/context/WorkoutContext";
@@ -147,15 +148,29 @@ export default function WorkoutTab() {
     {},
   );
 
+  // Animation de pulsation du bouton + Séance pendant le guidage première séance
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    const loadCollapsedState = async () => {
-      const saved = await StorageService.loadCollapsedCards();
-      if (saved) {
-        setCollapsedCards(saved);
-      }
-    };
-    loadCollapsedState();
-  }, []);
+    if (data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.06,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [data?.hasCompletedOnboarding, data?.hasCreatedFirstSession]);
 
   const toggleCardCollapse = (id: string) => {
     setCollapsedCards((prev) => {
@@ -508,23 +523,32 @@ export default function WorkoutTab() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
+          <Animated.View
             style={[
-              styles.createActionBox,
-              { backgroundColor: theme.surface, borderColor: theme.border },
+              { flex: 1 },
               data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && {
-                borderColor: theme.accent,
-                borderWidth: 2,
+                transform: [{ scale: pulseAnim }],
               },
             ]}
-            onPress={() => router.push("/template-editor")}
           >
-            <Plus size={22} color={theme.text} />
-            <Text style={[styles.createActionTitle, { color: theme.text }]}>
-              SÉANCE
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.createActionBox,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && {
+                  borderColor: theme.accent,
+                  borderWidth: 2,
+                },
+              ]}
+              onPress={() => router.push("/template-editor")}
+            >
+              <Plus size={22} color={theme.text} />
+              <Text style={[styles.createActionTitle, { color: theme.text }]}>
+                SÉANCE
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
 
         {/* Section Header with "Nouveau dossier" button */}
