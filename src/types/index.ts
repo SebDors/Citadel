@@ -55,6 +55,7 @@ export interface CircuitExerciseItem {
   targetMuscles?: string[];
   targetValue: number;
   targetType: 'reps' | 'time';
+  setType?: SetType;
 }
 
 export interface CircuitBlock {

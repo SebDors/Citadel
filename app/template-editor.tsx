@@ -100,6 +100,9 @@ export default function TemplateEditorScreen() {
   // Target set pour modal de type de série: { blockId, setIdx }
   const [activeSetTarget, setActiveSetTarget] = useState<{ blockId: string; setIdx: number } | null>(null);
 
+  // Target circuit item pour modal de type de série: { blockId, itemId }
+  const [activeCircuitSetTarget, setActiveCircuitSetTarget] = useState<{ blockId: string; itemId: string } | null>(null);
+
   // Target single exercise pour modal de superset
   const [supersetModalBlockId, setSupersetModalBlockId] = useState<string | null>(null);
 
@@ -463,6 +466,45 @@ export default function TemplateEditorScreen() {
         return b;
       })
     );
+  };
+
+  const handleCycleCircuitItemSetType = (blockId: string, exId: string) => {
+    const typesOrder: SetType[] = ['normal', 'failure', 'amrap', 'drop', 'warmup'];
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: b.exercises.map((item) => {
+              if (item.id === exId) {
+                const currentType = item.setType || 'normal';
+                const nextIdx = (typesOrder.indexOf(currentType) + 1) % typesOrder.length;
+                return { ...item, setType: typesOrder[nextIdx] };
+              }
+              return item;
+            }),
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleUpdateCircuitItemSetType = (blockId: string, itemId: string, newType: SetType) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'circuit') {
+          return {
+            ...b,
+            exercises: b.exercises.map((item) =>
+              item.id === itemId ? { ...item, setType: newType } : item
+            ),
+          };
+        }
+        return b;
+      })
+    );
+    setActiveCircuitSetTarget(null);
   };
 
   // Inclure un exercice individuel dans un circuit
@@ -1196,6 +1238,30 @@ export default function TemplateEditorScreen() {
                           </Text>
                         </TouchableOpacity>
 
+                        {/* Badge Type de Série (Normale, Échec, AMRAP, Drop Set, Échauffement) */}
+                        {(() => {
+                          const itemSetType = item.setType || 'normal';
+                          const typeCfg = SET_TYPES_CONFIG[itemSetType] || SET_TYPES_CONFIG.normal;
+                          return (
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              style={[
+                                styles.targetTypeToggle,
+                                {
+                                  backgroundColor: typeCfg.color,
+                                  marginLeft: 4,
+                                  paddingHorizontal: 6,
+                                },
+                              ]}
+                              onPress={() => setActiveCircuitSetTarget({ blockId: block.id, itemId: item.id })}
+                            >
+                              <Text style={styles.targetTypeToggleText}>
+                                {typeCfg.code} • {typeCfg.label.split(' ')[0]}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })()}
+
                         {/* Bouton Options ... pour cet exercice du circuit */}
                         <TouchableOpacity
                           style={styles.moreOptionsBtn}
@@ -1664,6 +1730,68 @@ export default function TemplateEditorScreen() {
                       isSelected && { backgroundColor: theme.surface },
                     ]}
                     onPress={() => handleUpdateSetType(activeSetTarget.blockId, activeSetTarget.setIdx, cfg.type)}
+                  >
+                    <View style={[styles.typeBadgeCircle, { backgroundColor: cfg.color }]}>
+                      <Text style={styles.typeBadgeText}>{cfg.code}</Text>
+                    </View>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text style={[styles.typeOptionLabel, { color: theme.text }]}>{cfg.label}</Text>
+                      <Text style={[styles.typeOptionDesc, { color: theme.textMuted }]}>
+                        {cfg.description}
+                      </Text>
+                    </View>
+                    {isSelected && <Check size={18} color={theme.accent} />}
+                  </TouchableOpacity>
+                );
+              })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- MODAL DE SÉLECTION DU TYPE POUR UN EXERCICE DE CIRCUIT --- */}
+      <Modal
+        visible={activeCircuitSetTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActiveCircuitSetTarget(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActiveCircuitSetTarget(null)}
+        >
+          <View style={[styles.modalSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Type d'exercice du circuit</Text>
+              <TouchableOpacity onPress={() => setActiveCircuitSetTarget(null)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {activeCircuitSetTarget &&
+              Object.values(SET_TYPES_CONFIG).map((cfg) => {
+                const block = selectedBlocks.find((b) => b.id === activeCircuitSetTarget.blockId);
+                const currentItem =
+                  block && block.type === 'circuit'
+                    ? block.exercises.find((ex) => ex.id === activeCircuitSetTarget.itemId)
+                    : undefined;
+                const isSelected = (currentItem?.setType || 'normal') === cfg.type;
+
+                return (
+                  <TouchableOpacity
+                    key={cfg.type}
+                    style={[
+                      styles.typeOptionRow,
+                      { borderBottomColor: theme.border },
+                      isSelected && { backgroundColor: theme.surface },
+                    ]}
+                    onPress={() =>
+                      handleUpdateCircuitItemSetType(
+                        activeCircuitSetTarget.blockId,
+                        activeCircuitSetTarget.itemId,
+                        cfg.type
+                      )
+                    }
                   >
                     <View style={[styles.typeBadgeCircle, { backgroundColor: cfg.color }]}>
                       <Text style={styles.typeBadgeText}>{cfg.code}</Text>

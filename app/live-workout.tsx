@@ -32,6 +32,7 @@ import {
   CircuitBlock,
   SingleExerciseBlock,
   CircuitExerciseItem,
+  SET_TYPES_CONFIG,
 } from "../src/types";
 import {
   Plus,
@@ -964,16 +965,26 @@ export default function LiveWorkoutScreen() {
                               {idx + 1}
                             </Text>
                           </View>
-                          <View style={{ marginLeft: 10 }}>
-                            <Text
-                              style={[
-                                styles.collapsedExName,
-                                { color: theme.text },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {ex.exerciseName}
-                            </Text>
+                          <View style={{ marginLeft: 10, flex: 1 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center" }}>
+                              <Text
+                                style={[
+                                  styles.collapsedExName,
+                                  { color: theme.text },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {ex.exerciseName}
+                              </Text>
+                              {ex.setType && ex.setType !== 'normal' && (() => {
+                                const cfg = SET_TYPES_CONFIG[ex.setType] || SET_TYPES_CONFIG.normal;
+                                return (
+                                  <View style={{ backgroundColor: cfg.color, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
+                                  </View>
+                                );
+                              })()}
+                            </View>
                             <Text
                               style={[
                                 styles.collapsedSub,
@@ -1062,14 +1073,24 @@ export default function LiveWorkoutScreen() {
                         </View>
 
                         <View style={{ flex: 1, marginLeft: 10 }}>
-                          <Text
-                            style={[
-                              styles.circuitExName,
-                              { color: theme.text },
-                            ]}
-                          >
-                            {ex.exerciseName}
-                          </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            <Text
+                              style={[
+                                styles.circuitExName,
+                                { color: theme.text },
+                              ]}
+                            >
+                              {ex.exerciseName}
+                            </Text>
+                            {ex.setType && ex.setType !== 'normal' && (() => {
+                              const cfg = SET_TYPES_CONFIG[ex.setType] || SET_TYPES_CONFIG.normal;
+                              return (
+                                <View style={{ backgroundColor: cfg.color, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
+                                </View>
+                              );
+                            })()}
+                          </View>
                           <View
                             style={{
                               flexDirection: "row",

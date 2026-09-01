@@ -4,7 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Button } from '../UI/Button';
 import { X, Calendar as CalendarIcon, Clock, Zap, List, Plus, Trash2, Edit2, CheckCircle2, Search } from 'lucide-react-native';
-import { WorkoutSession, WorkoutBlock, getTemplateBlocks, SingleExerciseBlock, WorkoutSet } from '../../types';
+import { WorkoutSession, WorkoutBlock, getTemplateBlocks, SingleExerciseBlock, WorkoutSet, SET_TYPES_CONFIG } from '../../types';
 import { SharedExercise } from '../../constants/exerciseDatabase';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 
@@ -420,6 +420,81 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                           onPress={() => handleAddSet(block.id)}
                           style={{ marginTop: 8 }}
                         />
+                      </>
+                    )}
+                    {block.type === 'circuit' && (
+                      <>
+                        <View style={styles.blockHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Zap size={16} color={theme.accent} style={{ marginRight: 6 }} />
+                            <Text style={[styles.blockTitle, { color: theme.text }]}>
+                              {block.title || 'Circuit'} ({block.circuitType === 'amrap' ? `${block.amrapDurationMinutes || 12} min AMRAP` : `${block.rounds} tours`})
+                            </Text>
+                          </View>
+                          <TouchableOpacity onPress={() => handleRemoveBlock(block.id)}>
+                            <Trash2 size={16} color={theme.danger} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={{ marginTop: 8 }}>
+                          {block.exercises.map((item, exIdx) => {
+                            const letter = String.fromCharCode(65 + exIdx);
+                            const itemSetType = item.setType || 'normal';
+                            const typeCfg = SET_TYPES_CONFIG[itemSetType] || SET_TYPES_CONFIG.normal;
+                            return (
+                              <View
+                                key={item.id}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  paddingVertical: 8,
+                                  paddingHorizontal: 10,
+                                  borderRadius: 8,
+                                  backgroundColor: theme.background,
+                                  marginBottom: 6,
+                                  borderWidth: 1,
+                                  borderColor: theme.border,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 11,
+                                    backgroundColor: theme.accent,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 8,
+                                  }}
+                                >
+                                  <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>{letter}</Text>
+                                </View>
+
+                                <View style={{ flex: 1, marginRight: 8 }}>
+                                  <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                                    {item.exerciseName}
+                                  </Text>
+                                  <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '500' }}>
+                                    {item.targetValue} {item.targetType === 'reps' ? 'reps' : 's'} · {item.primaryMuscle}
+                                  </Text>
+                                </View>
+
+                                <View
+                                  style={{
+                                    backgroundColor: typeCfg.color,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 3,
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>
+                                    {typeCfg.code} • {typeCfg.label.split(' ')[0]}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
                       </>
                     )}
                   </View>
