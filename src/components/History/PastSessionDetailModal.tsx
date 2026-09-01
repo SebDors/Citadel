@@ -69,7 +69,7 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
                 {session.title}
               </Text>
               <Text style={[styles.dateText, { color: theme.textMuted }]}>
-                {formattedDate} à {formattedTime}
+                {formattedDate} · {formattedTime}
               </Text>
             </View>
             <View style={styles.headerActions}>

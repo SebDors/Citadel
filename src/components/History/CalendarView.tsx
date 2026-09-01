@@ -292,6 +292,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
 
                           <View style={styles.statsRow}>
                             <View style={styles.statBadge}>
+                              <Clock size={14} color={theme.accent} />
+                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                À {new Date(session.startTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </Text>
+                            </View>
+
+                            <View style={styles.statBadge}>
                               <Clock size={14} color={theme.textMuted} />
                               <Text style={[styles.statBadgeText, { color: theme.text }]}>
                                 {Math.floor(session.durationSeconds / 60)} min

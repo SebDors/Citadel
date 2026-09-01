@@ -39,6 +39,11 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
       year: 'numeric',
     });
 
+    const formattedTime = new Date(session.startTime).toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
     const blocks = getSessionBlocks(session);
     const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
 
@@ -87,7 +92,7 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
               {session.title}
             </Text>
             <Text style={[styles.sessionDateText, { color: theme.textMuted }]}>
-              {formattedDate}
+              {formattedDate} · {formattedTime}
             </Text>
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>

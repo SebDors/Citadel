@@ -620,6 +620,7 @@ export default function WorkoutAnalyticsScreen() {
           {allHistorySessions.length > 0 ? (
             allHistorySessions.map((sess, idx) => {
               const formattedDate = new Date(sess.startTime).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+              const formattedTime = new Date(sess.startTime).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
               const hours = Math.floor((sess.durationSeconds || 0) / 3600);
               const mins = Math.round(((sess.durationSeconds || 0) % 3600) / 60);
               const durStr = hours > 0 ? `${hours} h ${mins < 10 ? "0" : ""}${mins}` : `${mins} min`;
@@ -630,7 +631,7 @@ export default function WorkoutAnalyticsScreen() {
                   style={[styles.historyLinkRow, idx > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}
                   onPress={() => setSelectedSession(sess)}
                 >
-                  <Text style={[styles.historyDate, { color: theme.text }]}>{formattedDate}</Text>
+                  <Text style={[styles.historyDate, { color: theme.text }]}>{formattedDate} · {formattedTime}</Text>
                   <View style={styles.historyRight}>
                     <Text style={[styles.historyVol, { color: theme.text }]}>
                       {sess.totalVolumeKg ? `${sess.totalVolumeKg} kg` : durStr}

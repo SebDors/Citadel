@@ -42,11 +42,15 @@ export default function ExerciseDetailModal({
     sortedSessions.forEach(session => {
       let foundSets: { weightKg: number; reps: number; isPr: boolean }[] = [];
       const sessionDate = new Date(session.startTime);
-      const dateFormatted = sessionDate.toLocaleDateString('fr-FR', {
+      const timeFormatted = sessionDate.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const dateFormatted = `${sessionDate.toLocaleDateString('fr-FR', {
         day: 'numeric',
         month: 'short',
         year: 'numeric'
-      });
+      })} · ${timeFormatted}`;
       const dateStr = sessionDate.toISOString();
 
       const targetName = exerciseName.trim().toLowerCase();
