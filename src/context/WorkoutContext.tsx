@@ -68,6 +68,7 @@ export interface WorkoutContextType {
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
+  resetAllData: () => Promise<void>;
   // Base d'exercices personnalisés
   customExercises: SharedExercise[];
   allExercises: SharedExercise[];
@@ -163,6 +164,14 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (loaded.currentWorkout) {
       setActiveSession(loaded.currentWorkout);
     }
+    setLoading(false);
+  };
+
+  const resetAllData = async () => {
+    setLoading(true);
+    const reset = await StorageService.resetAllData();
+    setData(reset);
+    setActiveSession(null);
     setLoading(false);
   };
 
@@ -1319,6 +1328,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteExerciseFromSession,
         deleteSetFromSession,
         reloadAllData,
+        resetAllData,
         customExercises,
         allExercises,
         addCustomExercise,

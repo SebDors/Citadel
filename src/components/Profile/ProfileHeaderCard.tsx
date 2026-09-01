@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { UserProfile } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { User, Scale, Flame, Settings } from 'lucide-react-native';
+import { User, Scale, Flame, Settings, RotateCcw } from 'lucide-react-native';
 
 interface ProfileHeaderCardProps {
   profile: UserProfile;
@@ -13,6 +14,7 @@ interface ProfileHeaderCardProps {
 
 export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, onUpdateProfile }) => {
   const { theme } = useTheme();
+  const { resetAllData } = useWorkout();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [name, setName] = useState(profile.name);
@@ -73,6 +75,44 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
               <Button title="Annuler" variant="outline" onPress={() => setShowEditModal(false)} style={{ flex: 1, marginRight: 6 }} />
               <Button title="Enregistrer" variant="primary" onPress={handleSave} style={{ flex: 1, marginLeft: 6 }} />
             </View>
+
+            {/* Bouton Réinitialiser l'application */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 10,
+                marginTop: 18,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: theme.danger,
+                backgroundColor: 'rgba(235, 87, 87, 0.08)',
+              }}
+              onPress={() => {
+                Alert.alert(
+                  "Réinitialiser l'application ?",
+                  "Cette action va effacer toutes les données de l'application sur votre téléphone pour repartir sur un compte 100% neuf sans données factices.",
+                  [
+                    { text: "Annuler", style: "cancel" },
+                    {
+                      text: "Réinitialiser",
+                      style: "destructive",
+                      onPress: async () => {
+                        setShowEditModal(false);
+                        await resetAllData();
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <RotateCcw size={15} color={theme.danger} style={{ marginRight: 6 }} />
+              <Text style={{ color: theme.danger, fontSize: 13, fontWeight: "700" }}>
+                Réinitialiser les données de l'application
+              </Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
