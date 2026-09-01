@@ -57,6 +57,7 @@ import {
   ArrowUpDown,
   ChevronsUp,
   ChevronsDown,
+  RefreshCw,
 } from 'lucide-react-native';
 import { ReorderBlocksModal } from '../src/components/Workout/ReorderBlocksModal';
 
@@ -88,6 +89,13 @@ export default function TemplateEditorScreen() {
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(new Set());
+
+  // Cible de remplacement d'exercice ("Modifier l'exercice")
+  const [replaceTarget, setReplaceTarget] = useState<{
+    type: 'single' | 'circuit_exercise';
+    blockId: string;
+    exIdx?: number;
+  } | null>(null);
 
   // Target set pour modal de type de série: { blockId, setIdx }
   const [activeSetTarget, setActiveSetTarget] = useState<{ blockId: string; setIdx: number } | null>(null);
@@ -218,6 +226,10 @@ export default function TemplateEditorScreen() {
   };
 
   const toggleSelectExercise = (exId: string) => {
+    if (replaceTarget) {
+      setSelectedExerciseIds(new Set([exId]));
+      return;
+    }
     setSelectedExerciseIds((prev) => {
       const next = new Set(prev);
       if (next.has(exId)) {
@@ -232,15 +244,64 @@ export default function TemplateEditorScreen() {
   const handleClosePickerModal = () => {
     setShowPickerModal(false);
     setTargetCircuitBlockId(null);
+    setReplaceTarget(null);
     setSearchQuery('');
     setSelectedExerciseIds(new Set());
   };
 
-  // Ajouter les exercices sélectionnés par lot (individuel ou dans circuit)
+  // Ajouter ou remplacer les exercices sélectionnés
   const handleBatchAddSharedExercises = () => {
     if (selectedExerciseIds.size === 0) return;
 
     const selectedExercises = allExercises.filter((ex) => selectedExerciseIds.has(ex.id));
+    if (selectedExercises.length === 0) return;
+
+    // Remplacement d'un exercice existant (en conservant les séries, reps, poids, etc.)
+    if (replaceTarget) {
+      const newEx = selectedExercises[0];
+      if (replaceTarget.type === 'single') {
+        setSelectedBlocks((prev) =>
+          prev.map((b) => {
+            if (b.id === replaceTarget.blockId && b.type === 'single') {
+              return {
+                ...b,
+                exercise: {
+                  ...b.exercise,
+                  exerciseId: newEx.id,
+                  exerciseName: newEx.name,
+                  primaryMuscle: newEx.primaryMuscle,
+                  targetMuscles: newEx.targetMuscles,
+                },
+              };
+            }
+            return b;
+          })
+        );
+      } else if (replaceTarget.type === 'circuit_exercise' && replaceTarget.exIdx !== undefined) {
+        setSelectedBlocks((prev) =>
+          prev.map((b) => {
+            if (b.id === replaceTarget.blockId && b.type === 'circuit') {
+              const updatedExercises = [...b.exercises];
+              if (updatedExercises[replaceTarget.exIdx!]) {
+                updatedExercises[replaceTarget.exIdx!] = {
+                  ...updatedExercises[replaceTarget.exIdx!],
+                  exerciseName: newEx.name,
+                  primaryMuscle: newEx.primaryMuscle,
+                  targetMuscles: newEx.targetMuscles,
+                };
+              }
+              return {
+                ...b,
+                exercises: updatedExercises,
+              };
+            }
+            return b;
+          })
+        );
+      }
+      handleClosePickerModal();
+      return;
+    }
 
     if (targetCircuitBlockId) {
       const newCircuitItems: CircuitExerciseItem[] = selectedExercises.map((ex, idx) => ({
@@ -1407,38 +1468,6 @@ export default function TemplateEditorScreen() {
               <>
                 <TouchableOpacity
                   style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'up')}
-                >
-                  <ArrowUp size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Monter le circuit</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'down')}
-                >
-                  <ArrowDown size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre le circuit</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'top')}
-                >
-                  <ChevronsUp size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en haut</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'bottom')}
-                >
-                  <ChevronsDown size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en bas</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
                   onPress={() => handleDuplicateCircuitBlock(activeBlockOptions.blockId)}
                 >
                   <Copy size={16} color={theme.text} style={{ marginRight: 8 }} />
@@ -1460,30 +1489,18 @@ export default function TemplateEditorScreen() {
                 <>
                   <TouchableOpacity
                     style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                    onPress={() =>
-                      handleMoveCircuitExercise(
-                        activeBlockOptions.blockId,
-                        activeBlockOptions.exIdx!,
-                        'up'
-                      )
-                    }
+                    onPress={() => {
+                      setReplaceTarget({
+                        type: 'circuit_exercise',
+                        blockId: activeBlockOptions.blockId,
+                        exIdx: activeBlockOptions.exIdx,
+                      });
+                      setActiveBlockOptions(null);
+                      setShowPickerModal(true);
+                    }}
                   >
-                    <ChevronUp size={16} color={theme.text} style={{ marginRight: 8 }} />
-                    <Text style={[styles.menuItemText, { color: theme.text }]}>Monter dans le circuit</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                    onPress={() =>
-                      handleMoveCircuitExercise(
-                        activeBlockOptions.blockId,
-                        activeBlockOptions.exIdx!,
-                        'down'
-                      )
-                    }
-                  >
-                    <ChevronDown size={16} color={theme.text} style={{ marginRight: 8 }} />
-                    <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre dans le circuit</Text>
+                    <RefreshCw size={16} color={theme.accent} style={{ marginRight: 8 }} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Modifier l'exercice</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1533,34 +1550,17 @@ export default function TemplateEditorScreen() {
               <>
                 <TouchableOpacity
                   style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'up')}
+                  onPress={() => {
+                    setReplaceTarget({
+                      type: 'single',
+                      blockId: activeBlockOptions.blockId,
+                    });
+                    setActiveBlockOptions(null);
+                    setShowPickerModal(true);
+                  }}
                 >
-                  <ArrowUp size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Monter l'exercice</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'down')}
-                >
-                  <ArrowDown size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Descendre l'exercice</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'top')}
-                >
-                  <ChevronsUp size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en haut</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
-                  onPress={() => handleMoveBlock(activeBlockOptions.blockId, 'bottom')}
-                >
-                  <ChevronsDown size={16} color={theme.text} style={{ marginRight: 8 }} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Placer tout en bas</Text>
+                  <RefreshCw size={16} color={theme.accent} style={{ marginRight: 8 }} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Modifier l'exercice</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1755,7 +1755,11 @@ export default function TemplateEditorScreen() {
             >
               <View style={styles.pickerModalHeaderRow}>
                 <Text style={[styles.modalTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
-                  {targetCircuitBlockId ? 'Ajouter au Circuit' : "Base de Données d'Exercices"}
+                  {replaceTarget
+                    ? "Modifier l'exercice"
+                    : targetCircuitBlockId
+                    ? 'Ajouter au Circuit'
+                    : "Base de Données d'Exercices"}
                 </Text>
                 <TouchableOpacity onPress={handleClosePickerModal} style={{ padding: 4 }}>
                   <X size={20} color={theme.textMuted} />
@@ -1806,29 +1810,48 @@ export default function TemplateEditorScreen() {
                             {ex.primaryMuscle} • {ex.category} • {defaultRestSeconds || ex.defaultRestSeconds}s repos
                           </Text>
                         </View>
-                        {/* Checkbox Icon */}
-                        <View
-                          style={[
-                            styles.checkboxBox,
-                            {
-                              borderColor: isSelected ? theme.accent : theme.border,
-                              backgroundColor: isSelected ? theme.accent : 'transparent',
-                            },
-                          ]}
-                        >
-                          {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
-                        </View>
+                        {/* Radio Button vs Checkbox Icon */}
+                        {replaceTarget ? (
+                          <View
+                            style={[
+                              styles.radioCircle,
+                              {
+                                borderColor: isSelected ? theme.accent : theme.border,
+                              },
+                            ]}
+                          >
+                            {isSelected && (
+                              <View style={[styles.radioDot, { backgroundColor: theme.accent }]} />
+                            )}
+                          </View>
+                        ) : (
+                          <View
+                            style={[
+                              styles.checkboxBox,
+                              {
+                                borderColor: isSelected ? theme.accent : theme.border,
+                                backgroundColor: isSelected ? theme.accent : 'transparent',
+                              },
+                            ]}
+                          >
+                            {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                          </View>
+                        )}
                       </TouchableOpacity>
                     );
                   })
                 )}
               </ScrollView>
 
-              {/* Barre d'action fixe en bas avec bouton Ajouter (X) et Créer un exercice */}
+              {/* Barre d'action fixe en bas */}
               <View style={styles.pickerActionBar}>
                 <Button
                   title={
-                    selectedExerciseIds.size > 0
+                    replaceTarget
+                      ? selectedExerciseIds.size > 0
+                        ? "Remplacer l'exercice"
+                        : 'Sélectionner un exercice'
+                      : selectedExerciseIds.size > 0
                       ? `Ajouter (${selectedExerciseIds.size})`
                       : 'Ajouter (0)'
                   }
@@ -2305,6 +2328,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
+  },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   pickerActionBar: {
     marginTop: 10,
