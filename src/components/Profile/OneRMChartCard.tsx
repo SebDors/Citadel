@@ -25,22 +25,43 @@ export const OneRMChartCard: React.FC = () => {
       { name: string; weightKg: number; reps: number; date: string }
     >();
 
+    const processSetForPR = (exerciseName: string, set: any, sessionDate: string) => {
+      if (set.completed && set.weightKg && set.weightKg > 0) {
+        const repsVal = set.reps || 0;
+        const currentPR = prMap.get(exerciseName);
+
+        const isNewPR =
+          !currentPR ||
+          set.weightKg > currentPR.weightKg ||
+          (set.weightKg === currentPR.weightKg && repsVal > currentPR.reps);
+
+        if (isNewPR) {
+          prMap.set(exerciseName, {
+            name: exerciseName,
+            weightKg: set.weightKg,
+            reps: repsVal,
+            date: sessionDate,
+          });
+        }
+      }
+    };
+
     sortedHistory.forEach((session) => {
-      const sessExercises = session.exercises || [];
-      sessExercises.forEach((ex) => {
-        const name = ex.exerciseName;
+      const sessionDate = session.startTime;
+
+      // 1. Blocs de la séance
+      (session.blocks || []).forEach((block) => {
+        if (block.type === 'single') {
+          (block.exercise.sets || []).forEach((set) => {
+            processSetForPR(block.exercise.exerciseName, set, sessionDate);
+          });
+        }
+      });
+
+      // 2. Exercices de la séance
+      (session.exercises || []).forEach((ex) => {
         (ex.sets || []).forEach((set) => {
-          if (set.completed && set.weightKg && set.weightKg > 0) {
-            const currentPR = prMap.get(name);
-            if (!currentPR || set.weightKg > currentPR.weightKg) {
-              prMap.set(name, {
-                name,
-                weightKg: set.weightKg,
-                reps: set.reps || 0,
-                date: session.startTime,
-              });
-            }
-          }
+          processSetForPR(ex.exerciseName, set, sessionDate);
         });
       });
     });
