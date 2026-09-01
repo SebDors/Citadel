@@ -7,7 +7,8 @@ import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { useRouter } from 'expo-router';
-import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw, BookmarkPlus } from 'lucide-react-native';
+import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw, BookmarkPlus, Eye } from 'lucide-react-native';
+import { PastSessionDetailModal } from './PastSessionDetailModal';
 
 interface ActivitySummaryCardProps {
   session?: WorkoutSession;
@@ -71,19 +72,33 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
     const exercisesStr = blockSummaries.join(' · ');
     const targetMusclesList = Array.from(targetMusclesSet);
 
+    const [showDetail, setShowDetail] = useState(false);
+
     return (
       <Card style={styles.cardMargin}>
         {/* Header de la séance + Bouton de suppression 🗑️ */}
         <View style={styles.sessionHeaderRow}>
-          <View style={styles.sessionTitleBox}>
+          <TouchableOpacity
+            style={styles.sessionTitleBox}
+            activeOpacity={0.7}
+            onPress={() => setShowDetail(true)}
+          >
             <Text style={[styles.sessionTitle, { color: theme.text }]} numberOfLines={1}>
               {session.title}
             </Text>
             <Text style={[styles.sessionDateText, { color: theme.textMuted }]}>
               {formattedDate}
             </Text>
-          </View>
+          </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface, marginRight: 8 }]}
+              onPress={() => setShowDetail(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Voir le détail de la séance"
+            >
+              <Eye size={16} color={theme.accent} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: theme.surface, marginRight: 8 }]}
               onPress={() => router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } })}
@@ -198,6 +213,13 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Modale de détail en lecture seule de la séance */}
+        <PastSessionDetailModal
+          visible={showDetail}
+          session={session}
+          onClose={() => setShowDetail(false)}
+        />
       </Card>
     );
   }

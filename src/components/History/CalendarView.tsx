@@ -24,7 +24,9 @@ import {
   Layers,
   RotateCw,
   BookmarkPlus,
+  Eye,
 } from 'lucide-react-native';
+import { PastSessionDetailModal } from './PastSessionDetailModal';
 
 interface CalendarViewProps {
   history: WorkoutSession[];
@@ -60,6 +62,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [selectedDetailSession, setSelectedDetailSession] = useState<WorkoutSession | null>(null);
 
   const isCurrentMonthView =
     currentMonthIndex === now.getMonth() && currentYear === now.getFullYear();
@@ -277,7 +280,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                     >
                       {/* Session Header: Details & Delete Session Button */}
                       <View style={styles.sessionCardHeader}>
-                        <View style={styles.sessionInfo}>
+                        <TouchableOpacity
+                          style={styles.sessionInfo}
+                          activeOpacity={0.7}
+                          onPress={() => setSelectedDetailSession(session)}
+                        >
                           <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
                             {session.title}
                           </Text>
@@ -316,8 +323,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                               {summaryStr}
                             </Text>
                           ) : null}
-                        </View>
+                        </TouchableOpacity>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                            onPress={() => setSelectedDetailSession(session)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Voir le détail de la séance"
+                          >
+                            <Eye size={18} color={theme.accent} />
+                          </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
                             onPress={() => {
@@ -378,6 +393,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modale de détail en lecture seule de la séance */}
+      <PastSessionDetailModal
+        visible={!!selectedDetailSession}
+        session={selectedDetailSession}
+        onClose={() => setSelectedDetailSession(null)}
+      />
     </Card>
   );
 };
