@@ -103,6 +103,9 @@ export default function TemplateEditorScreen() {
   // Target circuit item pour modal de type de série: { blockId, itemId }
   const [activeCircuitSetTarget, setActiveCircuitSetTarget] = useState<{ blockId: string; itemId: string } | null>(null);
 
+  // Target circuit pour modal de réorganisation des exercices du circuit uniquement
+  const [reorderCircuitBlockId, setReorderCircuitBlockId] = useState<string | null>(null);
+
   // Target single exercise pour modal de superset
   const [supersetModalBlockId, setSupersetModalBlockId] = useState<string | null>(null);
 
@@ -1078,19 +1081,31 @@ export default function TemplateEditorScreen() {
                     </View>
                   </View>
 
-                  {/* Bouton Options ... pour le circuit */}
-                  <TouchableOpacity
-                    style={styles.moreOptionsBtn}
-                    onPress={() =>
-                      setActiveBlockOptions({
-                        type: 'circuit',
-                        blockId: block.id,
-                      })
-                    }
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <MoreVertical size={20} color={theme.text} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {/* Bouton Réorganiser les exercices de CE circuit uniquement */}
+                    <TouchableOpacity
+                      style={[styles.moreOptionsBtn, { marginRight: 4 }]}
+                      onPress={() => setReorderCircuitBlockId(block.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel="Réorganiser les exercices du circuit"
+                    >
+                      <ArrowUpDown size={18} color={theme.accent} />
+                    </TouchableOpacity>
+
+                    {/* Bouton Options ... pour le circuit */}
+                    <TouchableOpacity
+                      style={styles.moreOptionsBtn}
+                      onPress={() =>
+                        setActiveBlockOptions({
+                          type: 'circuit',
+                          blockId: block.id,
+                        })
+                      }
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <MoreVertical size={20} color={theme.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Réglage du nombre de tours (Round) ou de la durée (AMRAP) */}
@@ -1806,6 +1821,116 @@ export default function TemplateEditorScreen() {
                   </TouchableOpacity>
                 );
               })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- MODAL RÉORGANISATION DES EXERCICES D'UN CIRCUIT --- */}
+      <Modal
+        visible={reorderCircuitBlockId !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReorderCircuitBlockId(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setReorderCircuitBlockId(null)}
+        >
+          <View style={[styles.modalSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ArrowUpDown size={18} color={theme.accent} style={{ marginRight: 8 }} />
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Ordre des exercices du circuit</Text>
+              </View>
+              <TouchableOpacity onPress={() => setReorderCircuitBlockId(null)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {reorderCircuitBlockId && (() => {
+              const circuitBlock = selectedBlocks.find(
+                (b) => b.id === reorderCircuitBlockId && b.type === 'circuit'
+              ) as CircuitBlock | undefined;
+
+              if (!circuitBlock || circuitBlock.exercises.length === 0) {
+                return (
+                  <Text style={{ color: theme.textMuted, textAlign: 'center', padding: 20 }}>
+                    Aucun exercice dans ce circuit.
+                  </Text>
+                );
+              }
+
+              return (
+                <ScrollView style={{ maxHeight: 350 }}>
+                  {circuitBlock.exercises.map((item, exIdx) => {
+                    const letter = String.fromCharCode(65 + exIdx);
+                    const isFirst = exIdx === 0;
+                    const isLast = exIdx === circuitBlock.exercises.length - 1;
+                    return (
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.typeOptionRow,
+                          { borderBottomColor: theme.border, paddingVertical: 10 },
+                        ]}
+                      >
+                        <View
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            backgroundColor: theme.accent,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: 10,
+                          }}
+                        >
+                          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900' }}>{letter}</Text>
+                        </View>
+
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={[styles.typeOptionLabel, { color: theme.text }]} numberOfLines={1}>
+                            {item.exerciseName}
+                          </Text>
+                          <Text style={[styles.typeOptionDesc, { color: theme.textMuted }]}>
+                            {item.targetValue} {item.targetType === 'reps' ? 'reps' : 's'} · {item.primaryMuscle}
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <TouchableOpacity
+                            disabled={isFirst}
+                            style={{
+                              padding: 6,
+                              opacity: isFirst ? 0.3 : 1,
+                              backgroundColor: theme.surface,
+                              borderRadius: 6,
+                              marginRight: 4,
+                            }}
+                            onPress={() => handleMoveCircuitExercise(reorderCircuitBlockId, exIdx, 'up')}
+                          >
+                            <ChevronUp size={18} color={theme.text} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            disabled={isLast}
+                            style={{
+                              padding: 6,
+                              opacity: isLast ? 0.3 : 1,
+                              backgroundColor: theme.surface,
+                              borderRadius: 6,
+                            }}
+                            onPress={() => handleMoveCircuitExercise(reorderCircuitBlockId, exIdx, 'down')}
+                          >
+                            <ChevronDown size={18} color={theme.text} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              );
+            })()}
           </View>
         </TouchableOpacity>
       </Modal>
