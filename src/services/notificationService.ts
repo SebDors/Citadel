@@ -5,9 +5,9 @@ import Constants from 'expo-constants';
 // On n'importe JAMAIS le module statiquement — uniquement en dynamic import conditionnel.
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// Son local embarqué dans les assets (WAV 44100 Hz, bip double 880 Hz + 1100 Hz)
+// Son local embarqué dans les assets (Bell_ring.mp3)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const TIMER_SOUND = require('../../assets/timer_end.wav');
+const TIMER_SOUND = require('../../assets/Bell_ring.mp3');
 
 let activeNotificationId: string | null = null;
 let ongoingNotificationId: string | null = null;
