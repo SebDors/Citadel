@@ -774,6 +774,25 @@ export default function TemplateEditorScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Card d'Onboarding Pas-à-Pas Placée en Haut de Page */}
+        {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
+          <View style={[styles.floatingOnboardingCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
+            <View style={styles.floatingOnboardingHeader}>
+              <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.floatingOnboardingTitle, { color: theme.accent }]}>
+                Tutoriel de création de séance
+              </Text>
+            </View>
+            <Text style={[styles.floatingOnboardingText, { color: theme.text }]}>
+              {!title.trim()
+                ? "1. Entrez le nom de votre programme dans le champ 'Nom du programme' ci-dessous (mis en surbrillance)."
+                : selectedBlocks.length === 0
+                ? "2. Cliquez sur le bouton '+ Exercice' en bas pour choisir les exercices de votre séance."
+                : "3. Prenez ceux que vous voulez, modifiez le temps de repos ou les séries si besoin, puis cliquez sur 'Enregistrer' !"}
+            </Text>
+          </View>
+        )}
+
         {/* Nom du programme */}
         <Text style={[styles.label, { color: theme.text }]}>Nom du programme</Text>
         <TextInput
@@ -1299,32 +1318,13 @@ export default function TemplateEditorScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Card Flottante d'Onboarding Pas-à-Pas pendant la Création de Séance */}
-        {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
-          <View style={[styles.floatingOnboardingCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
-            <View style={styles.floatingOnboardingHeader}>
-              <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
-              <Text style={[styles.floatingOnboardingTitle, { color: theme.accent }]}>
-                Tutoriel de création de séance
-              </Text>
-            </View>
-            <Text style={[styles.floatingOnboardingText, { color: theme.text }]}>
-              {!title.trim()
-                ? "1. Entrez le nom de votre programme dans le champ 'Nom du programme' ci-dessus (mis en surbrillance)."
-                : selectedBlocks.length === 0
-                ? "2. Cliquez sur le bouton '+ Exercice' ci-dessous pour choisir les exercices de votre séance."
-                : "3. Prenez ceux que vous voulez, modifiez le temps de repos ou les séries si besoin, puis cliquez sur 'Enregistrer' !"}
-            </Text>
-          </View>
-        )}
-
         {/* Bouton Enregistrer */}
         <Button
           title="Enregistrer le programme"
           variant="primary"
           onPress={handleSave}
           disabled={isSaveDisabled}
-          style={{ marginTop: 18, marginBottom: 40 }}
+          style={{ marginTop: 24, marginBottom: 40 }}
         />
       </ScrollView>
 

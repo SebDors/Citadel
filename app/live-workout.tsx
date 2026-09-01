@@ -644,6 +644,23 @@ export default function LiveWorkoutScreen() {
             circuitInfo={circuitInfo}
           />
 
+          {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
+          {data?.hasCompletedOnboarding && (data?.history || []).length === 0 && (
+            <View style={[styles.guidedLiveCard, { backgroundColor: theme.cardBg, borderColor: theme.accent, marginTop: 8, marginBottom: 4 }]}>
+              <View style={styles.guidedLiveHeader}>
+                <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
+                <Text style={[styles.guidedLiveTitle, { color: theme.accent }]}>
+                  Guide 1er Entraînement (Étape 2/2)
+                </Text>
+              </View>
+              <Text style={[styles.guidedLiveText, { color: theme.text }]}>
+                1. Renseignez vos poids (kg) et répétitions pour chaque série.{"\n"}
+                2. Cochez la case <Text style={{ fontWeight: '800', color: theme.primary }}>✓</Text> à droite pour valider chaque série.{"\n"}
+                3. Une fois fini, cliquez sur <Text style={{ fontWeight: '800', color: theme.text }}>"Terminer"</Text> en haut à droite !
+              </Text>
+            </View>
+          )}
+
           {/* Bannière "Commencer la séance" si la séance est en préparation (hasStarted = false) */}
           {activeSession.hasStarted === false && (
             <TouchableOpacity
@@ -698,23 +715,6 @@ export default function LiveWorkoutScreen() {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
-        {data?.hasCompletedOnboarding && (data?.history || []).length === 0 && (
-          <View style={[styles.guidedLiveCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
-            <View style={styles.guidedLiveHeader}>
-              <Sparkles size={16} color={theme.accent} style={{ marginRight: 6 }} />
-              <Text style={[styles.guidedLiveTitle, { color: theme.accent }]}>
-                Guide 1er Entraînement (Étape 2/2)
-              </Text>
-            </View>
-            <Text style={[styles.guidedLiveText, { color: theme.text }]}>
-              1. Renseignez vos poids (kg) et répétitions pour chaque série.{"\n"}
-              2. Cochez la case <Text style={{ fontWeight: '800', color: theme.primary }}>✓</Text> à droite pour valider chaque série.{"\n"}
-              3. Une fois fini, cliquez sur <Text style={{ fontWeight: '800', color: theme.text }}>"Terminer"</Text> en haut à droite !
-            </Text>
-          </View>
-        )}
 
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
         {blocks.map((block, blockIdx) => {
