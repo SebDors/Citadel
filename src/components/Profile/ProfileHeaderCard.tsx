@@ -5,7 +5,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { User, Scale, Flame, Settings, RotateCcw, Sparkles } from 'lucide-react-native';
+import { User, Scale, Flame, Settings, RotateCcw, Sparkles, Download } from 'lucide-react-native';
+import { ExportDataModal } from './ExportDataModal';
 
 interface ProfileHeaderCardProps {
   profile: UserProfile;
@@ -17,6 +18,7 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
   const { resetAllData, resetOnboarding } = useWorkout();
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [name, setName] = useState(profile.name);
 
   const handleSave = () => {
@@ -75,6 +77,31 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
               <Button title="Annuler" variant="outline" onPress={() => setShowEditModal(false)} style={{ flex: 1, marginRight: 6 }} />
               <Button title="Enregistrer" variant="primary" onPress={handleSave} style={{ flex: 1, marginLeft: 6 }} />
             </View>
+
+            {/* Bouton Sauvegarde & Exportation */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 10,
+                marginTop: 14,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: theme.primary || theme.accent,
+                backgroundColor: theme.surface,
+              }}
+              onPress={() => {
+                setShowEditModal(false);
+                setShowExportModal(true);
+              }}
+            >
+              <Download size={15} color={theme.primary || theme.accent} style={{ marginRight: 6 }} />
+              <Text style={{ color: theme.primary || theme.accent, fontSize: 13, fontWeight: "700" }}>
+                Sauvegarde & Exportation des données
+              </Text>
+            </TouchableOpacity>
 
             {/* Bouton Relancer le tutoriel */}
             <TouchableOpacity
@@ -141,6 +168,11 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <ExportDataModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
     </Card>
   );
 };

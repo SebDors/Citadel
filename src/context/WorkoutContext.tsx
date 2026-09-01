@@ -72,6 +72,7 @@ export interface WorkoutContextType {
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
   resetAllData: () => Promise<void>;
+  importFullData: (newData: FitTrackerData) => Promise<void>;
   completeOnboarding: (profileData?: { name?: string; currentWeightKg?: number }) => Promise<void>;
   markFirstSessionCreated: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
@@ -286,6 +287,14 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const reset = await StorageService.resetAllData();
     setData(reset);
     setActiveSession(null);
+    setLoading(false);
+  };
+
+  const importFullData = async (newData: FitTrackerData) => {
+    setLoading(true);
+    const imported = await StorageService.importFullData(newData);
+    setData(imported);
+    setActiveSession(imported.currentWorkout || null);
     setLoading(false);
   };
 
@@ -1491,6 +1500,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteSetFromSession,
         reloadAllData,
         resetAllData,
+        importFullData,
         completeOnboarding,
         markFirstSessionCreated,
         resetOnboarding,

@@ -38,6 +38,14 @@ export const StorageService = {
   },
 
   /**
+   * Importe et écrase toutes les données avec une nouvelle sauvegarde.
+   */
+  async importFullData(newData: FitTrackerData): Promise<FitTrackerData> {
+    await this.saveData(newData);
+    return newData;
+  },
+
+  /**
    * Sauvegarde globale de l'état applicatif.
    */
   async saveData(data: FitTrackerData): Promise<void> {
