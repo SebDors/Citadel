@@ -22,7 +22,7 @@ import {
   Play,
   Edit3,
 } from "lucide-react-native";
-import Svg, { Defs, LinearGradient, Stop, Path, Circle } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Stop, Path, Circle, G } from "react-native-svg";
 import {
   getTemplateBlocks,
   formatCircuitSummary,
@@ -39,7 +39,7 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function WorkoutAnalyticsScreen() {
   const { theme } = useTheme();
-  const { data } = useWorkout();
+  const { data, startWorkout } = useWorkout();
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -120,28 +120,42 @@ export default function WorkoutAnalyticsScreen() {
 
   const chartLayout = useMemo(() => {
     if (chartData.length === 0) return null;
-    const paddingHorizontal = 10;
-    const width = SCREEN_WIDTH - 64 - paddingHorizontal * 2;
-    const height = 120;
     
-    const maxVal = Math.max(...chartData.map(d => d.val), 1);
-    const minVal = Math.min(...chartData.map(d => d.val), 0);
+    const yAxisWidth = 45;
+    const paddingLeft = 15;
+    const paddingRight = 15;
+    const cardPadding = 32; // 16 left + 16 right
+    const containerPadding = 32; // 16 left + 16 right
+    
+    const svgWidth = SCREEN_WIDTH - containerPadding - cardPadding - yAxisWidth;
+    const drawableWidth = Math.max(10, svgWidth - paddingLeft - paddingRight);
+
+    const height = 130;
+    const topPadding = 15;
+    const bottomPadding = 15;
+    const drawableHeight = height - topPadding - bottomPadding;
+
+    const maxVal = Math.max(...chartData.map((d) => d.val), 1);
+    const minVal = Math.min(...chartData.map((d) => d.val), 0);
     const range = maxVal - minVal || 1;
 
     const points = chartData.map((d, i) => {
-      const x = chartData.length > 1 ? paddingHorizontal + (i / (chartData.length - 1)) * width : width / 2;
-      const y = height - ((d.val - minVal) / range) * height;
+      const x =
+        chartData.length > 1
+          ? paddingLeft + (i / (chartData.length - 1)) * drawableWidth
+          : svgWidth / 2;
+      const y =
+        topPadding + (1 - (d.val - minVal) / range) * drawableHeight;
       return { x, y, val: d.val, date: d.date };
     });
 
     const pathData = points.reduce((acc, pt, i) => {
-      return acc + `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y} `;
+      return acc + `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)} `;
     }, '');
 
-    // Path pour le gradient
-    const areaPath = `${pathData} L ${points[points.length - 1]?.x} ${height} L ${points[0]?.x} ${height} Z`;
+    const areaPath = `${pathData} L ${points[points.length - 1]?.x.toFixed(1)} ${height - bottomPadding} L ${points[0]?.x.toFixed(1)} ${height - bottomPadding} Z`;
 
-    return { points, pathData, areaPath, maxVal, minVal, width, height };
+    return { points, pathData, areaPath, maxVal, minVal, width: svgWidth, height, yAxisWidth };
   }, [chartData]);
 
 
@@ -308,6 +322,13 @@ export default function WorkoutAnalyticsScreen() {
     });
   }, [allExercises, allHistorySessions]);
 
+  const handleStartWorkout = () => {
+    if (template) {
+      startWorkout(template);
+    }
+    router.push('/live-workout');
+  };
+
   return (
     <View style={[styles.safeArea, { backgroundColor: theme.background }]}>
       {/* Top Header Navigation */}
@@ -342,7 +363,7 @@ export default function WorkoutAnalyticsScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.headerActionBtn, { backgroundColor: theme.accent }]}
-            onPress={() => router.push({ pathname: '/live-workout', params: { templateId: template?.id } })}
+            onPress={handleStartWorkout}
           >
             <Play size={18} color="#fff" fill="#fff" />
           </TouchableOpacity>
@@ -379,17 +400,17 @@ export default function WorkoutAnalyticsScreen() {
         </View>
 
         {/* Chart Canvas Card */}
-        <View style={[styles.chartCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+        <View style={[styles.chartCard, { backgroundColor: theme.cardBg, borderColor: theme.border, overflow: 'hidden' }]}>
           <View style={styles.chartArea}>
             {chartLayout ? (
               <>
-                <View style={styles.chartYLabels}>
+                <View style={[styles.chartYLabels, { width: chartLayout.yAxisWidth }]}>
                   <Text style={[styles.chartYText, { color: theme.textMuted }]}>{chartLayout.maxVal.toFixed(1)}</Text>
                   <Text style={[styles.chartYText, { color: theme.textMuted }]}>{((chartLayout.maxVal + chartLayout.minVal)/2).toFixed(1)}</Text>
                   <Text style={[styles.chartYText, { color: theme.textMuted }]}>{chartLayout.minVal.toFixed(1)}</Text>
                 </View>
                 
-                <View style={{ flex: 1, marginLeft: 40 }}>
+                <View style={{ width: chartLayout.width, height: chartLayout.height, marginLeft: chartLayout.yAxisWidth, position: 'relative' }}>
                   <Svg width={chartLayout.width} height={chartLayout.height}>
                     <Defs>
                       <LinearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -402,29 +423,61 @@ export default function WorkoutAnalyticsScreen() {
                     <Path d={chartLayout.pathData} fill="none" stroke={theme.accent} strokeWidth="3" strokeLinejoin="round" />
                     
                     {chartLayout.points.map((pt, i) => (
-                      <Circle
-                        key={i}
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={activeDataPointIndex === i ? 6 : 4}
-                        fill={theme.accent}
-                        stroke={theme.cardBg}
-                        strokeWidth="2"
-                        onPress={() => setActiveDataPointIndex(i)}
-                      />
+                      <G key={i}>
+                        {activeDataPointIndex === i && (
+                          <Circle
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={10}
+                            fill={theme.primary + '33'}
+                          />
+                        )}
+                        <Circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={activeDataPointIndex === i ? 6 : 4}
+                          fill={activeDataPointIndex === i ? theme.primary : theme.accent}
+                          stroke={theme.cardBg}
+                          strokeWidth={activeDataPointIndex === i ? 3 : 2}
+                        />
+                      </G>
                     ))}
                   </Svg>
 
+                  {/* Overlay React Native d'interactivité 100% Cliquable */}
+                  <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+                    {chartLayout.points.map((pt, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        activeOpacity={0.7}
+                        style={{
+                          position: 'absolute',
+                          left: pt.x - 22,
+                          top: pt.y - 22,
+                          width: 44,
+                          height: 44,
+                          borderRadius: 22,
+                          zIndex: 20,
+                        }}
+                        onPress={() => setActiveDataPointIndex(i)}
+                      />
+                    ))}
+                  </View>
+
                   {/* Tooltip */}
                   {activeDataPointIndex !== null && chartLayout.points[activeDataPointIndex] && (
-                    <View style={[
-                      styles.tooltip, 
-                      { 
-                        backgroundColor: theme.text,
-                        left: Math.min(Math.max(chartLayout.points[activeDataPointIndex].x - 40, 0), chartLayout.width - 80),
-                        top: Math.max(chartLayout.points[activeDataPointIndex].y - 40, 0)
-                      }
-                    ]}>
+                    <View 
+                      pointerEvents="none"
+                      style={[
+                        styles.tooltip, 
+                        { 
+                          backgroundColor: theme.text,
+                          left: Math.min(Math.max(chartLayout.points[activeDataPointIndex].x - 40, 0), chartLayout.width - 80),
+                          top: Math.max(chartLayout.points[activeDataPointIndex].y - 45, -10),
+                          zIndex: 30,
+                        }
+                      ]}
+                    >
                       <Text style={[styles.tooltipVal, { color: theme.background }]}>
                         {chartLayout.points[activeDataPointIndex].val.toFixed(1)}
                       </Text>

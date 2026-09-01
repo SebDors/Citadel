@@ -5,6 +5,8 @@ import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Trophy, Dumbbell } from 'lucide-react-native';
 
+import { getSessionBlocks } from '../../types';
+
 export const OneRMChartCard: React.FC = () => {
   const { theme } = useTheme();
   const { data } = useWorkout();
@@ -48,21 +50,14 @@ export const OneRMChartCard: React.FC = () => {
 
     sortedHistory.forEach((session) => {
       const sessionDate = session.startTime;
+      const blocks = getSessionBlocks(session);
 
-      // 1. Blocs de la séance
-      (session.blocks || []).forEach((block) => {
+      blocks.forEach((block) => {
         if (block.type === 'single') {
           (block.exercise.sets || []).forEach((set) => {
             processSetForPR(block.exercise.exerciseName, set, sessionDate);
           });
         }
-      });
-
-      // 2. Exercices de la séance
-      (session.exercises || []).forEach((ex) => {
-        (ex.sets || []).forEach((set) => {
-          processSetForPR(ex.exerciseName, set, sessionDate);
-        });
       });
     });
 

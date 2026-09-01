@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, SafeAreaView } from 'react-native';
 import { X, Trophy, Activity, Calendar, Dumbbell } from 'lucide-react-native';
-import { WorkoutSession } from '../../types';
+import { WorkoutSession, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 
 interface ExerciseDetailModalProps {
@@ -49,32 +49,12 @@ export default function ExerciseDetailModal({
       });
       const dateStr = sessionDate.toISOString();
 
-      // Check single exercises
-      session.exercises?.forEach(ex => {
-        if (ex.exerciseName.trim().toLowerCase() === exerciseName.trim().toLowerCase()) {
-          ex.sets.forEach(set => {
-            if (set.completed) {
-              const w = set.weightKg || 0;
-              const r = set.reps || 0;
-              let isPr = false;
-              if (w > bestWeight || (w === bestWeight && r > bestReps)) {
-                bestWeight = w;
-                bestReps = r;
-                prDate = dateFormatted;
-                isPr = true; // Temporary flag
-              }
-              foundSets.push({ weightKg: w, reps: r, isPr });
-            }
-          });
-        }
-      });
+      const targetName = exerciseName.trim().toLowerCase();
+      const blocks = getSessionBlocks(session);
 
-      // Check circuits (optional, maybe circuits just have target values, but we can check if sets exist)
-      session.blocks?.forEach(block => {
-        if (block.type === 'circuit') {
-           // Circuit sets aren't structured the same way, skipped for PRs typically unless explicitly recorded
-        } else if (block.type === 'single') {
-          if (block.exercise.exerciseName.trim().toLowerCase() === exerciseName.trim().toLowerCase()) {
+      blocks.forEach(block => {
+        if (block.type === 'single') {
+          if (block.exercise.exerciseName.trim().toLowerCase() === targetName) {
             block.exercise.sets.forEach(set => {
               if (set.completed) {
                 const w = set.weightKg || 0;
