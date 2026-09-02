@@ -3,11 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Modal,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { X, Delete, ArrowRight, Check, RotateCcw } from 'lucide-react-native';
+import { X, Delete, ArrowRight, Check, RotateCcw, ArrowLeft } from 'lucide-react-native';
 
 export type NumericFieldType = 'weightKg' | 'reps' | 'rir';
 
@@ -19,6 +20,7 @@ export interface CustomNumericKeypadProps {
   value: string;
   onChangeValue?: (val: string) => void;
   onNextField?: (currentVal: string) => void;
+  onPreviousField?: (currentVal: string) => void;
   onValidate?: (finalVal: string) => void;
   onClear?: () => void;
 }
@@ -56,7 +58,7 @@ export const computeNextValue = (
   return prevVal;
 };
 
-// Sous-composant KeyButton mémoïsé avec React.memo pour des performances optimales (< 16ms)
+// Sous-composant KeyButton mémoïsé avec surbrillance dynamique au clic (< 16ms)
 const KeyButton = React.memo<KeyButtonProps>(({
   value,
   label,
@@ -66,19 +68,40 @@ const KeyButton = React.memo<KeyButtonProps>(({
   style,
   textStyle,
 }) => {
+  const { theme } = useTheme();
+
   const handlePress = useCallback(() => {
     onPress(value);
   }, [onPress, value]);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.6}
+    <Pressable
       onPress={handlePress}
       disabled={disabled}
-      style={style}
+      style={({ pressed }) => [
+        style,
+        pressed && !disabled && {
+          backgroundColor: `${theme.accent}45`,
+          borderColor: theme.accent,
+          transform: [{ scale: 0.94 }],
+        },
+      ]}
     >
-      {icon ? icon : <Text style={textStyle}>{label || value}</Text>}
-    </TouchableOpacity>
+      {({ pressed }) => (
+        icon ? (
+          icon
+        ) : (
+          <Text
+            style={[
+              textStyle,
+              pressed && !disabled && { color: theme.accent, fontWeight: '900' },
+            ]}
+          >
+            {label || value}
+          </Text>
+        )
+      )}
+    </Pressable>
   );
 });
 
@@ -92,6 +115,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   value,
   onChangeValue,
   onNextField,
+  onPreviousField,
   onValidate,
   onClear,
 }) => {
@@ -155,6 +179,13 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
       onNextField(localValue);
     }
   }, [onNextField, localValue]);
+
+  // Action Précédent (retourner au champ précédent en transmettant la valeur locale)
+  const handlePrevious = useCallback(() => {
+    if (onPreviousField) {
+      onPreviousField(localValue);
+    }
+  }, [onPreviousField, localValue]);
 
   // Action Valider (valider et fermer en transmettant la valeur locale)
   const handleValidate = useCallback(() => {
@@ -298,60 +329,87 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
           {/* Barre d'action inférieure */}
           <View style={styles.buttonBar}>
-            {/* Bouton Gauche : Effacer */}
-            <TouchableOpacity
-              activeOpacity={0.7}
+            {/* Bouton Gauche 1 : Précédent (si pas sur le tout premier champ) */}
+            {activeField !== 'weightKg' && onPreviousField && (
+              <Pressable
+                onPress={handlePrevious}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  styles.prevBtn,
+                  {
+                    backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                    borderColor: pressed ? theme.accent : theme.border,
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                  },
+                ]}
+              >
+                <ArrowLeft
+                  size={15}
+                  color={theme.text}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.prevBtnText, { color: theme.text }]}>
+                  Précédent
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Bouton Gauche 2 : Effacer */}
+            <Pressable
               onPress={handleClear}
-              style={[
+              style={({ pressed }) => [
                 styles.actionBtn,
                 styles.clearBtn,
                 {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
+                  backgroundColor: pressed ? `${theme.danger}30` : theme.surface,
+                  borderColor: pressed ? theme.danger : theme.border,
+                  transform: [{ scale: pressed ? 0.95 : 1 }],
                 },
               ]}
             >
               <RotateCcw
-                size={16}
+                size={15}
                 color={theme.textMuted}
-                style={{ marginRight: 6 }}
+                style={{ marginRight: 4 }}
               />
               <Text style={[styles.clearBtnText, { color: theme.text }]}>
                 Effacer
               </Text>
-            </TouchableOpacity>
+            </Pressable>
 
             {/* Bouton Droit : Suivant ➔ ou Valider 🗸 */}
             {isLastField ? (
-              <TouchableOpacity
-                activeOpacity={0.8}
+              <Pressable
                 onPress={handleValidate}
-                style={[
+                style={({ pressed }) => [
                   styles.actionBtn,
                   styles.validateBtn,
                   {
                     backgroundColor: theme.success || theme.accent,
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    opacity: pressed ? 0.85 : 1,
                   },
                 ]}
               >
                 <Text style={styles.actionBtnText}>Valider</Text>
                 <Check size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
+              </Pressable>
             ) : (
-              <TouchableOpacity
-                activeOpacity={0.8}
+              <Pressable
                 onPress={handleNext}
-                style={[
+                style={({ pressed }) => [
                   styles.actionBtn,
                   styles.nextBtn,
                   {
                     backgroundColor: theme.accent,
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    opacity: pressed ? 0.85 : 1,
                   },
                 ]}
               >
                 <Text style={styles.actionBtnText}>Suivant</Text>
                 <ArrowRight size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
+              </Pressable>
             )}
           </View>
         </TouchableOpacity>
@@ -474,9 +532,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  prevBtn: {
+    borderWidth: 1,
+    marginRight: 6,
+  },
+  prevBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   clearBtn: {
     borderWidth: 1,
-    marginRight: 8,
+    marginRight: 6,
   },
   clearBtnText: {
     fontSize: 15,

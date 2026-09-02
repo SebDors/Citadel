@@ -114,6 +114,25 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     }
   }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad, set.type, set.completed, onToggleComplete]);
 
+  // Retour au champ précédent (RIR ➔ REPS ➔ KG)
+  const handleKeypadPrevious = useCallback((currentVal?: string) => {
+    if (!keypadTarget) return;
+    const valToCommit = currentVal !== undefined ? currentVal : tempValue;
+    commitValue(keypadTarget, valToCommit);
+
+    if (keypadTarget.type === 'main') {
+      if (keypadTarget.field === 'rir') {
+        handleOpenMainKeypad('reps');
+      } else if (keypadTarget.field === 'reps') {
+        handleOpenMainKeypad('weightKg');
+      }
+    } else if (keypadTarget.type === 'drop') {
+      if (keypadTarget.field === 'reps') {
+        handleOpenDropKeypad(keypadTarget.stepId, 'weightKg');
+      }
+    }
+  }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad]);
+
   // Validation finale
   const handleKeypadValidate = useCallback((finalVal?: string) => {
     if (!keypadTarget) return;
@@ -378,6 +397,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           value={tempValue}
           onChangeValue={handleKeypadChange}
           onNextField={handleKeypadNext}
+          onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}
           onClear={() => commitValue(keypadTarget, '')}
         />
