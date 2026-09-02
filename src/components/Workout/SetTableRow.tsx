@@ -83,13 +83,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     }
   }, [onUpdate, set.dropSteps]);
 
-  // Changement en direct de la valeur
+  // Changement en direct de la valeur (mise à jour locale instantanée < 1ms)
   const handleKeypadChange = useCallback((val: string) => {
     setTempValue(val);
-    if (keypadTarget) {
-      commitValue(keypadTarget, val);
-    }
-  }, [keypadTarget, commitValue]);
+  }, []);
 
   // Passage au champ suivant (KG ➔ REPS ➔ RIR)
   const handleKeypadNext = useCallback((currentVal?: string) => {
@@ -130,8 +127,11 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   }, [keypadTarget, tempValue, commitValue, set.completed, onToggleComplete]);
 
   const handleKeypadClose = useCallback(() => {
+    if (keypadTarget && tempValue !== '') {
+      commitValue(keypadTarget, tempValue);
+    }
     setKeypadTarget(null);
-  }, []);
+  }, [keypadTarget, tempValue, commitValue]);
 
   const handleAddDropStep = () => {
     const current = set.dropSteps || [];
