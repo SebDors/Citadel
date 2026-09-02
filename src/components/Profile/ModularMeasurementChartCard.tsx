@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { formatWeight } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Activity, TrendingUp } from 'lucide-react-native';
 
@@ -46,7 +47,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
 
   const latestPoint = points[points.length - 1];
   const previousPoint = points.length > 1 ? points[points.length - 2] : null;
-  const delta = latestPoint && previousPoint ? (latestPoint.value - previousPoint.value).toFixed(1) : null;
+  const delta = latestPoint && previousPoint ? (latestPoint.value - previousPoint.value).toFixed(2) : null;
 
   // Chart dimensions & plotting logic
   const chartHeight = 120;
@@ -139,7 +140,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
           </Text>
           <View style={styles.calloutValueRow}>
             <Text style={[styles.calloutValue, { color: theme.text }]}>
-              {latestPoint.value.toFixed(1)} {activeConfig.unit}
+              {formatWeight(latestPoint.value)} {activeConfig.unit}
             </Text>
             {delta !== null && (
               <Text
@@ -245,7 +246,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
               ]}
             >
               <Text style={[styles.tooltipVal, { color: theme.background }]}>
-                {chartPoints[activePointIndex].val.toFixed(1)} {activeConfig.unit}
+                {formatWeight(chartPoints[activePointIndex].val)} {activeConfig.unit}
               </Text>
               <Text style={[styles.tooltipDate, { color: theme.background }]}>
                 {new Date(chartPoints[activePointIndex].date).toLocaleDateString('fr-FR', {

@@ -7,6 +7,7 @@ import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { User, Scale, Flame, Settings, RotateCcw, Sparkles, Download } from 'lucide-react-native';
 import { ExportDataModal } from './ExportDataModal';
+import { formatWeight } from '../../utils/numberUtils';
 
 interface ProfileHeaderCardProps {
   profile: UserProfile;
@@ -41,7 +42,7 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
             <View style={styles.statItem}>
               <Scale size={14} color={theme.textMuted} />
               <Text style={[styles.statText, { color: theme.textMuted }]}>
-                {profile.currentWeightKg && profile.currentWeightKg > 0 ? `${profile.currentWeightKg.toFixed(1)} kg` : '-- kg'}
+                {profile.currentWeightKg && profile.currentWeightKg > 0 ? `${formatWeight(profile.currentWeightKg)} kg` : '-- kg'}
               </Text>
             </View>
 

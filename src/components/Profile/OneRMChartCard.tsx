@@ -6,6 +6,7 @@ import { Card } from '../UI/Card';
 import { Trophy, Dumbbell } from 'lucide-react-native';
 
 import { getSessionBlocks } from '../../types';
+import { formatWeight } from '../../utils/numberUtils';
 
 export const OneRMChartCard: React.FC = () => {
   const { theme } = useTheme();
@@ -93,7 +94,7 @@ export const OneRMChartCard: React.FC = () => {
               </View>
 
               <View style={styles.itemRight}>
-                <Text style={[styles.prValue, { color: theme.accent }]}>{item.weightKg.toFixed(1)} kg</Text>
+                <Text style={[styles.prValue, { color: theme.accent }]}>{formatWeight(item.weightKg)} kg</Text>
                 {item.reps > 0 && (
                   <Text style={[styles.prSub, { color: theme.textMuted }]}>
                     {item.reps} rep{item.reps > 1 ? 's' : ''}

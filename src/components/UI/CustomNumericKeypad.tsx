@@ -48,11 +48,20 @@ export const computeNextValue = (
     if (prevVal.includes('.')) return prevVal;
     return prevVal === '' ? '0.' : prevVal + '.';
   }
+
+  // Limitation à 2 chiffres après la virgule (ex: 82.25)
+  if (prevVal.includes('.')) {
+    const decimalPart = prevVal.split('.')[1];
+    if (decimalPart && decimalPart.length >= 2) {
+      return prevVal;
+    }
+  }
+
   // Chiffres 0-9
   if (prevVal === '0') {
     return key;
   }
-  if (prevVal.length < 6) {
+  if (prevVal.length < 7) {
     return prevVal + key;
   }
   return prevVal;
