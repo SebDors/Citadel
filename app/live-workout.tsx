@@ -696,34 +696,7 @@ export default function LiveWorkoutScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Bannière "Séance en pause" si isPaused = true */}
-          {activeSession.hasStarted !== false && activeSession.isPaused && (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[
-                styles.startSessionBanner,
-                { backgroundColor: theme.secondary },
-              ]}
-              onPress={togglePauseWorkoutSession}
-            >
-              <View style={styles.startSessionIconCircle}>
-                <Play
-                  size={18}
-                  color={theme.secondary}
-                  fill={theme.secondary}
-                />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.startSessionBannerTitle}>
-                  Séance en pause
-                </Text>
-                <Text style={styles.startSessionBannerSub}>
-                  Le chrono est figé. Appuyez pour reprendre l'entraînement !
-                </Text>
-              </View>
-              <ChevronRight size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
+
         </View>
 
         {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
@@ -1584,7 +1557,7 @@ export default function LiveWorkoutScreen() {
               activeSession.hasStarted === false
                 ? theme.textMuted
                 : activeSession.isPaused
-                  ? theme.secondary
+                  ? theme.danger
                   : theme.accent
             }
           />
@@ -1597,7 +1570,7 @@ export default function LiveWorkoutScreen() {
                     activeSession.hasStarted === false
                       ? theme.textMuted
                       : activeSession.isPaused
-                        ? theme.secondary
+                        ? theme.danger
                         : theme.text,
                 },
               ]}
@@ -1612,7 +1585,7 @@ export default function LiveWorkoutScreen() {
                     activeSession.hasStarted === false
                       ? theme.textMuted
                       : activeSession.isPaused
-                        ? theme.secondary
+                        ? theme.danger
                         : theme.textMuted,
                   fontWeight: activeSession.isPaused ? "800" : "600",
                 },
@@ -1621,7 +1594,7 @@ export default function LiveWorkoutScreen() {
               {activeSession.hasStarted === false
                 ? "Séance non démarrée"
                 : activeSession.isPaused
-                  ? "En pause"
+                  ? "EN PAUSE"
                   : "Temps écoulé"}
             </Text>
           </View>
@@ -1635,7 +1608,7 @@ export default function LiveWorkoutScreen() {
               styles.bottomPauseCircleBtn,
               {
                 backgroundColor: activeSession.isPaused
-                  ? theme.secondary
+                  ? theme.danger
                   : theme.accent,
               },
             ]}

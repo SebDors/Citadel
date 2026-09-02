@@ -1,8 +1,8 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Animated } from "react-native";
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
-import { CheckCircle, RotateCw, Timer } from "lucide-react-native";
+import { CheckCircle, RotateCw, Timer, Pause } from "lucide-react-native";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -26,6 +26,21 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   circuitInfo,
 }) => {
   const { theme } = useTheme();
+
+  const pauseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (session.isPaused) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pauseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+          Animated.timing(pauseAnim, { toValue: 1, duration: 800, useNativeDriver: true })
+        ])
+      ).start();
+    } else {
+      pauseAnim.setValue(1);
+    }
+  }, [session.isPaused, pauseAnim]);
 
   const formatMinutesSeconds = (totalSeconds: number = 0): string => {
     const m = Math.floor(totalSeconds / 60);
@@ -99,6 +114,16 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           </Text>
         </View>
 
+        {/* Badge "EN PAUSE" au centre si la séance est en pause */}
+        {session.isPaused && session.hasStarted !== false && (
+          <View style={styles.centerBadgeContainer}>
+            <Animated.View style={[styles.pauseBadge, { backgroundColor: `${theme.danger}20`, borderColor: theme.danger, opacity: pauseAnim }]}>
+              <Pause size={11} color={theme.danger} fill={theme.danger} style={{ marginRight: 4 }} />
+              <Text style={[styles.pauseText, { color: theme.danger }]}>EN PAUSE</Text>
+            </Animated.View>
+          </View>
+        )}
+
         {/* Badge pilule des séries avec mention 'séries' à Droite */}
         <View style={styles.rightGroup}>
           {renderSetsBadge()}
@@ -128,12 +153,18 @@ const styles = StyleSheet.create({
   },
   titleBox: {
     flex: 1,
-    marginRight: 10,
+    flexShrink: 1,
+    marginRight: 6,
   },
   title: {
     fontSize: 17,
     fontWeight: "900",
     textAlign: "left",
+  },
+  centerBadgeContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 6,
   },
   rightGroup: {
     alignItems: "flex-end",
@@ -151,5 +182,17 @@ const styles = StyleSheet.create({
   setsPillText: {
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  pauseBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  pauseText: {
+    fontSize: 11,
+    fontWeight: "900",
   },
 });

@@ -65,7 +65,7 @@ function getActiveBannerSubtitle(session: WorkoutSession): string {
     const mins = Math.floor((session.durationSeconds || 0) / 60);
     const secs = (session.durationSeconds || 0) % 60;
     const timeStr = `${mins < 10 ? "0" + mins : mins}:${secs < 10 ? "0" + secs : secs}`;
-    return `Séance en pause ⏸ · ${timeStr}`;
+    return `Séance en pause · ${timeStr}`;
   }
   const blocks = getSessionBlocks(session);
   const circuitBlock = blocks.find(
