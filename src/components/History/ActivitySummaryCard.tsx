@@ -229,20 +229,36 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
     );
   }
 
-  // Mode 2: Bloc de statistiques globale d'activité (si history est fourni)
+  // Mode 2: Bloc de statistiques de l'activité de la semaine (commençant au lundi)
   const historyList = history || [];
-  const totalVolume = historyList.reduce((acc, s) => acc + s.totalVolumeKg, 0);
-  const totalSeconds = historyList.reduce((acc, s) => acc + s.durationSeconds, 0);
+  
+  // Obtenir le lundi 00:00:00 de la semaine en cours
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0: Dimanche, 1: Lundi, ...
+  const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+  const startOfCurrentWeek = new Date(now.setDate(diffToMonday));
+  startOfCurrentWeek.setHours(0, 0, 0, 0);
+
+  // Filtrer les séances réalisées depuis le lundi de la semaine courante
+  const currentWeekSessions = historyList.filter(
+    (s) => new Date(s.startTime) >= startOfCurrentWeek
+  );
+
+  const totalVolume = currentWeekSessions.reduce((acc, s) => acc + s.totalVolumeKg, 0);
+  const totalSeconds = currentWeekSessions.reduce((acc, s) => acc + s.durationSeconds, 0);
   const totalHours = Math.round((totalSeconds / 3600) * 10) / 10;
 
   return (
     <Card style={styles.cardMargin}>
-      <Text style={[styles.cardTitle, { color: theme.text }]}>Activité Récente</Text>
+      <View style={styles.cardHeaderRow}>
+        <Text style={[styles.cardTitle, { color: theme.text }]}>Activité de la Semaine</Text>
+        <Text style={[styles.cardSubTitle, { color: theme.textMuted }]}>Lun. - Dim.</Text>
+      </View>
 
       <View style={styles.metricsGrid}>
         <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Award size={18} color={theme.accent} />
-          <Text style={[styles.value, { color: theme.text }]}>{historyList.length}</Text>
+          <Text style={[styles.value, { color: theme.text }]}>{currentWeekSessions.length}</Text>
           <Text style={[styles.label, { color: theme.textMuted }]}>Séances</Text>
         </View>
 
@@ -266,10 +282,19 @@ const styles = StyleSheet.create({
   cardMargin: {
     marginBottom: 10,
   },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: '800',
-    marginBottom: 12,
+  },
+  cardSubTitle: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   metricsGrid: {
     flexDirection: 'row',
