@@ -150,6 +150,19 @@ export default function WorkoutTab() {
     {},
   );
 
+  // Restauration de l'état de réduction des cartes depuis AsyncStorage au lancement
+  useEffect(() => {
+    let isMounted = true;
+    StorageService.loadCollapsedCards().then((savedState) => {
+      if (isMounted && savedState) {
+        setCollapsedCards(savedState);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Animation de pulsation du bouton + Séance pendant le guidage première séance
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
