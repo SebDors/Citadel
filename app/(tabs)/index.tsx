@@ -54,6 +54,7 @@ import {
   getSessionBlocks,
   formatCircuitSummary,
   calculateEstimatedWorkoutMinutes,
+  getAverageWorkoutDurationMinutes,
 } from "../../src/types";
 import { StorageService } from "../../src/services/storage";
 
@@ -291,9 +292,9 @@ export default function WorkoutTab() {
     if (isOnlyAmrap && totalAmrapMinutes > 0) {
       templateSubtitle = `${totalExercises} exos · AMRAP ${totalAmrapMinutes} min`;
     } else {
-      const estimatedMins = calculateEstimatedWorkoutMinutes(blocks);
+      const estimatedMins = getAverageWorkoutDurationMinutes(tpl, data?.history);
       const circuitTag = hasCircuit ? " · ⚡ CIRCUIT" : "";
-      const timeTag = estimatedMins > 0 ? ` · ~${estimatedMins} min` : "";
+      const timeTag = estimatedMins > 0 ? ` · ~${estimatedMins} min` : " · 45-60 min";
       templateSubtitle = `${totalExercises} exos${circuitTag}${timeTag}`;
     }
 
