@@ -54,6 +54,7 @@ export interface WorkoutContextType {
   updateActiveSessionCircuitStates: (states: Record<string, any>) => void;
   addExerciseToCircuit: (blockId: string, exerciseName: string, primaryMuscle: string, targetMuscles?: string[]) => void;
   addBatchExercisesToCircuit: (blockId: string, items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles?: string[] }>) => void;
+  updateCircuitItemSetType: (blockId: string, exerciseId: string, setType: SetType) => void;
   addMeasurement: (measurement: BodyMeasurement) => Promise<void>;
   deleteMeasurement: (id: string) => Promise<void>;
   updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
@@ -1225,6 +1226,32 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ]);
   };
 
+  const updateCircuitItemSetType = (
+    blockId: string,
+    exerciseId: string,
+    setType: SetType
+  ) => {
+    if (!activeSession || !activeSession.blocks) return;
+
+    const updatedBlocks = activeSession.blocks.map((block) => {
+      if (block.id === blockId && block.type === 'circuit') {
+        const updatedExercises = block.exercises.map((ex) =>
+          ex.id === exerciseId ? { ...ex, setType } : ex
+        );
+        return { ...block, exercises: updatedExercises };
+      }
+      return block;
+    });
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
   const finishWorkout = async () => {
     if (!activeSession) return;
 
@@ -1482,6 +1509,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateActiveSessionCircuitStates,
         addExerciseToCircuit,
         addBatchExercisesToCircuit,
+        updateCircuitItemSetType,
         addMeasurement,
         deleteMeasurement,
         updateUserProfile,

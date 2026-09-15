@@ -33,6 +33,7 @@ import {
   SingleExerciseBlock,
   CircuitExerciseItem,
   SET_TYPES_CONFIG,
+  SetType,
 } from "../src/types";
 import {
   Plus,
@@ -107,12 +108,24 @@ export default function LiveWorkoutScreen() {
     startSessionTimer,
     togglePauseWorkoutSession,
     updateActiveSessionCircuitStates,
+    updateCircuitItemSetType,
     allExercises,
     data,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleCycleCircuitSetType = (
+    blockId: string,
+    exId: string,
+    currentSetType?: SetType
+  ) => {
+    const typesOrder: SetType[] = ["normal", "warmup", "drop", "amrap", "failure"];
+    const cur = currentSetType || "normal";
+    const nextIdx = (typesOrder.indexOf(cur) + 1) % typesOrder.length;
+    updateCircuitItemSetType(blockId, exId, typesOrder[nextIdx]);
+  };
 
   const [showAddExModal, setShowAddExModal] = useState(false);
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
@@ -949,12 +962,26 @@ export default function LiveWorkoutScreen() {
                               >
                                 {ex.exerciseName}
                               </Text>
-                              {ex.setType && ex.setType !== 'normal' && (() => {
-                                const cfg = SET_TYPES_CONFIG[ex.setType] || SET_TYPES_CONFIG.normal;
+                              {(() => {
+                                const currentSetType = ex.setType || 'normal';
+                                const cfg = SET_TYPES_CONFIG[currentSetType] || SET_TYPES_CONFIG.normal;
                                 return (
-                                  <View style={{ backgroundColor: cfg.color, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
-                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
-                                  </View>
+                                  <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      handleCycleCircuitSetType(block.id, ex.id, ex.setType);
+                                    }}
+                                    style={{
+                                      backgroundColor: currentSetType === 'normal' ? `${theme.border}90` : cfg.color,
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                      borderRadius: 4,
+                                      marginLeft: 6,
+                                    }}
+                                  >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.code} · {cfg.label}</Text>
+                                  </TouchableOpacity>
                                 );
                               })()}
                             </View>
@@ -1055,12 +1082,23 @@ export default function LiveWorkoutScreen() {
                             >
                               {ex.exerciseName}
                             </Text>
-                            {ex.setType && ex.setType !== 'normal' && (() => {
-                              const cfg = SET_TYPES_CONFIG[ex.setType] || SET_TYPES_CONFIG.normal;
+                            {(() => {
+                              const currentSetType = ex.setType || 'normal';
+                              const cfg = SET_TYPES_CONFIG[currentSetType] || SET_TYPES_CONFIG.normal;
                               return (
-                                <View style={{ backgroundColor: cfg.color, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
-                                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
-                                </View>
+                                <TouchableOpacity
+                                  activeOpacity={0.7}
+                                  onPress={() => handleCycleCircuitSetType(block.id, ex.id, ex.setType)}
+                                  style={{
+                                    backgroundColor: currentSetType === 'normal' ? `${theme.border}90` : cfg.color,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 1,
+                                    borderRadius: 4,
+                                    marginLeft: 6,
+                                  }}
+                                >
+                                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.code} · {cfg.label}</Text>
+                                </TouchableOpacity>
                               );
                             })()}
                           </View>
