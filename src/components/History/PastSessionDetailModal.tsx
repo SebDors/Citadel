@@ -11,6 +11,7 @@ import {
 import { WorkoutSession, SingleExerciseBlock, CircuitBlock, getSessionBlocks, formatCircuitSummary } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
+import { formatWeight } from '../../utils/numberUtils';
 import {
   X,
   Clock,
@@ -99,7 +100,7 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
             <View style={styles.metricCell}>
               <Dumbbell size={14} color={theme.accent} />
               <Text style={[styles.metricVal, { color: theme.accent }]}>
-                {(session.totalVolumeKg || 0).toFixed(1)} kg
+                {formatWeight(session.totalVolumeKg || 0)} kg
               </Text>
               <Text style={[styles.metricSub, { color: theme.textMuted }]}>Volume total</Text>
             </View>
@@ -152,7 +153,7 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
 
                       {/* Liste des séries en lecture seule */}
                       {sets.map((s, sIdx) => {
-                        const weightStr = s.weightKg !== undefined && s.weightKg !== null ? `${s.weightKg.toFixed(1)} kg` : '-';
+                        const weightStr = s.weightKg !== undefined && s.weightKg !== null ? `${formatWeight(s.weightKg)} kg` : '-';
                         const repsStr = s.reps !== undefined && s.reps !== null ? `${s.reps}` : '-';
 
                         return (

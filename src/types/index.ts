@@ -323,6 +323,34 @@ export function calculateEstimatedWorkoutMinutes(items: WorkoutExercise[] | Work
 }
 
 /**
+ * Calcule la durée moyenne (en minutes) d'une séance basée sur l'historique des séances terminées.
+ * Si aucun historique n'existe, retombe sur l'estimation calculée des blocs.
+ */
+export function getAverageWorkoutDurationMinutes(
+  template: WorkoutTemplate,
+  history?: WorkoutSession[]
+): number {
+  if (history && history.length > 0) {
+    const completedSessions = history.filter(
+      (s) =>
+        s.status === 'completed' &&
+        s.durationSeconds > 0 &&
+        ((s.templateId && s.templateId === template.id) ||
+          (s.title && s.title.toLowerCase().trim() === template.title.toLowerCase().trim()))
+    );
+
+    if (completedSessions.length > 0) {
+      const totalSeconds = completedSessions.reduce((acc, s) => acc + s.durationSeconds, 0);
+      return Math.round(totalSeconds / completedSessions.length / 60);
+    }
+  }
+
+  const blocks = getTemplateBlocks(template);
+  const calculatedMins = calculateEstimatedWorkoutMinutes(blocks);
+  return calculatedMins > 0 ? calculatedMins : 45;
+}
+
+/**
  * Formate le texte résumé d'un bloc circuit.
  * Ex: "Circuit AMRAP (20 min · 3 exos)", "Circuit Round (3 tours · 3 exos)"
  * Titre personnalisé: "Abdos Round (3 tours · 3 exos)"

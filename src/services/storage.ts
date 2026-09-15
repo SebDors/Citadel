@@ -426,7 +426,10 @@ export const StorageService = {
    */
   async loadCollapsedCards(): Promise<Record<string, boolean>> {
     try {
-      const jsonValue = await AsyncStorage.getItem(COLLAPSED_CARDS_KEY);
+      let jsonValue = await AsyncStorage.getItem(COLLAPSED_CARDS_KEY);
+      if (jsonValue === null) {
+        jsonValue = await AsyncStorage.getItem(LEGACY_COLLAPSED_CARDS_KEY);
+      }
       if (jsonValue !== null) {
         return JSON.parse(jsonValue) as Record<string, boolean>;
       }

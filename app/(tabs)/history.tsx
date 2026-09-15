@@ -76,7 +76,7 @@ export default function HistoryTab() {
               Aucune séance terminée pour le moment.
             </Text>
           ) : (
-            historyList.map((session) => (
+            historyList.slice(0, 7).map((session) => (
               <ActivitySummaryCard
                 key={session.id}
                 session={session}

@@ -54,6 +54,7 @@ import {
   getSessionBlocks,
   formatCircuitSummary,
   calculateEstimatedWorkoutMinutes,
+  getAverageWorkoutDurationMinutes,
 } from "../../src/types";
 import { StorageService } from "../../src/services/storage";
 
@@ -65,7 +66,7 @@ function getActiveBannerSubtitle(session: WorkoutSession): string {
     const mins = Math.floor((session.durationSeconds || 0) / 60);
     const secs = (session.durationSeconds || 0) % 60;
     const timeStr = `${mins < 10 ? "0" + mins : mins}:${secs < 10 ? "0" + secs : secs}`;
-    return `Séance en pause ⏸ · ${timeStr}`;
+    return `Séance en pause · ${timeStr}`;
   }
   const blocks = getSessionBlocks(session);
   const circuitBlock = blocks.find(
@@ -149,6 +150,19 @@ export default function WorkoutTab() {
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>(
     {},
   );
+
+  // Restauration de l'état de réduction des cartes depuis AsyncStorage au lancement
+  useEffect(() => {
+    let isMounted = true;
+    StorageService.loadCollapsedCards().then((savedState) => {
+      if (isMounted && savedState) {
+        setCollapsedCards(savedState);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Animation de pulsation du bouton + Séance pendant le guidage première séance
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -278,9 +292,9 @@ export default function WorkoutTab() {
     if (isOnlyAmrap && totalAmrapMinutes > 0) {
       templateSubtitle = `${totalExercises} exos · AMRAP ${totalAmrapMinutes} min`;
     } else {
-      const estimatedMins = calculateEstimatedWorkoutMinutes(blocks);
+      const estimatedMins = getAverageWorkoutDurationMinutes(tpl, data?.history);
       const circuitTag = hasCircuit ? " · ⚡ CIRCUIT" : "";
-      const timeTag = estimatedMins > 0 ? ` · ~${estimatedMins} min` : "";
+      const timeTag = estimatedMins > 0 ? ` · ~${estimatedMins} min` : " · 45-60 min";
       templateSubtitle = `${totalExercises} exos${circuitTag}${timeTag}`;
     }
 

@@ -6,7 +6,7 @@ import { FitTrackerData, WorkoutSession, BodyMeasurement, getSessionBlocks } fro
 
 function calculateEpley1RM(weight?: number, reps?: number): string {
   if (weight && reps && reps > 0) {
-    return (weight * (1 + reps / 30)).toFixed(1);
+    return (weight * (1 + reps / 30)).toFixed(2);
   }
   return '';
 }

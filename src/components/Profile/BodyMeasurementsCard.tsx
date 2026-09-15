@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { parseFloatFrench } from '../../utils/numberUtils';
+import { parseFloatFrench, formatWeight } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import {
@@ -229,10 +229,10 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
               {formatDateToListDisplay(m.date)}
             </Text>
             <View style={styles.mStats}>
-              <Text style={[styles.mVal, { color: theme.text }]}>{m.weightKg ? m.weightKg.toFixed(1) : ''} kg</Text>
-              {m.chestCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {m.chestCm.toFixed(1)}cm</Text>}
-              {m.thighCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>C: {m.thighCm.toFixed(1)}cm</Text>}
-              {m.bicepsCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {m.bicepsCm.toFixed(1)}cm</Text>}
+              <Text style={[styles.mVal, { color: theme.text }]}>{m.weightKg ? formatWeight(m.weightKg) : ''} kg</Text>
+              {m.chestCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {formatWeight(m.chestCm)}cm</Text>}
+              {m.thighCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>C: {formatWeight(m.thighCm)}cm</Text>}
+              {m.bicepsCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {formatWeight(m.bicepsCm)}cm</Text>}
 
               <TouchableOpacity
                 onPress={() => handleEditMeasurement(m)}
