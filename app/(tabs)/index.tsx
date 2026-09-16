@@ -40,6 +40,7 @@ import {
   BookOpen,
   Dumbbell,
   Sparkles,
+  Share2,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
@@ -56,6 +57,7 @@ import {
   getAverageWorkoutDurationMinutes,
 } from "../../src/types";
 import { StorageService } from "../../src/services/storage";
+import { ExportService } from "../../src/services/exportService";
 
 function getActiveBannerSubtitle(session: WorkoutSession): string {
   if (session.hasStarted === false) {
@@ -212,6 +214,14 @@ export default function WorkoutTab() {
   const handleOpenTemplateMenu = (tpl: WorkoutTemplate) => {
     setSelectedTemplate(tpl);
     setShowTemplateMenuModal(true);
+  };
+
+  const handleShareTemplate = async (tpl: WorkoutTemplate) => {
+    try {
+      await ExportService.shareTemplate(tpl);
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible d'exporter la séance.");
+    }
   };
 
   const handleConfirmRenameTemplate = async () => {
@@ -937,6 +947,26 @@ export default function WorkoutTab() {
                 <Copy size={18} color={theme.text} />
                 <Text style={[styles.menuOptionText, { color: theme.text }]}>
                   Dupliquer la séance
+                </Text>
+              </TouchableOpacity>
+
+              {/* 5. Partager la séance */}
+              <TouchableOpacity
+                style={[
+                  styles.menuOptionRow,
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
+                ]}
+                onPress={() => {
+                  const tpl = selectedTemplate;
+                  setShowTemplateMenuModal(false);
+                  if (tpl) {
+                    handleShareTemplate(tpl);
+                  }
+                }}
+              >
+                <Share2 size={18} color={theme.text} />
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>
+                  Partager la séance (.json)
                 </Text>
               </TouchableOpacity>
 
