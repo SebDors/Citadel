@@ -83,11 +83,6 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     }
   }, [onUpdate, set.dropSteps]);
 
-  // Changement en direct de la valeur (mise à jour locale instantanée < 1ms)
-  const handleKeypadChange = useCallback((val: string) => {
-    setTempValue(val);
-  }, []);
-
   // Passage au champ suivant (KG ➔ REPS ➔ RIR)
   const handleKeypadNext = useCallback((currentVal?: string) => {
     if (!keypadTarget) return;
@@ -145,9 +140,12 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setKeypadTarget(null);
   }, [keypadTarget, tempValue, commitValue, set.completed, onToggleComplete]);
 
-  const handleKeypadClose = useCallback(() => {
-    if (keypadTarget && tempValue !== '') {
-      commitValue(keypadTarget, tempValue);
+  const handleKeypadClose = useCallback((currentVal?: string) => {
+    if (keypadTarget) {
+      const valToCommit = currentVal !== undefined ? currentVal : tempValue;
+      if (valToCommit !== '') {
+        commitValue(keypadTarget, valToCommit);
+      }
     }
     setKeypadTarget(null);
   }, [keypadTarget, tempValue, commitValue]);
@@ -395,11 +393,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           setNumber={set.setNumber}
           activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
-          onChangeValue={handleKeypadChange}
           onNextField={handleKeypadNext}
           onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}
-          onClear={() => commitValue(keypadTarget, '')}
+          onClear={() => setTempValue('')}
         />
       )}
 

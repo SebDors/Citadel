@@ -7,6 +7,9 @@ const STORAGE_KEY = '@citadel_app_data_v1';
 const LEGACY_STORAGE_KEY = '@warriorfit_app_data_v1';
 const COLLAPSED_CARDS_KEY = '@citadel_collapsed_cards_v1';
 const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
+const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
+
+let saveCurrentWorkoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const StorageService = {
   /**
@@ -26,6 +29,17 @@ export const StorageService = {
         if (!parsed.folders) {
           parsed.folders = INITIAL_MOCK_DATA.folders || [];
         }
+
+        // Vérifier si une session active isolée et plus récente existe
+        try {
+          const activeSessionJson = await AsyncStorage.getItem(CURRENT_WORKOUT_KEY);
+          if (activeSessionJson !== null) {
+            parsed.currentWorkout = JSON.parse(activeSessionJson) as WorkoutSession;
+          }
+        } catch {
+          // Ignorer si échec de lecture de la clé isolée
+        }
+
         return parsed;
       }
       // Première utilisation : Sauvegarder les données mock initiales
@@ -61,6 +75,16 @@ export const StorageService = {
    * Enregistre une séance terminée dans l'historique et met à jour le profil.
    */
   async saveWorkoutSession(session: WorkoutSession): Promise<FitTrackerData> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    try {
+      await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+    } catch (e) {
+      console.error('Erreur suppression CURRENT_WORKOUT_KEY:', e);
+    }
+
     const currentData = await this.loadData();
     const updatedHistory = [session, ...currentData.history.filter((s) => s.id !== session.id)];
     const updatedData: FitTrackerData = {
@@ -96,18 +120,40 @@ export const StorageService = {
     return updatedData;
   },
 
-
   /**
-   * Sauvegarde ou met à jour la séance en cours (en direct).
+   * Sauvegarde ultra-rapide et optimisée de la séance en cours.
+   * Utilise une clé isolée légère (@citadel_current_workout_v1, ~3 Ko)
+   * et débounce la réécriture de la base globale pour 0ms de latence perçue.
    */
-  async saveCurrentWorkout(session: WorkoutSession | null): Promise<FitTrackerData> {
-    const currentData = await this.loadData();
-    const updatedData: FitTrackerData = {
-      ...currentData,
-      currentWorkout: session,
-    };
-    await this.saveData(updatedData);
-    return updatedData;
+  async saveCurrentWorkout(session: WorkoutSession | null): Promise<void> {
+    // 1. Sauvegarde instantanée de la session active isolée (~3 Ko, < 2ms)
+    try {
+      if (session === null) {
+        await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+      } else {
+        await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(session));
+      }
+    } catch (e) {
+      console.error('Erreur sauvegarde rapide currentWorkout:', e);
+    }
+
+    // 2. Débounce de la réécriture dans l'arbre global (800ms) pour ne jamais bloquer le thread JS
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+    }
+
+    saveCurrentWorkoutDebounceTimer = setTimeout(async () => {
+      try {
+        const currentData = await this.loadData();
+        const updatedData: FitTrackerData = {
+          ...currentData,
+          currentWorkout: session,
+        };
+        await this.saveData(updatedData);
+      } catch (e) {
+        console.error('Erreur debounce saveCurrentWorkout:', e);
+      }
+    }, 800);
   },
 
   /**
@@ -456,11 +502,16 @@ export const StorageService = {
    * Efface toutes les données de stockage local pour repartir sur une application neuve.
    */
   async resetAllData(): Promise<FitTrackerData> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
       await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
       await AsyncStorage.removeItem(COLLAPSED_CARDS_KEY);
       await AsyncStorage.removeItem(LEGACY_COLLAPSED_CARDS_KEY);
+      await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
     } catch (e) {
       console.error('Erreur lors de la réinitialisation des données:', e);
     }

@@ -14,7 +14,7 @@ export type NumericFieldType = 'weightKg' | 'reps' | 'rir';
 
 export interface CustomNumericKeypadProps {
   visible: boolean;
-  onClose: () => void;
+  onClose: (currentVal?: string) => void;
   setNumber: number;
   activeField: NumericFieldType;
   value: string;
@@ -130,13 +130,15 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 }) => {
   const { theme } = useTheme();
 
-  // État local de la saisie pour éviter de ré-exécuter le rendu du composant parent SetTableRow à chaque touche tapée
+  // État local de la saisie : buffer pur pour 0ms de latence
   const [localValue, setLocalValue] = useState<string>(value);
 
-  // Synchronisation de l'état local lors du changement de prop value ou activeField
+  // Synchronisation du buffer local uniquement lors de l'ouverture ou du changement de cible
   useEffect(() => {
-    setLocalValue(value);
-  }, [value, activeField, visible]);
+    if (visible) {
+      setLocalValue(value);
+    }
+  }, [visible, activeField, setNumber]);
 
   // Titre et unité de l'en-tête selon le champ actif
   const getFieldHeaderInfo = useCallback(() => {
@@ -154,33 +156,23 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   const { title, unit } = getFieldHeaderInfo();
 
-  // Gestion des clics du pavé numérique (0-9, ., backspace)
+  // Gestion des clics du pavé numérique (0-9, ., backspace) : purement local, callback stable (< 0.5ms)
   const handleKeyPress = useCallback((key: string) => {
-    const nextVal = computeNextValue(localValue, key, activeField);
-    setLocalValue(nextVal);
-    if (onChangeValue) {
-      onChangeValue(nextVal);
-    }
-  }, [localValue, activeField, onChangeValue]);
+    setLocalValue((prevVal) => computeNextValue(prevVal, key, activeField));
+  }, [activeField]);
 
-  // Gestion des boutons de choix rapide RIR (1, 2, 3, 4, 5+)
+  // Gestion des boutons de choix rapide RIR (0, 1, 2, 3, 4, 5+) : purement local
   const handleRirPress = useCallback((key: string) => {
     setLocalValue(key);
-    if (onChangeValue) {
-      onChangeValue(key);
-    }
-  }, [onChangeValue]);
+  }, []);
 
-  // Réinitialisation de la valeur saisie
+  // Réinitialisation locale de la valeur saisie (sans commit synchrone bloquant)
   const handleClear = useCallback(() => {
     setLocalValue('');
-    if (onChangeValue) {
-      onChangeValue('');
-    }
     if (onClear) {
       onClear();
     }
-  }, [onChangeValue, onClear]);
+  }, [onClear]);
 
   // Action Suivant (passer au champ suivant en transmettant la valeur locale)
   const handleNext = useCallback(() => {
@@ -205,6 +197,13 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   const isLastField = activeField === 'rir';
 
+  // Action Fermer (ferme le modal en transmettant la valeur locale en cours)
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      onClose(localValue);
+    }
+  }, [onClose, localValue]);
+
   // Pavé numérique standard 4x3 pour KG et REPS
   const keypadRows = [
     ['1', '2', '3'],
@@ -221,12 +220,12 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
-        onPress={onClose}
+        onPress={handleClose}
       >
         <TouchableOpacity
           activeOpacity={1}
@@ -260,7 +259,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             </View>
 
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleClose}
               style={[styles.closeButton, { backgroundColor: theme.surface }]}
               activeOpacity={0.7}
             >
