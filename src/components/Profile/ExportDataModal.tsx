@@ -39,9 +39,12 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
     try {
       setLoading(true);
       const csv = ExportService.exportWorkoutsToCSV(data);
-      await ExportService.shareFile('citadel_seances.csv', csv, 'text/csv');
+      const success = await ExportService.saveOrDownloadFile('citadel_seances.csv', csv, 'text/csv');
+      if (success && Platform.OS === 'android') {
+        Alert.alert('Fichier téléchargé !', 'Le fichier "citadel_seances.csv" a été enregistré avec succès.');
+      }
     } catch (error) {
-      Alert.alert('Erreur', "Impossible d'exporter les séances.");
+      Alert.alert('Erreur', "Impossible de télécharger les séances.");
     } finally {
       setLoading(false);
     }
@@ -52,9 +55,12 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
     try {
       setLoading(true);
       const csv = ExportService.exportMeasurementsToCSV(data);
-      await ExportService.shareFile('citadel_mensurations.csv', csv, 'text/csv');
+      const success = await ExportService.saveOrDownloadFile('citadel_mensurations.csv', csv, 'text/csv');
+      if (success && Platform.OS === 'android') {
+        Alert.alert('Fichier téléchargé !', 'Le fichier "citadel_mensurations.csv" a été enregistré avec succès.');
+      }
     } catch (error) {
-      Alert.alert('Erreur', "Impossible d'exporter les mensurations.");
+      Alert.alert('Erreur', "Impossible de télécharger les mensurations.");
     } finally {
       setLoading(false);
     }
@@ -65,9 +71,12 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
     try {
       setLoading(true);
       const json = ExportService.exportFullDataToJSON(data);
-      await ExportService.shareFile('citadel_backup.json', json, 'application/json');
+      const success = await ExportService.saveOrDownloadFile('citadel_backup.json', json, 'application/json');
+      if (success && Platform.OS === 'android') {
+        Alert.alert('Fichier téléchargé !', 'Le fichier "citadel_backup.json" a été enregistré avec succès.');
+      }
     } catch (error) {
-      Alert.alert('Erreur', "Impossible d'exporter la sauvegarde complète.");
+      Alert.alert('Erreur', "Impossible de télécharger la sauvegarde complète.");
     } finally {
       setLoading(false);
     }
@@ -112,23 +121,23 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
   const actions = [
     {
       id: 'export-workouts',
-      title: 'Exporter les Séances (CSV)',
-      description: 'Format tableur pour vos séances',
+      title: 'Télécharger les Séances (CSV)',
+      description: 'Format tableur enregistré dans votre appareil',
       icon: FileSpreadsheet,
       onPress: handleExportWorkouts,
       color: theme.primary,
     },
     {
       id: 'export-measurements',
-      title: 'Exporter les Mensurations (CSV)',
-      description: 'Format tableur pour vos mensurations',
+      title: 'Télécharger les Mensurations (CSV)',
+      description: 'Format tableur enregistré dans votre appareil',
       icon: Scale,
       onPress: handleExportMeasurements,
       color: theme.secondary,
     },
     {
       id: 'export-full',
-      title: 'Sauvegarde Intégrale (JSON)',
+      title: 'Télécharger la Sauvegarde (JSON)',
       description: 'Copie complète de vos données Citadel',
       icon: FileJson,
       onPress: handleExportFullData,

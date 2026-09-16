@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { shareAsync } from 'expo-sharing';
 import { getDocumentAsync } from 'expo-document-picker';
@@ -93,6 +94,34 @@ export const ExportService = {
     const fileUri = FileSystem.cacheDirectory + filename;
     await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
     await shareAsync(fileUri, { mimeType, dialogTitle: filename, UTI: mimeType });
+  },
+
+  async saveOrDownloadFile(filename: string, content: string, mimeType: string): Promise<boolean> {
+    if (Platform.OS === 'android') {
+      try {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          return false;
+        }
+        const fileNameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+        const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          fileNameWithoutExt,
+          mimeType
+        );
+        await FileSystem.writeAsStringAsync(fileUri, content, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        return true;
+      } catch (err) {
+        console.warn('StorageAccessFramework error, fallback to shareFile:', err);
+        await this.shareFile(filename, content, mimeType);
+        return true;
+      }
+    } else {
+      await this.shareFile(filename, content, mimeType);
+      return true;
+    }
   },
 
   async pickAndParseJSONBackup(): Promise<FitTrackerData | null> {
