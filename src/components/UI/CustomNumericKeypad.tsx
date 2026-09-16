@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,6 +67,16 @@ export const computeNextValue = (
   return prevVal;
 };
 
+// Grille et options constantes (évite la ré-instanciation de tableaux à chaque frappe)
+const KEYPAD_ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', 'backspace'],
+];
+
+const RIR_OPTIONS = ['0', '1', '2', '3', '4', '5+'];
+
 interface KeyButtonProps {
   value: string;
   label?: string;
@@ -76,7 +86,7 @@ interface KeyButtonProps {
   theme: any;
 }
 
-// Sous-composant KeyButton ultra-réactif avec surbrillance / remplissage coloré dynamique au clic
+// Sous-composant KeyButton ultra-réactif : déclenchement immédiat dès le contact tactile (onPressIn)
 const KeyButton = React.memo<KeyButtonProps>(({
   value,
   label,
@@ -85,15 +95,21 @@ const KeyButton = React.memo<KeyButtonProps>(({
   onPress,
   theme,
 }) => {
-  const handlePress = useCallback(() => {
-    onPress(value);
-  }, [onPress, value]);
+  const handlePressIn = useCallback(() => {
+    if (!disabled) {
+      onPress(value);
+    }
+  }, [onPress, value, disabled]);
 
   return (
     <Pressable
-      onPress={handlePress}
+      onPressIn={handlePressIn}
       disabled={disabled}
       unstable_pressDelay={0}
+      android_ripple={{
+        color: isBackspace ? `${theme.danger}40` : `${theme.accent}40`,
+        borderless: false,
+      }}
       style={({ pressed }) => [
         styles.keypadBtn,
         {
@@ -147,14 +163,18 @@ const RirButton = React.memo<RirButtonProps>(({
   onPress,
   theme,
 }) => {
-  const handlePress = useCallback(() => {
+  const handlePressIn = useCallback(() => {
     onPress(option);
   }, [onPress, option]);
 
   return (
     <Pressable
       unstable_pressDelay={0}
-      onPress={handlePress}
+      onPressIn={handlePressIn}
+      android_ripple={{
+        color: `${theme.accent}40`,
+        borderless: false,
+      }}
       style={({ pressed }) => [
         styles.rirBtn,
         {
@@ -205,12 +225,15 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   // État local de la saisie : buffer pur pour 0ms de latence
   const [localValue, setLocalValue] = useState<string>(value);
+  const localValueRef = useRef<string>(localValue);
+  localValueRef.current = localValue;
 
   // Synchronisation du buffer local uniquement lors de l'ouverture ou du changement de cible
   useEffect(() => {
     if (visible) {
       console.log(`[CITADEL-PERF] Clavier ouvert: field=${activeField}, setNumber=${setNumber}, initialValue="${value}"`);
       setLocalValue(value);
+      localValueRef.current = value;
     }
   }, [visible, activeField, setNumber, value]);
 
@@ -232,10 +255,9 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   // Gestion des clics du pavé numérique (0-9, ., backspace) : purement local, callback stable (< 0.5ms)
   const handleKeyPress = useCallback((key: string) => {
-    const t0 = Date.now();
     setLocalValue((prevVal) => {
       const nextVal = computeNextValue(prevVal, key, activeField);
-      console.log(`[CITADEL-PERF] Touche pressée: "${key}", "${prevVal}" ➔ "${nextVal}" (${Date.now() - t0}ms)`);
+      console.log(`[CITADEL-PERF] Touche pressée: "${key}", "${prevVal}" ➔ "${nextVal}"`);
       return nextVal;
     });
   }, [activeField]);
@@ -257,48 +279,41 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   // Action Suivant (passer au champ suivant en transmettant la valeur locale)
   const handleNext = useCallback(() => {
-    console.log(`[CITADEL-PERF] Suivant cliqué: transmission de "${localValue}"`);
+    const current = localValueRef.current;
+    console.log(`[CITADEL-PERF] Suivant cliqué: transmission de "${current}"`);
     if (onNextField) {
-      onNextField(localValue);
+      onNextField(current);
     }
-  }, [onNextField, localValue]);
+  }, [onNextField]);
 
   // Action Précédent (retourner au champ précédent en transmettant la valeur locale)
   const handlePrevious = useCallback(() => {
-    console.log(`[CITADEL-PERF] Précédent cliqué: transmission de "${localValue}"`);
+    const current = localValueRef.current;
+    console.log(`[CITADEL-PERF] Précédent cliqué: transmission de "${current}"`);
     if (onPreviousField) {
-      onPreviousField(localValue);
+      onPreviousField(current);
     }
-  }, [onPreviousField, localValue]);
+  }, [onPreviousField]);
 
   // Action Valider (valider et fermer en transmettant la valeur locale)
   const handleValidate = useCallback(() => {
-    console.log(`[CITADEL-PERF] Valider cliqué: validation finale de "${localValue}"`);
+    const current = localValueRef.current;
+    console.log(`[CITADEL-PERF] Valider cliqué: validation finale de "${current}"`);
     if (onValidate) {
-      onValidate(localValue);
+      onValidate(current);
     }
-  }, [onValidate, localValue]);
+  }, [onValidate]);
 
   const isLastField = activeField === 'rir';
 
   // Action Fermer (ferme le modal en transmettant la valeur locale en cours)
   const handleClose = useCallback(() => {
-    console.log(`[CITADEL-PERF] Fermeture clavier: valeur finale enregistrée "${localValue}"`);
+    const current = localValueRef.current;
+    console.log(`[CITADEL-PERF] Fermeture clavier: valeur finale enregistrée "${current}"`);
     if (onClose) {
-      onClose(localValue);
+      onClose(current);
     }
-  }, [onClose, localValue]);
-
-  // Pavé numérique standard 4x3 pour KG et REPS
-  const keypadRows = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['.', '0', 'backspace'],
-  ];
-
-  // Choix rapides RIR dédiés (de 0 à 5+)
-  const rirOptions = ['0', '1', '2', '3', '4', '5+'];
+  }, [onClose]);
 
   return (
     <Modal
@@ -357,7 +372,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           {activeField === 'rir' ? (
             /* Mode RIR : Rangée exclusive de boutons de choix rapide (0, 1, 2, 3, 4, 5+) */
             <View style={styles.rirContainer}>
-              {rirOptions.map((option) => {
+              {RIR_OPTIONS.map((option) => {
                 const isSelected =
                   localValue === option || (option === '5+' && (localValue === '5+' || localValue === '5'));
                 return (
@@ -374,7 +389,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           ) : (
             /* Mode Standard (KG / REPS) : Grille Numérique 4x3 */
             <View style={styles.gridContainer}>
-              {keypadRows.map((row, rowIndex) => (
+              {KEYPAD_ROWS.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.gridRow}>
                   {row.map((key) => {
                     const isDotDisabled = key === '.' && activeField === 'reps';

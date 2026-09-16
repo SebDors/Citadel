@@ -124,7 +124,8 @@ export const StorageService = {
 
   /**
    * Sauvegarde non-bloquante et entièrement débouncée de la séance en cours.
-   * Ne bloque JAMAIS le thread JS ni le bridge lors de la frappe ou de la navigation rapide.
+   * Enregistre EXCLUSIVEMENT la clé isolée CURRENT_WORKOUT_KEY (~2 Ko) sans jamais
+   * charger ni réécrire la base globale complète (évite les 2.1s de blocage du pont Android).
    */
   saveCurrentWorkout(session: WorkoutSession | null): void {
     lastPendingSession = session;
@@ -142,19 +143,33 @@ export const StorageService = {
         } else {
           await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
         }
-
-        const currentData = await StorageService.loadData();
-        const updatedData: FitTrackerData = {
-          ...currentData,
-          currentWorkout: targetSession,
-        };
-        await StorageService.saveData(updatedData);
-
-        console.log(`[CITADEL-PERF] AsyncStorage séance en cours écrit en tâche de fond en ${Date.now() - t0}ms`);
+        console.log(`[CITADEL-PERF] AsyncStorage CURRENT_WORKOUT_KEY sauvegardé en tâche de fond en ${Date.now() - t0}ms`);
       } catch (e) {
         console.error('Erreur debounce saveCurrentWorkout:', e);
       }
-    }, 400);
+    }, 2000);
+  },
+
+  /**
+   * Force l'écriture immédiate de la session active en cours (ex: fermeture de l'app ou mise en arrière-plan).
+   */
+  async flushCurrentWorkout(): Promise<void> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    const targetSession = lastPendingSession;
+    if (targetSession !== undefined) {
+      try {
+        if (targetSession === null) {
+          await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+        } else {
+          await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
+        }
+      } catch (e) {
+        console.error('Erreur flushCurrentWorkout:', e);
+      }
+    }
   },
 
   /**

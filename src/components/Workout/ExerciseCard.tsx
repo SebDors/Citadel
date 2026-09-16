@@ -439,5 +439,8 @@ const styles = StyleSheet.create({
   },
 });
 
-export const ExerciseCard = React.memo(ExerciseCardComponent);
+export const ExerciseCard = React.memo(
+  ExerciseCardComponent,
+  (prev, next) => prev.exercise === next.exercise
+);
 export default ExerciseCard;

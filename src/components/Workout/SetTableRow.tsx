@@ -461,7 +461,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
 SetTableRowComponent.displayName = 'SetTableRowComponent';
 
-export const SetTableRow = React.memo(SetTableRowComponent);
+export const SetTableRow = React.memo(
+  SetTableRowComponent,
+  (prev, next) => prev.set === next.set && prev.exerciseId === next.exerciseId
+);
 export default SetTableRow;
 
 const styles = StyleSheet.create({

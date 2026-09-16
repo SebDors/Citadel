@@ -339,6 +339,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Gestion du Cycle de Vie AppState (Arrière-plan -> Premier plan)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') {
+        StorageService.flushCurrentWorkout();
+      }
+
       if (!restTimer.active || !restTimer.targetEndTime) return;
 
       const remainingMs = restTimer.targetEndTime - Date.now();
