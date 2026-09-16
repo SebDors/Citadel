@@ -206,6 +206,17 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     return dateStr;
   };
 
+  // Formatage pour l'affichage de la date courte (ex: 2026-08-30 -> 30/08)
+  const formatShortDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [, month, day] = parts;
+      return `${day}/${month}`;
+    }
+    return dateStr;
+  };
+
   const handleConfirmDelete = (m: BodyMeasurement) => {
     const displayDate = formatDateToListDisplay(m.date);
     const displayWeight = m.weightKg ? ` (${formatWeight(m.weightKg)} kg)` : '';
@@ -243,22 +254,17 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       ) : (
         sortedMeasurements.map((m) => {
           const secondaryParts: string[] = [];
-          if (m.chestCm !== undefined) secondaryParts.push(`P: ${formatWeight(m.chestCm)}`);
-          if (m.thighCm !== undefined) secondaryParts.push(`C: ${formatWeight(m.thighCm)}`);
-          if (m.bicepsCm !== undefined) secondaryParts.push(`B: ${formatWeight(m.bicepsCm)}`);
+          if (m.chestCm !== undefined) secondaryParts.push(`P ${formatWeight(m.chestCm)}`);
+          if (m.thighCm !== undefined) secondaryParts.push(`C ${formatWeight(m.thighCm)}`);
+          if (m.bicepsCm !== undefined) secondaryParts.push(`B ${formatWeight(m.bicepsCm)}`);
           const secondarySummary = secondaryParts.join(' · ');
 
           return (
             <View key={m.id} style={[styles.mCompactRow, { borderBottomColor: theme.border }]}>
-              {/* Zone principale cliquable pour ouvrir la modification */}
-              <TouchableOpacity
-                activeOpacity={0.6}
-                onPress={() => handleEditMeasurement(m)}
-                style={styles.mClickableZone}
-                accessibilityLabel="Modifier cette mesure"
-              >
+              {/* Contenu gauche : Date courte, Poids principal et Mensurations condensées */}
+              <View style={styles.mLeftContent}>
                 <Text style={[styles.mDate, { color: theme.textMuted }]}>
-                  {formatDateToListDisplay(m.date)}
+                  {formatShortDate(m.date)}
                 </Text>
 
                 {m.weightKg !== undefined && (
@@ -277,18 +283,29 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                     {secondarySummary}
                   </Text>
                 )}
-              </TouchableOpacity>
+              </View>
 
-              {/* Bouton de suppression direct avec confirmation */}
-              <TouchableOpacity
-                activeOpacity={0.6}
-                onPress={() => handleConfirmDelete(m)}
-                style={styles.mDeleteBtn}
-                accessibilityLabel="Supprimer cette mesure"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Trash2 size={15} color={theme.danger} />
-              </TouchableOpacity>
+              {/* Boutons d'action compacts à droite : Edit et Delete */}
+              <View style={styles.mActions}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleEditMeasurement(m)}
+                  style={styles.miniActionBtn}
+                  accessibilityLabel="Modifier cette mesure"
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <Edit2 size={14} color={theme.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleConfirmDelete(m)}
+                  style={styles.miniActionBtn}
+                  accessibilityLabel="Supprimer cette mesure"
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <Trash2 size={14} color={theme.danger} />
+                </TouchableOpacity>
+              </View>
             </View>
           );
         })
@@ -538,15 +555,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 9,
+    paddingVertical: 7,
     borderBottomWidth: 1,
   },
-  mClickableZone: {
+  mLeftContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginRight: 6,
+    gap: 8,
+    marginRight: 8,
   },
   mDate: {
     fontSize: 12,
@@ -565,8 +582,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flexShrink: 1,
   },
-  mDeleteBtn: {
-    padding: 6,
+  mActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  miniActionBtn: {
+    padding: 3,
     justifyContent: 'center',
     alignItems: 'center',
   },
