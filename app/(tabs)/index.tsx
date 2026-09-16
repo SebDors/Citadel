@@ -122,6 +122,8 @@ export default function WorkoutTab() {
     deleteFolder,
     toggleFolderCollapse,
     moveTemplateToFolder,
+    saveTemplate,
+    markFirstSessionCreated,
     completeOnboarding,
     skipOnboarding,
     allExercises,
@@ -221,6 +223,39 @@ export default function WorkoutTab() {
       await ExportService.shareTemplate(tpl);
     } catch (error) {
       Alert.alert("Erreur", "Impossible d'exporter la séance.");
+    }
+  };
+
+  const handleImportTemplate = async () => {
+    try {
+      const imported = await ExportService.pickAndParseTemplateJSON();
+      if (!imported) return;
+
+      const title = imported.title?.trim() || "Séance importée";
+      const existingTitles = (data?.templates || []).map((t) => t.title.toLowerCase());
+      let finalTitle = title;
+      if (existingTitles.includes(title.toLowerCase())) {
+        finalTitle = `${title} (Importé)`;
+      }
+
+      const newTemplate: WorkoutTemplate = {
+        ...imported,
+        id: `tpl_${Date.now()}`,
+        title: finalTitle,
+        createdAt: new Date().toISOString(),
+      };
+
+      await saveTemplate(newTemplate);
+      if (!data?.hasCreatedFirstSession) {
+        await markFirstSessionCreated();
+      }
+
+      Alert.alert(
+        "Séance importée avec succès !",
+        `La séance "${finalTitle}" a été ajoutée à votre bibliothèque.`
+      );
+    } catch (error: any) {
+      Alert.alert("Erreur d'importation", error?.message || "Impossible d'importer le fichier de séance.");
     }
   };
 
@@ -618,12 +653,26 @@ export default function WorkoutTab() {
                 ]}
                 onPress={() => router.push("/template-editor")}
               >
-                <Plus size={22} color={theme.text} />
+                <Plus size={20} color={theme.text} />
                 <Text style={[styles.createActionTitle, { color: theme.text }]}>
                   SÉANCE
                 </Text>
               </TouchableOpacity>
             </Animated.View>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.createActionBox,
+                { backgroundColor: theme.surface, borderColor: theme.border, flex: 1 },
+              ]}
+              onPress={handleImportTemplate}
+            >
+              <FolderInput size={20} color={theme.accent} />
+              <Text style={[styles.createActionTitle, { color: theme.text }]}>
+                IMPORTER
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Section Header with "Nouveau dossier" button */}
@@ -1357,32 +1406,32 @@ const styles = StyleSheet.create({
   actionButtonsRow: {
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 10,
+    gap: 8,
     marginBottom: 14,
   },
   mainActionBox: {
-    flex: 1.8,
+    flex: 1.5,
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    padding: 10,
     borderRadius: 14,
   },
   playIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
   mainActionTitle: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
   },
   mainActionSub: {
     color: "rgba(255,255,255,0.85)",
-    fontSize: 10,
+    fontSize: 9.5,
   },
   createActionBox: {
     flex: 1,
@@ -1390,12 +1439,13 @@ const styles = StyleSheet.create({
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     borderRadius: 14,
     borderWidth: 1,
   },
   createActionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900",
     marginTop: 2,
   },
