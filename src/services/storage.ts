@@ -136,14 +136,12 @@ export const StorageService = {
 
     saveCurrentWorkoutDebounceTimer = setTimeout(async () => {
       const targetSession = lastPendingSession;
-      const t0 = Date.now();
       try {
         if (targetSession === null) {
           await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
         } else {
           await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
         }
-        console.log(`[CITADEL-PERF] AsyncStorage CURRENT_WORKOUT_KEY sauvegardé en tâche de fond en ${Date.now() - t0}ms`);
       } catch (e) {
         console.error('Erreur debounce saveCurrentWorkout:', e);
       }

@@ -231,7 +231,6 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   // Synchronisation du buffer local uniquement lors de l'ouverture ou du changement de cible
   useEffect(() => {
     if (visible) {
-      console.log(`[CITADEL-PERF] Clavier ouvert: field=${activeField}, setNumber=${setNumber}, initialValue="${value}"`);
       setLocalValue(value);
       localValueRef.current = value;
     }
@@ -256,31 +255,26 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   // Gestion des clics du pavé numérique (0-9, ., backspace) : purement local, callback stable (< 0.5ms)
   const handleKeyPress = useCallback((key: string) => {
     setLocalValue((prevVal) => {
-      const nextVal = computeNextValue(prevVal, key, activeField);
-      console.log(`[CITADEL-PERF] Touche pressée: "${key}", "${prevVal}" ➔ "${nextVal}"`);
-      return nextVal;
+      return computeNextValue(prevVal, key, activeField);
     });
   }, [activeField]);
 
   // Gestion des boutons de choix rapide RIR (0, 1, 2, 3, 4, 5+) : sélection visuelle dans le buffer, validation par le bouton Valider
   const handleRirPress = useCallback((key: string) => {
-    console.log(`[CITADEL-PERF] RIR sélectionné dans le buffer: "${key}" (en attente du clic sur Valider)`);
     setLocalValue(key);
   }, []);
 
   // Réinitialisation locale de la valeur saisie (sans commit synchrone bloquant)
   const handleClear = useCallback(() => {
-    console.log(`[CITADEL-PERF] Effacer cliqué pour champ: ${activeField}`);
     setLocalValue('');
     if (onClear) {
       onClear();
     }
-  }, [onClear, activeField]);
+  }, [onClear]);
 
   // Action Suivant (passer au champ suivant en transmettant la valeur locale)
   const handleNext = useCallback(() => {
     const current = localValueRef.current;
-    console.log(`[CITADEL-PERF] Suivant cliqué: transmission de "${current}"`);
     if (onNextField) {
       onNextField(current);
     }
@@ -289,7 +283,6 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   // Action Précédent (retourner au champ précédent en transmettant la valeur locale)
   const handlePrevious = useCallback(() => {
     const current = localValueRef.current;
-    console.log(`[CITADEL-PERF] Précédent cliqué: transmission de "${current}"`);
     if (onPreviousField) {
       onPreviousField(current);
     }
@@ -298,7 +291,6 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   // Action Valider (valider et fermer en transmettant la valeur locale)
   const handleValidate = useCallback(() => {
     const current = localValueRef.current;
-    console.log(`[CITADEL-PERF] Valider cliqué: validation finale de "${current}"`);
     if (onValidate) {
       onValidate(current);
     }
@@ -309,7 +301,6 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   // Action Fermer (ferme le modal en transmettant la valeur locale en cours)
   const handleClose = useCallback(() => {
     const current = localValueRef.current;
-    console.log(`[CITADEL-PERF] Fermeture clavier: valeur finale enregistrée "${current}"`);
     if (onClose) {
       onClose(current);
     }
