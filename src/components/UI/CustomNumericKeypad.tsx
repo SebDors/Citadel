@@ -76,7 +76,7 @@ interface KeyButtonProps {
   theme: any;
 }
 
-// Sous-composant KeyButton ultra-optimisé avec réponse tactile native instantanée (0ms)
+// Sous-composant KeyButton ultra-réactif avec surbrillance / remplissage coloré dynamique au clic
 const KeyButton = React.memo<KeyButtonProps>(({
   value,
   label,
@@ -90,34 +90,45 @@ const KeyButton = React.memo<KeyButtonProps>(({
   }, [onPress, value]);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.55}
-      delayPressIn={0}
+    <Pressable
       onPress={handlePress}
       disabled={disabled}
-      style={[
+      unstable_pressDelay={0}
+      style={({ pressed }) => [
         styles.keypadBtn,
-        isBackspace
-          ? {
-              backgroundColor: `${theme.danger}15`,
-              borderColor: theme.danger,
-              borderWidth: 1.5,
-            }
-          : {
-              backgroundColor: theme.surface,
-              borderColor: theme.border,
-              opacity: disabled ? 0.35 : 1,
-            },
+        {
+          backgroundColor: isBackspace
+            ? (pressed && !disabled ? `${theme.danger}35` : theme.surface)
+            : (pressed && !disabled ? `${theme.accent}45` : theme.surface),
+          borderColor: isBackspace
+            ? (pressed && !disabled ? theme.danger : theme.border)
+            : (pressed && !disabled ? theme.accent : theme.border),
+          transform: [{ scale: pressed && !disabled ? 0.94 : 1 }],
+          opacity: disabled ? 0.35 : 1,
+        },
       ]}
     >
-      {isBackspace ? (
-        <Delete size={22} color={theme.danger} />
-      ) : (
-        <Text style={[styles.keypadText, { color: theme.text }]}>
-          {label || value}
-        </Text>
-      )}
-    </TouchableOpacity>
+      {({ pressed }) =>
+        isBackspace ? (
+          <Delete
+            size={22}
+            color={pressed && !disabled ? theme.danger : theme.text}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.keypadText,
+              {
+                color: pressed && !disabled ? theme.accent : theme.text,
+                fontWeight: pressed && !disabled ? '900' : '700',
+              },
+            ]}
+          >
+            {label || value}
+          </Text>
+        )
+      }
+    </Pressable>
   );
 });
 
@@ -141,27 +152,38 @@ const RirButton = React.memo<RirButtonProps>(({
   }, [onPress, option]);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.6}
-      delayPressIn={0}
+    <Pressable
+      unstable_pressDelay={0}
       onPress={handlePress}
-      style={[
+      style={({ pressed }) => [
         styles.rirBtn,
         {
-          backgroundColor: isSelected ? theme.accent : theme.surface,
-          borderColor: isSelected ? theme.accent : theme.border,
+          backgroundColor: isSelected
+            ? theme.accent
+            : (pressed ? `${theme.accent}35` : theme.surface),
+          borderColor: isSelected
+            ? theme.accent
+            : (pressed ? theme.accent : theme.border),
+          transform: [{ scale: pressed ? 0.94 : 1 }],
         },
       ]}
     >
-      <Text
-        style={[
-          styles.rirBtnText,
-          { color: isSelected ? '#FFFFFF' : theme.text },
-        ]}
-      >
-        {option}
-      </Text>
-    </TouchableOpacity>
+      {({ pressed }) => (
+        <Text
+          style={[
+            styles.rirBtnText,
+            {
+              color: isSelected
+                ? '#FFFFFF'
+                : (pressed ? theme.accent : theme.text),
+              fontWeight: isSelected || pressed ? '900' : '800',
+            },
+          ]}
+        >
+          {option}
+        </Text>
+      )}
+    </Pressable>
   );
 });
 
@@ -218,18 +240,11 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     });
   }, [activeField]);
 
-  // Gestion des boutons de choix rapide RIR (0, 1, 2, 3, 4, 5+) : commit direct et validation instantanée
+  // Gestion des boutons de choix rapide RIR (0, 1, 2, 3, 4, 5+) : sélection visuelle dans le buffer, validation par le bouton Valider
   const handleRirPress = useCallback((key: string) => {
-    console.log(`[CITADEL-PERF] RIR sélectionné: "${key}" ➔ commit immédiat dans la séance`);
+    console.log(`[CITADEL-PERF] RIR sélectionné dans le buffer: "${key}" (en attente du clic sur Valider)`);
     setLocalValue(key);
-    if (onValidate) {
-      onValidate(key);
-    } else if (onNextField) {
-      onNextField(key);
-    } else if (onClose) {
-      onClose(key);
-    }
-  }, [onValidate, onNextField, onClose]);
+  }, []);
 
   // Réinitialisation locale de la valeur saisie (sans commit synchrone bloquant)
   const handleClear = useCallback(() => {
@@ -289,7 +304,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={handleClose}
     >
       <TouchableOpacity
@@ -385,16 +400,16 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           <View style={styles.buttonBar}>
             {/* Bouton Gauche 1 : Précédent (si pas sur le tout premier champ) */}
             {activeField !== 'weightKg' && onPreviousField && (
-              <TouchableOpacity
-                activeOpacity={0.6}
-                delayPressIn={0}
+              <Pressable
+                unstable_pressDelay={0}
                 onPress={handlePrevious}
-                style={[
+                style={({ pressed }) => [
                   styles.actionBtn,
                   styles.prevBtn,
                   {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
+                    backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                    borderColor: pressed ? theme.accent : theme.border,
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
                   },
                 ]}
               >
@@ -406,67 +421,78 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                 <Text style={[styles.prevBtnText, { color: theme.text }]}>
                   Précédent
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             )}
 
-            {/* Bouton Gauche 2 : Effacer (même style danger rouge que backspace) */}
-            <TouchableOpacity
-              activeOpacity={0.6}
-              delayPressIn={0}
+            {/* Bouton Gauche 2 : Effacer (neutre par défaut, rouge uniquement à l'enfoncement) */}
+            <Pressable
+              unstable_pressDelay={0}
               onPress={handleClear}
-              style={[
+              style={({ pressed }) => [
                 styles.actionBtn,
                 styles.clearBtn,
                 {
-                  backgroundColor: `${theme.danger}15`,
-                  borderColor: theme.danger,
-                  borderWidth: 1.5,
+                  backgroundColor: pressed ? `${theme.danger}30` : theme.surface,
+                  borderColor: pressed ? theme.danger : theme.border,
+                  borderWidth: 1,
+                  transform: [{ scale: pressed ? 0.95 : 1 }],
                 },
               ]}
             >
-              <RotateCcw
-                size={15}
-                color={theme.danger}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.clearBtnText, { color: theme.danger }]}>
-                Effacer
-              </Text>
-            </TouchableOpacity>
+              {({ pressed }) => (
+                <>
+                  <RotateCcw
+                    size={15}
+                    color={pressed ? theme.danger : theme.textMuted}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={[
+                      styles.clearBtnText,
+                      { color: pressed ? theme.danger : theme.text },
+                    ]}
+                  >
+                    Effacer
+                  </Text>
+                </>
+              )}
+            </Pressable>
 
             {/* Bouton Droit : Suivant ➔ ou Valider 🗸 */}
             {isLastField ? (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                delayPressIn={0}
+              <Pressable
+                unstable_pressDelay={0}
                 onPress={handleValidate}
-                style={[
+                style={({ pressed }) => [
                   styles.actionBtn,
                   styles.validateBtn,
                   {
                     backgroundColor: theme.success || theme.accent,
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    opacity: pressed ? 0.85 : 1,
                   },
                 ]}
               >
                 <Text style={styles.actionBtnText}>Valider</Text>
                 <Check size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
+              </Pressable>
             ) : (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                delayPressIn={0}
+              <Pressable
+                unstable_pressDelay={0}
                 onPress={handleNext}
-                style={[
+                style={({ pressed }) => [
                   styles.actionBtn,
                   styles.nextBtn,
                   {
                     backgroundColor: theme.accent,
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    opacity: pressed ? 0.85 : 1,
                   },
                 ]}
               >
                 <Text style={styles.actionBtnText}>Suivant</Text>
                 <ArrowRight size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
+              </Pressable>
             )}
           </View>
         </TouchableOpacity>

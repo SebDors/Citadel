@@ -10,6 +10,7 @@ const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
 const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
 
 let saveCurrentWorkoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let lastPendingSession: WorkoutSession | null = null;
 
 export const StorageService = {
   /**
@@ -79,6 +80,7 @@ export const StorageService = {
       clearTimeout(saveCurrentWorkoutDebounceTimer);
       saveCurrentWorkoutDebounceTimer = null;
     }
+    lastPendingSession = null;
     try {
       await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
     } catch (e) {
@@ -121,41 +123,38 @@ export const StorageService = {
   },
 
   /**
-   * Sauvegarde ultra-rapide et optimisée de la séance en cours.
-   * Utilise une clé isolée légère (@citadel_current_workout_v1, ~3 Ko)
-   * et débounce la réécriture de la base globale pour 0ms de latence perçue.
+   * Sauvegarde non-bloquante et entièrement débouncée de la séance en cours.
+   * Ne bloque JAMAIS le thread JS ni le bridge lors de la frappe ou de la navigation rapide.
    */
-  async saveCurrentWorkout(session: WorkoutSession | null): Promise<void> {
-    const t0 = Date.now();
-    // 1. Sauvegarde instantanée de la session active isolée (~3 Ko, < 2ms)
-    try {
-      if (session === null) {
-        await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
-      } else {
-        await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(session));
-      }
-      console.log(`[CITADEL-PERF] AsyncStorage CURRENT_WORKOUT_KEY sauvegardé en ${Date.now() - t0}ms`);
-    } catch (e) {
-      console.error('Erreur sauvegarde rapide currentWorkout:', e);
-    }
+  saveCurrentWorkout(session: WorkoutSession | null): void {
+    lastPendingSession = session;
 
-    // 2. Débounce de la réécriture dans l'arbre global (800ms) pour ne jamais bloquer le thread JS
     if (saveCurrentWorkoutDebounceTimer) {
       clearTimeout(saveCurrentWorkoutDebounceTimer);
     }
 
     saveCurrentWorkoutDebounceTimer = setTimeout(async () => {
+      const targetSession = lastPendingSession;
+      const t0 = Date.now();
       try {
-        const currentData = await this.loadData();
+        if (targetSession === null) {
+          await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+        } else {
+          await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
+        }
+
+        const currentData = await StorageService.loadData();
         const updatedData: FitTrackerData = {
           ...currentData,
-          currentWorkout: session,
+          currentWorkout: targetSession,
         };
-        await this.saveData(updatedData);
+        await StorageService.saveData(updatedData);
+
+        console.log(`[CITADEL-PERF] AsyncStorage séance en cours écrit en tâche de fond en ${Date.now() - t0}ms`);
       } catch (e) {
         console.error('Erreur debounce saveCurrentWorkout:', e);
       }
-    }, 800);
+    }, 400);
   },
 
   /**
@@ -508,6 +507,7 @@ export const StorageService = {
       clearTimeout(saveCurrentWorkoutDebounceTimer);
       saveCurrentWorkoutDebounceTimer = null;
     }
+    lastPendingSession = null;
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
       await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);

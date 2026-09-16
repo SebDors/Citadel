@@ -525,49 +525,51 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateSet = (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => {
-    if (!activeSession) return;
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    const currentExercises = activeSession.exercises || [];
-    const updatedExercises = currentExercises.map((ex) => {
-      if (ex.id !== exerciseId) return ex;
+      const currentExercises = prevSession.exercises || [];
+      const updatedExercises = currentExercises.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
 
-      const updatedSets = ex.sets.map((s) => {
-        if (s.id !== setId) return s;
-        return { ...s, [field]: value };
+        const updatedSets = ex.sets.map((s) => {
+          if (s.id !== setId) return s;
+          return { ...s, [field]: value };
+        });
+
+        return { ...ex, sets: updatedSets };
       });
 
-      return { ...ex, sets: updatedSets };
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              const updatedSets = block.exercise.sets.map((s) => {
+                if (s.id !== setId) return s;
+                return { ...s, [field]: value };
+              });
+              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+            }
+            return block;
+          })
+        : undefined;
+
+      const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+        updatedExercises,
+        updatedBlocks
+      );
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+        totalVolumeKg: volume,
+        completedSetsCount: completedCount,
+        totalSetsCount: totalCount,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
     });
-
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            const updatedSets = block.exercise.sets.map((s) => {
-              if (s.id !== setId) return s;
-              return { ...s, [field]: value };
-            });
-            return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
-          }
-          return block;
-        })
-      : undefined;
-
-    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
-      updatedExercises,
-      updatedBlocks
-    );
-
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-      totalVolumeKg: volume,
-      completedSetsCount: completedCount,
-      totalSetsCount: totalCount,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const findNextSetPreview = (
@@ -656,92 +658,95 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const toggleSetComplete = (exerciseId: string, setId: string) => {
-    if (!activeSession) return;
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    let targetRestSeconds = 75;
-    let exerciseName = '';
-    let isMarkingCompleted = false;
+      let targetRestSeconds = 75;
+      let exerciseName = '';
+      let isMarkingCompleted = false;
 
-    const currentExercises = activeSession.exercises || [];
-    const updatedExercises = currentExercises.map((ex) => {
-      if (ex.id !== exerciseId) return ex;
-      exerciseName = ex.exerciseName;
-      targetRestSeconds = ex.restSeconds || 75;
+      const currentExercises = prevSession.exercises || [];
+      const updatedExercises = currentExercises.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        exerciseName = ex.exerciseName;
+        targetRestSeconds = ex.restSeconds || 75;
 
-      const updatedSets = ex.sets.map((s) => {
-        if (s.id !== setId) return s;
-        const newCompleted = !s.completed;
-        if (newCompleted) isMarkingCompleted = true;
+        const updatedSets = ex.sets.map((s) => {
+          if (s.id !== setId) return s;
+          const newCompleted = !s.completed;
+          if (newCompleted) isMarkingCompleted = true;
 
-        return {
-          ...s,
-          completed: newCompleted,
-          completedAt: newCompleted ? new Date().toISOString() : undefined,
-        };
+          return {
+            ...s,
+            completed: newCompleted,
+            completedAt: newCompleted ? new Date().toISOString() : undefined,
+          };
+        });
+
+        return { ...ex, sets: updatedSets };
       });
 
-      return { ...ex, sets: updatedSets };
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              exerciseName = block.exercise.exerciseName;
+              targetRestSeconds = block.exercise.restSeconds || 75;
+
+              const updatedSets = block.exercise.sets.map((s) => {
+                if (s.id !== setId) return s;
+                const newCompleted = !s.completed;
+                if (newCompleted) isMarkingCompleted = true;
+
+                return {
+                  ...s,
+                  completed: newCompleted,
+                  completedAt: newCompleted ? new Date().toISOString() : undefined,
+                };
+              });
+
+              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+            }
+            return block;
+          })
+        : undefined;
+
+      const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+        updatedExercises,
+        updatedBlocks
+      );
+
+      const autoStartTimer = !prevSession.hasStarted && isMarkingCompleted;
+      const shouldResumePause = prevSession.isPaused && isMarkingCompleted;
+
+      let newStartTime = prevSession.startTime;
+      if (autoStartTimer) {
+        newStartTime = new Date().toISOString();
+      } else if (shouldResumePause) {
+        newStartTime = new Date(Date.now() - (prevSession.durationSeconds || 0) * 1000).toISOString();
+      }
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        hasStarted: autoStartTimer ? true : prevSession.hasStarted,
+        isPaused: shouldResumePause ? false : prevSession.isPaused,
+        startTime: newStartTime,
+        durationSeconds: autoStartTimer ? 0 : prevSession.durationSeconds,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+        totalVolumeKg: volume,
+        completedSetsCount: completedCount,
+        totalSetsCount: totalCount,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+
+      if (isMarkingCompleted) {
+        const nextSetInfo = findNextSetPreview(updatedSession, exerciseId, setId);
+        startRestTimer(exerciseName, targetRestSeconds, nextSetInfo);
+      }
+
+      return updatedSession;
     });
-
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            exerciseName = block.exercise.exerciseName;
-            targetRestSeconds = block.exercise.restSeconds || 75;
-
-            const updatedSets = block.exercise.sets.map((s) => {
-              if (s.id !== setId) return s;
-              const newCompleted = !s.completed;
-              if (newCompleted) isMarkingCompleted = true;
-
-              return {
-                ...s,
-                completed: newCompleted,
-                completedAt: newCompleted ? new Date().toISOString() : undefined,
-              };
-            });
-
-            return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
-          }
-          return block;
-        })
-      : undefined;
-
-    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
-      updatedExercises,
-      updatedBlocks
-    );
-
-    const autoStartTimer = !activeSession.hasStarted && isMarkingCompleted;
-    const shouldResumePause = activeSession.isPaused && isMarkingCompleted;
-
-    let newStartTime = activeSession.startTime;
-    if (autoStartTimer) {
-      newStartTime = new Date().toISOString();
-    } else if (shouldResumePause) {
-      newStartTime = new Date(Date.now() - (activeSession.durationSeconds || 0) * 1000).toISOString();
-    }
-
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      hasStarted: autoStartTimer ? true : activeSession.hasStarted,
-      isPaused: shouldResumePause ? false : activeSession.isPaused,
-      startTime: newStartTime,
-      durationSeconds: autoStartTimer ? 0 : activeSession.durationSeconds,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-      totalVolumeKg: volume,
-      completedSetsCount: completedCount,
-      totalSetsCount: totalCount,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
-
-    if (isMarkingCompleted) {
-      const nextSetInfo = findNextSetPreview(updatedSession, exerciseId, setId);
-      startRestTimer(exerciseName, targetRestSeconds, nextSetInfo);
-    }
   };
 
   const addSet = (exerciseId: string) => {
