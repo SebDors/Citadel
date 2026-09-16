@@ -24,7 +24,6 @@ import {
   Play,
   Plus,
   Flame,
-  TrendingUp,
   ChevronRight,
   MoreHorizontal,
   Folder,
@@ -373,18 +372,6 @@ export default function WorkoutTab() {
           </View>
 
           <View style={styles.cardHeaderIcons}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                router.push({
-                  pathname: "/workout-analytics",
-                  params: { id: tpl.id },
-                });
-              }}
-            >
-              <TrendingUp size={17} color={theme.text} />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={(e) => {
