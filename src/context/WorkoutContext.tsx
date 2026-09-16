@@ -75,6 +75,7 @@ export interface WorkoutContextType {
   resetAllData: () => Promise<void>;
   importFullData: (newData: FitTrackerData) => Promise<void>;
   completeOnboarding: (profileData?: { name?: string; currentWeightKg?: number }) => Promise<void>;
+  skipOnboarding: () => Promise<void>;
   markFirstSessionCreated: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
   // Base d'exercices personnalisés
@@ -301,6 +302,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const completeOnboarding = async (profileData?: { name?: string; currentWeightKg?: number }) => {
     const updated = await StorageService.completeOnboarding(profileData);
+    setData(updated);
+  };
+
+  const skipOnboarding = async () => {
+    const updated = await StorageService.skipOnboarding();
     setData(updated);
   };
 
@@ -1526,6 +1532,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       resetAllData,
       importFullData,
       completeOnboarding,
+      skipOnboarding,
       markFirstSessionCreated,
       resetOnboarding,
       customExercises,

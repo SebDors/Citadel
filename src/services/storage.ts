@@ -560,6 +560,22 @@ export const StorageService = {
     return updatedData;
   },
 
+  async skipOnboarding(): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCompletedOnboarding: true,
+      hasCreatedFirstSession: true,
+      hasCompletedFirstWorkout: true,
+      profile: {
+        ...currentData.profile,
+        name: currentData.profile.name || 'Athlète',
+      },
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
   async markFirstSessionCreated(): Promise<FitTrackerData> {
     const currentData = await this.loadData();
     const updatedData: FitTrackerData = {

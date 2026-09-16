@@ -122,6 +122,7 @@ export default function WorkoutTab() {
     toggleFolderCollapse,
     moveTemplateToFolder,
     completeOnboarding,
+    skipOnboarding,
     allExercises,
   } = useWorkout();
   const { theme } = useTheme();
@@ -1291,6 +1292,7 @@ export default function WorkoutTab() {
         <OnboardingModal
           visible={!loading && !!data && !data.hasCompletedOnboarding}
           onComplete={completeOnboarding}
+          onSkip={skipOnboarding}
         />
       </SafeAreaView>
     </TabSwipeWrapper>

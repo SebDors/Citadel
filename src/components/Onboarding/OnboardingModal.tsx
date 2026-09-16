@@ -32,9 +32,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface OnboardingModalProps {
   visible: boolean;
   onComplete: (profileData: { name: string; currentWeightKg?: number }) => void;
+  onSkip?: () => void;
 }
 
-export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }) => {
+export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete, onSkip }) => {
   const { theme, isDark } = useTheme();
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -69,6 +70,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
     });
   };
 
+  const handleSkip = () => {
+    if (onSkip) {
+      onSkip();
+    } else {
+      handleFinish();
+    }
+  };
+
   if (!visible) return null;
 
   return (
@@ -83,9 +92,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
           {currentSlide < 2 && (
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={handleFinish}
-              disabled={currentSlide === 1 && !isSlide2Valid}
-              style={[styles.skipBtn, currentSlide === 1 && !isSlide2Valid && { opacity: 0.4 }]}
+              onPress={handleSkip}
+              style={styles.skipBtn}
             >
               <Text style={[styles.skipText, { color: theme.textMuted }]}>Passer</Text>
             </TouchableOpacity>
