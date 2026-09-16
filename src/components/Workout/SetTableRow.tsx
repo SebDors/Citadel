@@ -56,6 +56,8 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   // Validation et mise à jour de la valeur saisie
   const commitValue = useCallback((target: KeypadTarget, valStr: string) => {
     if (!target) return;
+    const t0 = Date.now();
+    console.log(`[CITADEL-PERF] commitValue début: target=${target.type}.${target.field}, valStr="${valStr}"`);
     if (target.type === 'main') {
       const field = target.field;
       if (field === 'weightKg') {
@@ -81,17 +83,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num } : s));
       onUpdate('dropSteps', next);
     }
+    console.log(`[CITADEL-PERF] commitValue fin: target=${target.type}.${target.field} (${Date.now() - t0}ms)`);
   }, [onUpdate, set.dropSteps]);
-
-  // Changement en direct de la valeur (mise à jour locale instantanée < 1ms)
-  const handleKeypadChange = useCallback((val: string) => {
-    setTempValue(val);
-  }, []);
 
   // Passage au champ suivant (KG ➔ REPS ➔ RIR)
   const handleKeypadNext = useCallback((currentVal?: string) => {
     if (!keypadTarget) return;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
+    console.log(`[CITADEL-PERF] handleKeypadNext: target=${keypadTarget.field}, val="${valToCommit}"`);
     commitValue(keypadTarget, valToCommit);
 
     if (keypadTarget.type === 'main') {
@@ -118,6 +117,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const handleKeypadPrevious = useCallback((currentVal?: string) => {
     if (!keypadTarget) return;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
+    console.log(`[CITADEL-PERF] handleKeypadPrevious: target=${keypadTarget.field}, val="${valToCommit}"`);
     commitValue(keypadTarget, valToCommit);
 
     if (keypadTarget.type === 'main') {
@@ -137,6 +137,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const handleKeypadValidate = useCallback((finalVal?: string) => {
     if (!keypadTarget) return;
     const valToCommit = finalVal !== undefined ? finalVal : tempValue;
+    console.log(`[CITADEL-PERF] handleKeypadValidate: target=${keypadTarget.field}, val="${valToCommit}"`);
     commitValue(keypadTarget, valToCommit);
 
     if (keypadTarget.type === 'main' && !set.completed) {
@@ -145,9 +146,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setKeypadTarget(null);
   }, [keypadTarget, tempValue, commitValue, set.completed, onToggleComplete]);
 
-  const handleKeypadClose = useCallback(() => {
-    if (keypadTarget && tempValue !== '') {
-      commitValue(keypadTarget, tempValue);
+  const handleKeypadClose = useCallback((currentVal?: string) => {
+    console.log(`[CITADEL-PERF] handleKeypadClose: currentVal="${currentVal}", tempValue="${tempValue}"`);
+    if (keypadTarget) {
+      const valToCommit = currentVal !== undefined ? currentVal : tempValue;
+      if (valToCommit !== '') {
+        commitValue(keypadTarget, valToCommit);
+      }
     }
     setKeypadTarget(null);
   }, [keypadTarget, tempValue, commitValue]);
@@ -395,11 +400,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           setNumber={set.setNumber}
           activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
-          onChangeValue={handleKeypadChange}
           onNextField={handleKeypadNext}
           onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}
-          onClear={() => commitValue(keypadTarget, '')}
+          onClear={() => setTempValue('')}
         />
       )}
 
@@ -457,7 +461,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
 SetTableRowComponent.displayName = 'SetTableRowComponent';
 
-export const SetTableRow = React.memo(SetTableRowComponent);
+export const SetTableRow = React.memo(
+  SetTableRowComponent,
+  (prev, next) => prev.set === next.set && prev.exerciseId === next.exerciseId
+);
 export default SetTableRow;
 
 const styles = StyleSheet.create({

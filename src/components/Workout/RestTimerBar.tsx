@@ -8,10 +8,31 @@ export const RestTimerBar: React.FC = () => {
   const { restTimer, dismissRestTimer, adjustRestTimer } = useWorkout();
   const { theme } = useTheme();
 
-  if (!restTimer.active || restTimer.secondsRemaining <= 0) return null;
+  const [secondsRemaining, setSecondsRemaining] = React.useState<number>(() => {
+    if (!restTimer.active || !restTimer.targetEndTime) return 0;
+    return Math.max(0, Math.ceil((restTimer.targetEndTime - Date.now()) / 1000));
+  });
 
-  const mins = Math.floor(restTimer.secondsRemaining / 60);
-  const secs = restTimer.secondsRemaining % 60;
+  React.useEffect(() => {
+    if (!restTimer.active || !restTimer.targetEndTime) {
+      setSecondsRemaining(0);
+      return;
+    }
+
+    const update = () => {
+      const rem = Math.max(0, Math.ceil((restTimer.targetEndTime! - Date.now()) / 1000));
+      setSecondsRemaining(rem);
+    };
+
+    update();
+    const interval = setInterval(update, 500);
+    return () => clearInterval(interval);
+  }, [restTimer.active, restTimer.targetEndTime]);
+
+  if (!restTimer.active || secondsRemaining <= 0) return null;
+
+  const mins = Math.floor(secondsRemaining / 60);
+  const secs = secondsRemaining % 60;
   const formatted = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
   const nextInfo = restTimer.nextSetInfo;
