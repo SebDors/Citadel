@@ -319,21 +319,21 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     NotificationService.init();
   }, []);
 
-  // Décompte du Minuteur de Repos
+  // Fin du Minuteur de Repos (géré par un unique timer de fin sans re-render perpétuel de l'arbre global)
   useEffect(() => {
     if (!restTimer.active || !restTimer.targetEndTime) return;
 
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((restTimer.targetEndTime! - Date.now()) / 1000));
-      if (remaining <= 0) {
-        handleTimerExpired();
-        clearInterval(interval);
-      } else {
-        setRestTimer((prev) => ({ ...prev, secondsRemaining: remaining }));
-      }
-    }, 500);
+    const remainingMs = restTimer.targetEndTime - Date.now();
+    if (remainingMs <= 0) {
+      handleTimerExpired();
+      return;
+    }
 
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => {
+      handleTimerExpired();
+    }, remainingMs);
+
+    return () => clearTimeout(timer);
   }, [restTimer.active, restTimer.targetEndTime]);
 
   // Gestion du Cycle de Vie AppState (Arrière-plan -> Premier plan)
@@ -348,32 +348,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const remainingMs = restTimer.targetEndTime - Date.now();
       if (remainingMs <= 0) {
         handleTimerExpired();
-      } else {
-        const remainingSec = Math.ceil(remainingMs / 1000);
-        setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [restTimer.active, restTimer.targetEndTime, restTimer.exerciseName]);
-
-  // Durée de la séance en cours (ne tourne que si la séance est officiellement lancée et non en pause)
-  useEffect(() => {
-    if (!activeSession || activeSession.status !== 'in_progress' || !activeSession.hasStarted || activeSession.isPaused) return;
-
-    const interval = setInterval(() => {
-      setActiveSession((prev) => {
-        if (!prev || !prev.hasStarted || prev.isPaused) return prev;
-        const start = new Date(prev.startTime).getTime();
-        const duration = Math.floor((Date.now() - start) / 1000);
-        return { ...prev, durationSeconds: duration };
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeSession?.status, activeSession?.startTime, activeSession?.hasStarted, activeSession?.isPaused]);
+  }, [restTimer.active, restTimer.targetEndTime]);
 
   const startSessionTimer = () => {
     setActiveSession((prev) => {
@@ -1264,8 +1245,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const finishWorkout = async () => {
     if (!activeSession) return;
 
+    let finalDuration = activeSession.durationSeconds || 0;
+    if (activeSession.hasStarted && !activeSession.isPaused && activeSession.startTime) {
+      const elapsed = Math.floor((Date.now() - new Date(activeSession.startTime).getTime()) / 1000);
+      finalDuration = Math.max(finalDuration, elapsed);
+    }
+
     const completedSession: WorkoutSession = {
       ...activeSession,
+      durationSeconds: finalDuration,
       endTime: new Date().toISOString(),
       status: 'completed',
     };

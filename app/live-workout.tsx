@@ -74,6 +74,102 @@ const formatDuration = (seconds: number = 0): string => {
   return `${pad(mins)}:${pad(secs)}`;
 };
 
+interface WorkoutDurationWidgetProps {
+  startTime?: string;
+  hasStarted?: boolean;
+  isPaused?: boolean;
+  durationSeconds?: number;
+  onPress: () => void;
+  theme: any;
+}
+
+const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo(({
+  startTime,
+  hasStarted,
+  isPaused,
+  durationSeconds,
+  onPress,
+  theme,
+}) => {
+  const [elapsed, setElapsed] = useState<number>(() => {
+    if (!hasStarted || !startTime) return 0;
+    if (isPaused) return durationSeconds || 0;
+    return Math.max(0, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
+  });
+
+  useEffect(() => {
+    if (!hasStarted || isPaused || !startTime) {
+      if (isPaused) setElapsed(durationSeconds || 0);
+      return;
+    }
+
+    const tick = () => {
+      const start = new Date(startTime).getTime();
+      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [startTime, hasStarted, isPaused, durationSeconds]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={styles.bottomTimerLeftRow}
+    >
+      <Clock
+        size={18}
+        color={
+          hasStarted === false
+            ? theme.textMuted
+            : isPaused
+              ? theme.danger
+              : theme.accent
+        }
+      />
+      <View style={{ marginLeft: 9 }}>
+        <Text
+          style={[
+            styles.bottomTimerValueText,
+            {
+              color:
+                hasStarted === false
+                  ? theme.textMuted
+                  : isPaused
+                    ? theme.danger
+                    : theme.text,
+            },
+          ]}
+        >
+          {formatDuration(elapsed)}
+        </Text>
+        <Text
+          style={[
+            styles.bottomTimerLabelText,
+            {
+              color:
+                hasStarted === false
+                  ? theme.textMuted
+                  : isPaused
+                    ? theme.danger
+                    : theme.textMuted,
+              fontWeight: isPaused ? "800" : "600",
+            },
+          ]}
+        >
+          {hasStarted === false
+            ? "Séance non démarrée"
+            : isPaused
+              ? "EN PAUSE"
+              : "Temps écoulé"}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 interface CircuitState {
   started: boolean;
   currentRound: number;
@@ -1580,63 +1676,18 @@ export default function LiveWorkoutScreen() {
         ]}
       >
         {/* Gauche : Icône Horloge + Timer (mm:ss ou hh:mm:ss) */}
-        <TouchableOpacity
-          activeOpacity={activeSession.hasStarted !== false ? 0.7 : 1}
+        <WorkoutDurationWidget
+          startTime={activeSession.startTime}
+          hasStarted={activeSession.hasStarted}
+          isPaused={activeSession.isPaused}
+          durationSeconds={activeSession.durationSeconds}
           onPress={() => {
             if (activeSession.hasStarted !== false) {
               togglePauseWorkoutSession();
             }
           }}
-          style={styles.bottomTimerLeftRow}
-        >
-          <Clock
-            size={18}
-            color={
-              activeSession.hasStarted === false
-                ? theme.textMuted
-                : activeSession.isPaused
-                  ? theme.danger
-                  : theme.accent
-            }
-          />
-          <View style={{ marginLeft: 9 }}>
-            <Text
-              style={[
-                styles.bottomTimerValueText,
-                {
-                  color:
-                    activeSession.hasStarted === false
-                      ? theme.textMuted
-                      : activeSession.isPaused
-                        ? theme.danger
-                        : theme.text,
-                },
-              ]}
-            >
-              {formatDuration(activeSession.durationSeconds)}
-            </Text>
-            <Text
-              style={[
-                styles.bottomTimerLabelText,
-                {
-                  color:
-                    activeSession.hasStarted === false
-                      ? theme.textMuted
-                      : activeSession.isPaused
-                        ? theme.danger
-                        : theme.textMuted,
-                  fontWeight: activeSession.isPaused ? "800" : "600",
-                },
-              ]}
-            >
-              {activeSession.hasStarted === false
-                ? "Séance non démarrée"
-                : activeSession.isPaused
-                  ? "EN PAUSE"
-                  : "Temps écoulé"}
-            </Text>
-          </View>
-        </TouchableOpacity>
+          theme={theme}
+        />
 
         {/* Droite : Bouton Logo Pause / Reprendre (Bouton circulaire sans texte) */}
         {activeSession.hasStarted !== false ? (
