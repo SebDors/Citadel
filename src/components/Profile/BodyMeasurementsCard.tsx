@@ -242,110 +242,53 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
         </Text>
       ) : (
         sortedMeasurements.map((m) => {
-          const hasSecondary =
-            m.chestCm !== undefined || m.thighCm !== undefined || m.bicepsCm !== undefined;
+          const secondaryParts: string[] = [];
+          if (m.chestCm !== undefined) secondaryParts.push(`P: ${formatWeight(m.chestCm)}`);
+          if (m.thighCm !== undefined) secondaryParts.push(`C: ${formatWeight(m.thighCm)}`);
+          if (m.bicepsCm !== undefined) secondaryParts.push(`B: ${formatWeight(m.bicepsCm)}`);
+          const secondarySummary = secondaryParts.join(' · ');
 
           return (
-            <View key={m.id} style={[styles.mItem, { borderBottomColor: theme.border }]}>
-              {/* Ligne 1 : Date, Poids principal & Actions tactiles */}
-              <View style={styles.mRowTop}>
-                <View style={styles.mMainInfo}>
-                  <Text style={[styles.mDate, { color: theme.textMuted }]}>
-                    {formatDateToListDisplay(m.date)}
+            <View key={m.id} style={[styles.mCompactRow, { borderBottomColor: theme.border }]}>
+              {/* Zone principale cliquable pour ouvrir la modification */}
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => handleEditMeasurement(m)}
+                style={styles.mClickableZone}
+                accessibilityLabel="Modifier cette mesure"
+              >
+                <Text style={[styles.mDate, { color: theme.textMuted }]}>
+                  {formatDateToListDisplay(m.date)}
+                </Text>
+
+                {m.weightKg !== undefined && (
+                  <Text style={[styles.mWeight, { color: theme.text }]}>
+                    {formatWeight(m.weightKg)}
+                    <Text style={[styles.mUnit, { color: theme.textMuted }]}> kg</Text>
                   </Text>
-                  {m.weightKg !== undefined && (
-                    <View
-                      style={[
-                        styles.weightBadge,
-                        { backgroundColor: theme.surface, borderColor: theme.border },
-                      ]}
-                    >
-                      <Text style={[styles.weightVal, { color: theme.text }]}>
-                        {formatWeight(m.weightKg)}
-                        <Text style={[styles.weightUnit, { color: theme.textMuted }]}> kg</Text>
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                )}
 
-                <View style={styles.mActions}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => handleEditMeasurement(m)}
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: theme.surface, borderColor: theme.border },
-                    ]}
-                    accessibilityLabel="Modifier cette mesure"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                {secondarySummary.length > 0 && (
+                  <Text
+                    style={[styles.mSecondarySummary, { color: theme.textMuted }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
-                    <Edit2 size={15} color={theme.accent} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => handleConfirmDelete(m)}
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: theme.surface, borderColor: theme.border },
-                    ]}
-                    accessibilityLabel="Supprimer cette mesure"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Trash2 size={15} color={theme.danger} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+                    {secondarySummary}
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-              {/* Ligne 2 : Mensurations secondaires (badges pilules) */}
-              {hasSecondary && (
-                <View style={styles.mBadgesRow}>
-                  {m.chestCm !== undefined && (
-                    <View
-                      style={[
-                        styles.subBadge,
-                        { backgroundColor: theme.surface, borderColor: theme.border },
-                      ]}
-                    >
-                      <Text style={[styles.subBadgeLabel, { color: theme.textMuted }]}>
-                        Poitrine{' '}
-                      </Text>
-                      <Text style={[styles.subBadgeVal, { color: theme.text }]}>
-                        {formatWeight(m.chestCm)} cm
-                      </Text>
-                    </View>
-                  )}
-                  {m.thighCm !== undefined && (
-                    <View
-                      style={[
-                        styles.subBadge,
-                        { backgroundColor: theme.surface, borderColor: theme.border },
-                      ]}
-                    >
-                      <Text style={[styles.subBadgeLabel, { color: theme.textMuted }]}>
-                        Cuisse{' '}
-                      </Text>
-                      <Text style={[styles.subBadgeVal, { color: theme.text }]}>
-                        {formatWeight(m.thighCm)} cm
-                      </Text>
-                    </View>
-                  )}
-                  {m.bicepsCm !== undefined && (
-                    <View
-                      style={[
-                        styles.subBadge,
-                        { backgroundColor: theme.surface, borderColor: theme.border },
-                      ]}
-                    >
-                      <Text style={[styles.subBadgeLabel, { color: theme.textMuted }]}>
-                        Bras{' '}
-                      </Text>
-                      <Text style={[styles.subBadgeVal, { color: theme.text }]}>
-                        {formatWeight(m.bicepsCm)} cm
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
+              {/* Bouton de suppression direct avec confirmation */}
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => handleConfirmDelete(m)}
+                style={styles.mDeleteBtn}
+                accessibilityLabel="Supprimer cette mesure"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Trash2 size={15} color={theme.danger} />
+              </TouchableOpacity>
             </View>
           );
         })
@@ -591,77 +534,41 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 10,
   },
-  mItem: {
-    paddingVertical: 10,
+  mCompactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
     borderBottomWidth: 1,
   },
-  mRowTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  mMainInfo: {
+  mClickableZone: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1,
     gap: 10,
+    marginRight: 6,
   },
   mDate: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
-  weightBadge: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  weightVal: {
-    fontSize: 14,
+  mWeight: {
+    fontSize: 13,
     fontWeight: '800',
   },
-  weightUnit: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  mActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginLeft: 8,
-    flexShrink: 0,
-  },
-  actionBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mBadgesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-  },
-  subBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  subBadgeLabel: {
+  mUnit: {
     fontSize: 11,
     fontWeight: '500',
   },
-  subBadgeVal: {
+  mSecondarySummary: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  mDeleteBtn: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   /* Modale Styles */
   modalOverlay: {
