@@ -126,6 +126,7 @@ export const StorageService = {
    * et débounce la réécriture de la base globale pour 0ms de latence perçue.
    */
   async saveCurrentWorkout(session: WorkoutSession | null): Promise<void> {
+    const t0 = Date.now();
     // 1. Sauvegarde instantanée de la session active isolée (~3 Ko, < 2ms)
     try {
       if (session === null) {
@@ -133,6 +134,7 @@ export const StorageService = {
       } else {
         await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(session));
       }
+      console.log(`[CITADEL-PERF] AsyncStorage CURRENT_WORKOUT_KEY sauvegardé en ${Date.now() - t0}ms`);
     } catch (e) {
       console.error('Erreur sauvegarde rapide currentWorkout:', e);
     }
