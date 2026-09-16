@@ -36,7 +36,7 @@ import {
   X,
   Tag,
   Check,
-  FolderInput,
+  Import as ImportIcon,
   BookOpen,
   Dumbbell,
   Sparkles,
@@ -653,49 +653,54 @@ export default function WorkoutTab() {
                 ]}
                 onPress={() => router.push("/template-editor")}
               >
-                <Plus size={20} color={theme.text} />
+                <Plus size={22} color={theme.text} />
                 <Text style={[styles.createActionTitle, { color: theme.text }]}>
                   SÉANCE
                 </Text>
               </TouchableOpacity>
             </Animated.View>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[
-                styles.createActionBox,
-                { backgroundColor: theme.surface, borderColor: theme.border, flex: 1 },
-              ]}
-              onPress={handleImportTemplate}
-            >
-              <FolderInput size={20} color={theme.accent} />
-              <Text style={[styles.createActionTitle, { color: theme.text }]}>
-                IMPORTER
-              </Text>
-            </TouchableOpacity>
           </View>
 
-          {/* Section Header with "Nouveau dossier" button */}
+          {/* Section Header with "Importer" & "Nouveau dossier" buttons */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
               MES DOSSIERS & SÉANCES
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.newFolderBtn,
-                { borderColor: theme.border, backgroundColor: theme.surface },
-              ]}
-              onPress={() => setShowCreateFolderModal(true)}
-            >
-              <FolderPlus
-                size={14}
-                color={theme.accent}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.newFolderText, { color: theme.accent }]}>
-                Nouveau dossier
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <TouchableOpacity
+                style={[
+                  styles.newFolderBtn,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                ]}
+                onPress={handleImportTemplate}
+              >
+                <ImportIcon
+                  size={13}
+                  color={theme.accent}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.newFolderText, { color: theme.accent }]}>
+                  Importer
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.newFolderBtn,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                ]}
+                onPress={() => setShowCreateFolderModal(true)}
+              >
+                <FolderPlus
+                  size={13}
+                  color={theme.accent}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.newFolderText, { color: theme.accent }]}>
+                  Nouveau dossier
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Folders List */}
@@ -1406,32 +1411,32 @@ const styles = StyleSheet.create({
   actionButtonsRow: {
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 8,
+    gap: 10,
     marginBottom: 14,
   },
   mainActionBox: {
-    flex: 1.5,
+    flex: 1.8,
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
+    padding: 12,
     borderRadius: 14,
   },
   playIconCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
   mainActionTitle: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "900",
   },
   mainActionSub: {
     color: "rgba(255,255,255,0.85)",
-    fontSize: 9.5,
+    fontSize: 10,
   },
   createActionBox: {
     flex: 1,
@@ -1439,13 +1444,12 @@ const styles = StyleSheet.create({
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
+    padding: 12,
     borderRadius: 14,
     borderWidth: 1,
   },
   createActionTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "900",
     marginTop: 2,
   },
