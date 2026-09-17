@@ -1,7 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { getContrastTextColor } from '../../utils/colorUtils';
 
 interface ButtonProps {
   title: string;
@@ -25,11 +24,11 @@ export const Button: React.FC<ButtonProps> = ({
   const { theme } = useTheme();
 
   let bgColor = theme.accent;
-  let textColor = getContrastTextColor(theme.accent);
+  let textColor = '#FFFFFF';
 
   if (variant === 'secondary') {
     bgColor = theme.secondary;
-    textColor = getContrastTextColor(theme.secondary);
+    textColor = '#FFFFFF';
   } else if (variant === 'danger') {
     bgColor = theme.danger;
     textColor = '#FFFFFF';
