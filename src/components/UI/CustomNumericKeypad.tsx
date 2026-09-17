@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ export type NumericFieldType = 'weightKg' | 'reps' | 'rir';
 
 export interface CustomNumericKeypadProps {
   visible: boolean;
-  onClose: () => void;
+  onClose: (currentVal?: string) => void;
   setNumber: number;
   activeField: NumericFieldType;
   value: string;
@@ -67,54 +67,147 @@ export const computeNextValue = (
   return prevVal;
 };
 
-// Sous-composant KeyButton mémoïsé avec surbrillance dynamique au clic (< 16ms)
+// Grille et options constantes (évite la ré-instanciation de tableaux à chaque frappe)
+const KEYPAD_ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', 'backspace'],
+];
+
+const RIR_OPTIONS = ['0', '1', '2', '3', '4', '5+'];
+
+interface KeyButtonProps {
+  value: string;
+  label?: string;
+  isBackspace?: boolean;
+  disabled?: boolean;
+  onPress: (val: string) => void;
+  theme: any;
+}
+
+// Sous-composant KeyButton ultra-réactif : déclenchement immédiat dès le contact tactile (onPressIn)
 const KeyButton = React.memo<KeyButtonProps>(({
   value,
   label,
-  icon,
-  onPress,
+  isBackspace,
   disabled,
-  style,
-  textStyle,
+  onPress,
+  theme,
 }) => {
-  const { theme } = useTheme();
-
-  const handlePress = useCallback(() => {
-    onPress(value);
-  }, [onPress, value]);
+  const handlePressIn = useCallback(() => {
+    if (!disabled) {
+      onPress(value);
+    }
+  }, [onPress, value, disabled]);
 
   return (
     <Pressable
-      onPress={handlePress}
+      onPressIn={handlePressIn}
       disabled={disabled}
+      unstable_pressDelay={0}
+      android_ripple={{
+        color: isBackspace ? `${theme.danger}40` : `${theme.accent}40`,
+        borderless: false,
+      }}
       style={({ pressed }) => [
-        style,
-        pressed && !disabled && {
-          backgroundColor: `${theme.accent}45`,
-          borderColor: theme.accent,
-          transform: [{ scale: 0.94 }],
+        styles.keypadBtn,
+        {
+          backgroundColor: isBackspace
+            ? (pressed && !disabled ? `${theme.danger}35` : theme.surface)
+            : (pressed && !disabled ? `${theme.accent}45` : theme.surface),
+          borderColor: isBackspace
+            ? (pressed && !disabled ? theme.danger : theme.border)
+            : (pressed && !disabled ? theme.accent : theme.border),
+          transform: [{ scale: pressed && !disabled ? 0.94 : 1 }],
+          opacity: disabled ? 0.35 : 1,
         },
       ]}
     >
-      {({ pressed }) => (
-        icon ? (
-          icon
+      {({ pressed }) =>
+        isBackspace ? (
+          <Delete
+            size={22}
+            color={pressed && !disabled ? theme.danger : theme.text}
+          />
         ) : (
           <Text
             style={[
-              textStyle,
-              pressed && !disabled && { color: theme.accent, fontWeight: '900' },
+              styles.keypadText,
+              {
+                color: pressed && !disabled ? theme.accent : theme.text,
+                fontWeight: pressed && !disabled ? '900' : '700',
+              },
             ]}
           >
             {label || value}
           </Text>
         )
-      )}
+      }
     </Pressable>
   );
 });
 
 KeyButton.displayName = 'KeyButton';
+
+interface RirButtonProps {
+  option: string;
+  isSelected: boolean;
+  onPress: (val: string) => void;
+  theme: any;
+}
+
+const RirButton = React.memo<RirButtonProps>(({
+  option,
+  isSelected,
+  onPress,
+  theme,
+}) => {
+  const handlePressIn = useCallback(() => {
+    onPress(option);
+  }, [onPress, option]);
+
+  return (
+    <Pressable
+      unstable_pressDelay={0}
+      onPressIn={handlePressIn}
+      android_ripple={{
+        color: `${theme.accent}40`,
+        borderless: false,
+      }}
+      style={({ pressed }) => [
+        styles.rirBtn,
+        {
+          backgroundColor: isSelected
+            ? theme.accent
+            : (pressed ? `${theme.accent}35` : theme.surface),
+          borderColor: isSelected
+            ? theme.accent
+            : (pressed ? theme.accent : theme.border),
+          transform: [{ scale: pressed ? 0.94 : 1 }],
+        },
+      ]}
+    >
+      {({ pressed }) => (
+        <Text
+          style={[
+            styles.rirBtnText,
+            {
+              color: isSelected
+                ? '#FFFFFF'
+                : (pressed ? theme.accent : theme.text),
+              fontWeight: isSelected || pressed ? '900' : '800',
+            },
+          ]}
+        >
+          {option}
+        </Text>
+      )}
+    </Pressable>
+  );
+});
+
+RirButton.displayName = 'RirButton';
 
 export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   visible,
@@ -130,13 +223,18 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 }) => {
   const { theme } = useTheme();
 
-  // État local de la saisie pour éviter de ré-exécuter le rendu du composant parent SetTableRow à chaque touche tapée
+  // État local de la saisie : buffer pur pour 0ms de latence
   const [localValue, setLocalValue] = useState<string>(value);
+  const localValueRef = useRef<string>(localValue);
+  localValueRef.current = localValue;
 
-  // Synchronisation de l'état local lors du changement de prop value ou activeField
+  // Synchronisation du buffer local uniquement lors de l'ouverture ou du changement de cible
   useEffect(() => {
-    setLocalValue(value);
-  }, [value, activeField, visible]);
+    if (visible) {
+      setLocalValue(value);
+      localValueRef.current = value;
+    }
+  }, [visible, activeField, setNumber, value]);
 
   // Titre et unité de l'en-tête selon le champ actif
   const getFieldHeaderInfo = useCallback(() => {
@@ -154,79 +252,71 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   const { title, unit } = getFieldHeaderInfo();
 
-  // Gestion des clics du pavé numérique (0-9, ., backspace)
+  // Gestion des clics du pavé numérique (0-9, ., backspace) : purement local, callback stable (< 0.5ms)
   const handleKeyPress = useCallback((key: string) => {
-    const nextVal = computeNextValue(localValue, key, activeField);
-    setLocalValue(nextVal);
-    if (onChangeValue) {
-      onChangeValue(nextVal);
-    }
-  }, [localValue, activeField, onChangeValue]);
+    setLocalValue((prevVal) => {
+      return computeNextValue(prevVal, key, activeField);
+    });
+  }, [activeField]);
 
-  // Gestion des boutons de choix rapide RIR (1, 2, 3, 4, 5+)
+  // Gestion des boutons de choix rapide RIR (0, 1, 2, 3, 4, 5+) : sélection visuelle dans le buffer, validation par le bouton Valider
   const handleRirPress = useCallback((key: string) => {
     setLocalValue(key);
-    if (onChangeValue) {
-      onChangeValue(key);
-    }
-  }, [onChangeValue]);
+  }, []);
 
-  // Réinitialisation de la valeur saisie
+  // Réinitialisation locale de la valeur saisie (sans commit synchrone bloquant)
   const handleClear = useCallback(() => {
     setLocalValue('');
-    if (onChangeValue) {
-      onChangeValue('');
-    }
     if (onClear) {
       onClear();
     }
-  }, [onChangeValue, onClear]);
+  }, [onClear]);
 
   // Action Suivant (passer au champ suivant en transmettant la valeur locale)
   const handleNext = useCallback(() => {
+    const current = localValueRef.current;
     if (onNextField) {
-      onNextField(localValue);
+      onNextField(current);
     }
-  }, [onNextField, localValue]);
+  }, [onNextField]);
 
   // Action Précédent (retourner au champ précédent en transmettant la valeur locale)
   const handlePrevious = useCallback(() => {
+    const current = localValueRef.current;
     if (onPreviousField) {
-      onPreviousField(localValue);
+      onPreviousField(current);
     }
-  }, [onPreviousField, localValue]);
+  }, [onPreviousField]);
 
   // Action Valider (valider et fermer en transmettant la valeur locale)
   const handleValidate = useCallback(() => {
+    const current = localValueRef.current;
     if (onValidate) {
-      onValidate(localValue);
+      onValidate(current);
     }
-  }, [onValidate, localValue]);
+  }, [onValidate]);
 
   const isLastField = activeField === 'rir';
 
-  // Pavé numérique standard 4x3 pour KG et REPS
-  const keypadRows = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['.', '0', 'backspace'],
-  ];
-
-  // Choix rapides RIR dédiés (start at 0)
-  const rirOptions = ['0', '1', '2', '3', '4', '5+'];
+  // Action Fermer (ferme le modal en transmettant la valeur locale en cours)
+  const handleClose = useCallback(() => {
+    const current = localValueRef.current;
+    if (onClose) {
+      onClose(current);
+    }
+  }, [onClose]);
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="fade"
+      onRequestClose={handleClose}
     >
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
-        onPress={onClose}
+        onPress={handleClose}
       >
         <TouchableOpacity
           activeOpacity={1}
@@ -260,9 +350,10 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             </View>
 
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleClose}
               style={[styles.closeButton, { backgroundColor: theme.surface }]}
               activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <X size={20} color={theme.text} />
             </TouchableOpacity>
@@ -272,30 +363,16 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           {activeField === 'rir' ? (
             /* Mode RIR : Rangée exclusive de boutons de choix rapide (0, 1, 2, 3, 4, 5+) */
             <View style={styles.rirContainer}>
-              {rirOptions.map((option) => {
+              {RIR_OPTIONS.map((option) => {
                 const isSelected =
                   localValue === option || (option === '5+' && (localValue === '5+' || localValue === '5'));
                 return (
-                  <KeyButton
+                  <RirButton
                     key={option}
-                    value={option}
-                    label={option}
+                    option={option}
+                    isSelected={isSelected}
                     onPress={handleRirPress}
-                    style={[
-                      styles.rirBtn,
-                      {
-                        backgroundColor: isSelected
-                          ? theme.accent
-                          : theme.surface,
-                        borderColor: isSelected
-                          ? theme.accent
-                          : theme.border,
-                      },
-                    ]}
-                    textStyle={[
-                      styles.rirBtnText,
-                      { color: isSelected ? '#FFFFFF' : theme.text },
-                    ]}
+                    theme={theme}
                   />
                 );
               })}
@@ -303,31 +380,20 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           ) : (
             /* Mode Standard (KG / REPS) : Grille Numérique 4x3 */
             <View style={styles.gridContainer}>
-              {keypadRows.map((row, rowIndex) => (
+              {KEYPAD_ROWS.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.gridRow}>
                   {row.map((key) => {
                     const isDotDisabled = key === '.' && activeField === 'reps';
+                    const isBackspace = key === 'backspace';
                     return (
                       <KeyButton
                         key={key}
                         value={key}
                         label={key}
+                        isBackspace={isBackspace}
                         disabled={isDotDisabled}
-                        icon={
-                          key === 'backspace' ? (
-                            <Delete size={22} color={theme.text} />
-                          ) : undefined
-                        }
                         onPress={handleKeyPress}
-                        style={[
-                          styles.keypadBtn,
-                          {
-                            backgroundColor: theme.surface,
-                            borderColor: theme.border,
-                            opacity: isDotDisabled ? 0.35 : 1,
-                          },
-                        ]}
-                        textStyle={[styles.keypadText, { color: theme.text }]}
+                        theme={theme}
                       />
                     );
                   })}
@@ -341,6 +407,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             {/* Bouton Gauche 1 : Précédent (si pas sur le tout premier champ) */}
             {activeField !== 'weightKg' && onPreviousField && (
               <Pressable
+                unstable_pressDelay={0}
                 onPress={handlePrevious}
                 style={({ pressed }) => [
                   styles.actionBtn,
@@ -363,8 +430,9 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               </Pressable>
             )}
 
-            {/* Bouton Gauche 2 : Effacer */}
+            {/* Bouton Gauche 2 : Effacer (neutre par défaut, rouge uniquement à l'enfoncement) */}
             <Pressable
+              unstable_pressDelay={0}
               onPress={handleClear}
               style={({ pressed }) => [
                 styles.actionBtn,
@@ -372,23 +440,34 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                 {
                   backgroundColor: pressed ? `${theme.danger}30` : theme.surface,
                   borderColor: pressed ? theme.danger : theme.border,
+                  borderWidth: 1,
                   transform: [{ scale: pressed ? 0.95 : 1 }],
                 },
               ]}
             >
-              <RotateCcw
-                size={15}
-                color={theme.textMuted}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.clearBtnText, { color: theme.text }]}>
-                Effacer
-              </Text>
+              {({ pressed }) => (
+                <>
+                  <RotateCcw
+                    size={15}
+                    color={pressed ? theme.danger : theme.textMuted}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={[
+                      styles.clearBtnText,
+                      { color: pressed ? theme.danger : theme.text },
+                    ]}
+                  >
+                    Effacer
+                  </Text>
+                </>
+              )}
             </Pressable>
 
             {/* Bouton Droit : Suivant ➔ ou Valider 🗸 */}
             {isLastField ? (
               <Pressable
+                unstable_pressDelay={0}
                 onPress={handleValidate}
                 style={({ pressed }) => [
                   styles.actionBtn,
@@ -405,6 +484,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               </Pressable>
             ) : (
               <Pressable
+                unstable_pressDelay={0}
                 onPress={handleNext}
                 style={({ pressed }) => [
                   styles.actionBtn,

@@ -20,7 +20,7 @@ interface ExerciseCardProps {
   onSetSupersetGroup: (supersetGroup?: string) => void;
 }
 
-export const ExerciseCard: React.FC<ExerciseCardProps> = ({
+const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   exercise,
   onUpdateSet,
   onToggleSetComplete,
@@ -438,3 +438,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+export const ExerciseCard = React.memo(
+  ExerciseCardComponent,
+  (prev, next) => prev.exercise === next.exercise
+);
+export default ExerciseCard;

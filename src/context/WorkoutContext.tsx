@@ -75,6 +75,7 @@ export interface WorkoutContextType {
   resetAllData: () => Promise<void>;
   importFullData: (newData: FitTrackerData) => Promise<void>;
   completeOnboarding: (profileData?: { name?: string; currentWeightKg?: number }) => Promise<void>;
+  skipOnboarding: () => Promise<void>;
   markFirstSessionCreated: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
   // Base d'exercices personnalisés
@@ -304,6 +305,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const skipOnboarding = async () => {
+    const updated = await StorageService.skipOnboarding();
+    setData(updated);
+  };
+
   const markFirstSessionCreated = async () => {
     const updated = await StorageService.markFirstSessionCreated();
     setData(updated);
@@ -319,57 +325,42 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     NotificationService.init();
   }, []);
 
-  // Décompte du Minuteur de Repos
+  // Fin du Minuteur de Repos (géré par un unique timer de fin sans re-render perpétuel de l'arbre global)
   useEffect(() => {
     if (!restTimer.active || !restTimer.targetEndTime) return;
 
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((restTimer.targetEndTime! - Date.now()) / 1000));
-      if (remaining <= 0) {
-        handleTimerExpired();
-        clearInterval(interval);
-      } else {
-        setRestTimer((prev) => ({ ...prev, secondsRemaining: remaining }));
-      }
-    }, 500);
+    const remainingMs = restTimer.targetEndTime - Date.now();
+    if (remainingMs <= 0) {
+      handleTimerExpired();
+      return;
+    }
 
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => {
+      handleTimerExpired();
+    }, remainingMs);
+
+    return () => clearTimeout(timer);
   }, [restTimer.active, restTimer.targetEndTime]);
 
   // Gestion du Cycle de Vie AppState (Arrière-plan -> Premier plan)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') {
+        StorageService.flushCurrentWorkout();
+      }
+
       if (!restTimer.active || !restTimer.targetEndTime) return;
 
       const remainingMs = restTimer.targetEndTime - Date.now();
       if (remainingMs <= 0) {
         handleTimerExpired();
-      } else {
-        const remainingSec = Math.ceil(remainingMs / 1000);
-        setRestTimer((prev) => ({ ...prev, secondsRemaining: remainingSec }));
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [restTimer.active, restTimer.targetEndTime, restTimer.exerciseName]);
-
-  // Durée de la séance en cours (ne tourne que si la séance est officiellement lancée et non en pause)
-  useEffect(() => {
-    if (!activeSession || activeSession.status !== 'in_progress' || !activeSession.hasStarted || activeSession.isPaused) return;
-
-    const interval = setInterval(() => {
-      setActiveSession((prev) => {
-        if (!prev || !prev.hasStarted || prev.isPaused) return prev;
-        const start = new Date(prev.startTime).getTime();
-        const duration = Math.floor((Date.now() - start) / 1000);
-        return { ...prev, durationSeconds: duration };
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeSession?.status, activeSession?.startTime, activeSession?.hasStarted, activeSession?.isPaused]);
+  }, [restTimer.active, restTimer.targetEndTime]);
 
   const startSessionTimer = () => {
     setActiveSession((prev) => {
@@ -525,49 +516,51 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateSet = (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => {
-    if (!activeSession) return;
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    const currentExercises = activeSession.exercises || [];
-    const updatedExercises = currentExercises.map((ex) => {
-      if (ex.id !== exerciseId) return ex;
+      const currentExercises = prevSession.exercises || [];
+      const updatedExercises = currentExercises.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
 
-      const updatedSets = ex.sets.map((s) => {
-        if (s.id !== setId) return s;
-        return { ...s, [field]: value };
+        const updatedSets = ex.sets.map((s) => {
+          if (s.id !== setId) return s;
+          return { ...s, [field]: value };
+        });
+
+        return { ...ex, sets: updatedSets };
       });
 
-      return { ...ex, sets: updatedSets };
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              const updatedSets = block.exercise.sets.map((s) => {
+                if (s.id !== setId) return s;
+                return { ...s, [field]: value };
+              });
+              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+            }
+            return block;
+          })
+        : undefined;
+
+      const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+        updatedExercises,
+        updatedBlocks
+      );
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+        totalVolumeKg: volume,
+        completedSetsCount: completedCount,
+        totalSetsCount: totalCount,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
     });
-
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            const updatedSets = block.exercise.sets.map((s) => {
-              if (s.id !== setId) return s;
-              return { ...s, [field]: value };
-            });
-            return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
-          }
-          return block;
-        })
-      : undefined;
-
-    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
-      updatedExercises,
-      updatedBlocks
-    );
-
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-      totalVolumeKg: volume,
-      completedSetsCount: completedCount,
-      totalSetsCount: totalCount,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const findNextSetPreview = (
@@ -656,92 +649,95 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const toggleSetComplete = (exerciseId: string, setId: string) => {
-    if (!activeSession) return;
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    let targetRestSeconds = 75;
-    let exerciseName = '';
-    let isMarkingCompleted = false;
+      let targetRestSeconds = 75;
+      let exerciseName = '';
+      let isMarkingCompleted = false;
 
-    const currentExercises = activeSession.exercises || [];
-    const updatedExercises = currentExercises.map((ex) => {
-      if (ex.id !== exerciseId) return ex;
-      exerciseName = ex.exerciseName;
-      targetRestSeconds = ex.restSeconds || 75;
+      const currentExercises = prevSession.exercises || [];
+      const updatedExercises = currentExercises.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        exerciseName = ex.exerciseName;
+        targetRestSeconds = ex.restSeconds || 75;
 
-      const updatedSets = ex.sets.map((s) => {
-        if (s.id !== setId) return s;
-        const newCompleted = !s.completed;
-        if (newCompleted) isMarkingCompleted = true;
+        const updatedSets = ex.sets.map((s) => {
+          if (s.id !== setId) return s;
+          const newCompleted = !s.completed;
+          if (newCompleted) isMarkingCompleted = true;
 
-        return {
-          ...s,
-          completed: newCompleted,
-          completedAt: newCompleted ? new Date().toISOString() : undefined,
-        };
+          return {
+            ...s,
+            completed: newCompleted,
+            completedAt: newCompleted ? new Date().toISOString() : undefined,
+          };
+        });
+
+        return { ...ex, sets: updatedSets };
       });
 
-      return { ...ex, sets: updatedSets };
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              exerciseName = block.exercise.exerciseName;
+              targetRestSeconds = block.exercise.restSeconds || 75;
+
+              const updatedSets = block.exercise.sets.map((s) => {
+                if (s.id !== setId) return s;
+                const newCompleted = !s.completed;
+                if (newCompleted) isMarkingCompleted = true;
+
+                return {
+                  ...s,
+                  completed: newCompleted,
+                  completedAt: newCompleted ? new Date().toISOString() : undefined,
+                };
+              });
+
+              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+            }
+            return block;
+          })
+        : undefined;
+
+      const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+        updatedExercises,
+        updatedBlocks
+      );
+
+      const autoStartTimer = !prevSession.hasStarted && isMarkingCompleted;
+      const shouldResumePause = prevSession.isPaused && isMarkingCompleted;
+
+      let newStartTime = prevSession.startTime;
+      if (autoStartTimer) {
+        newStartTime = new Date().toISOString();
+      } else if (shouldResumePause) {
+        newStartTime = new Date(Date.now() - (prevSession.durationSeconds || 0) * 1000).toISOString();
+      }
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        hasStarted: autoStartTimer ? true : prevSession.hasStarted,
+        isPaused: shouldResumePause ? false : prevSession.isPaused,
+        startTime: newStartTime,
+        durationSeconds: autoStartTimer ? 0 : prevSession.durationSeconds,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+        totalVolumeKg: volume,
+        completedSetsCount: completedCount,
+        totalSetsCount: totalCount,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+
+      if (isMarkingCompleted) {
+        const nextSetInfo = findNextSetPreview(updatedSession, exerciseId, setId);
+        startRestTimer(exerciseName, targetRestSeconds, nextSetInfo);
+      }
+
+      return updatedSession;
     });
-
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            exerciseName = block.exercise.exerciseName;
-            targetRestSeconds = block.exercise.restSeconds || 75;
-
-            const updatedSets = block.exercise.sets.map((s) => {
-              if (s.id !== setId) return s;
-              const newCompleted = !s.completed;
-              if (newCompleted) isMarkingCompleted = true;
-
-              return {
-                ...s,
-                completed: newCompleted,
-                completedAt: newCompleted ? new Date().toISOString() : undefined,
-              };
-            });
-
-            return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
-          }
-          return block;
-        })
-      : undefined;
-
-    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
-      updatedExercises,
-      updatedBlocks
-    );
-
-    const autoStartTimer = !activeSession.hasStarted && isMarkingCompleted;
-    const shouldResumePause = activeSession.isPaused && isMarkingCompleted;
-
-    let newStartTime = activeSession.startTime;
-    if (autoStartTimer) {
-      newStartTime = new Date().toISOString();
-    } else if (shouldResumePause) {
-      newStartTime = new Date(Date.now() - (activeSession.durationSeconds || 0) * 1000).toISOString();
-    }
-
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      hasStarted: autoStartTimer ? true : activeSession.hasStarted,
-      isPaused: shouldResumePause ? false : activeSession.isPaused,
-      startTime: newStartTime,
-      durationSeconds: autoStartTimer ? 0 : activeSession.durationSeconds,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-      totalVolumeKg: volume,
-      completedSetsCount: completedCount,
-      totalSetsCount: totalCount,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
-
-    if (isMarkingCompleted) {
-      const nextSetInfo = findNextSetPreview(updatedSession, exerciseId, setId);
-      startRestTimer(exerciseName, targetRestSeconds, nextSetInfo);
-    }
   };
 
   const addSet = (exerciseId: string) => {
@@ -1255,8 +1251,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const finishWorkout = async () => {
     if (!activeSession) return;
 
+    let finalDuration = activeSession.durationSeconds || 0;
+    if (activeSession.hasStarted && !activeSession.isPaused && activeSession.startTime) {
+      const elapsed = Math.floor((Date.now() - new Date(activeSession.startTime).getTime()) / 1000);
+      finalDuration = Math.max(finalDuration, elapsed);
+    }
+
     const completedSession: WorkoutSession = {
       ...activeSession,
+      durationSeconds: finalDuration,
       endTime: new Date().toISOString(),
       status: 'completed',
     };
@@ -1483,66 +1486,77 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updatedData);
   };
 
+  const contextValue = useMemo<WorkoutContextType>(
+    () => ({
+      data,
+      loading,
+      activeSession,
+      startWorkout,
+      startSessionTimer,
+      togglePauseWorkoutSession,
+      finishWorkout,
+      cancelWorkout,
+      updateSet,
+      toggleSetComplete,
+      addSet,
+      removeSet,
+      addExerciseToActiveWorkout,
+      addBatchExercisesToActiveWorkout,
+      reorderActiveSessionBlocks,
+      addCircuitToActiveWorkout,
+      removeExercise,
+      duplicateExercise,
+      updateExerciseRestTime,
+      setExerciseSupersetGroup,
+      updateActiveSessionCircuitStates,
+      addExerciseToCircuit,
+      addBatchExercisesToCircuit,
+      updateCircuitItemSetType,
+      addMeasurement,
+      deleteMeasurement,
+      updateUserProfile,
+      saveTemplate,
+      deleteTemplate,
+      duplicateTemplate,
+      renameTemplate,
+      createFolder,
+      renameFolder,
+      deleteFolder,
+      toggleFolderCollapse,
+      moveTemplateToFolder,
+      logPastWorkout,
+      deleteWorkoutSession,
+      deleteExerciseFromSession,
+      deleteSetFromSession,
+      reloadAllData,
+      resetAllData,
+      importFullData,
+      completeOnboarding,
+      skipOnboarding,
+      markFirstSessionCreated,
+      resetOnboarding,
+      customExercises,
+      allExercises,
+      addCustomExercise,
+      updateCustomExercise,
+      deleteCustomExercise,
+      restTimer,
+      startRestTimer,
+      dismissRestTimer,
+      adjustRestTimer,
+    }),
+    [
+      data,
+      loading,
+      activeSession,
+      customExercises,
+      allExercises,
+      restTimer,
+    ]
+  );
+
   return (
-    <WorkoutContext.Provider
-      value={{
-        data,
-        loading,
-        activeSession,
-        startWorkout,
-        startSessionTimer,
-        togglePauseWorkoutSession,
-        finishWorkout,
-        cancelWorkout,
-        updateSet,
-        toggleSetComplete,
-        addSet,
-        removeSet,
-        addExerciseToActiveWorkout,
-        addBatchExercisesToActiveWorkout,
-        reorderActiveSessionBlocks,
-        addCircuitToActiveWorkout,
-        removeExercise,
-        duplicateExercise,
-        updateExerciseRestTime,
-        setExerciseSupersetGroup,
-        updateActiveSessionCircuitStates,
-        addExerciseToCircuit,
-        addBatchExercisesToCircuit,
-        updateCircuitItemSetType,
-        addMeasurement,
-        deleteMeasurement,
-        updateUserProfile,
-        saveTemplate,
-        deleteTemplate,
-        duplicateTemplate,
-        renameTemplate,
-        createFolder,
-        renameFolder,
-        deleteFolder,
-        toggleFolderCollapse,
-        moveTemplateToFolder,
-        logPastWorkout,
-        deleteWorkoutSession,
-        deleteExerciseFromSession,
-        deleteSetFromSession,
-        reloadAllData,
-        resetAllData,
-        importFullData,
-        completeOnboarding,
-        markFirstSessionCreated,
-        resetOnboarding,
-        customExercises,
-        allExercises,
-        addCustomExercise,
-        updateCustomExercise,
-        deleteCustomExercise,
-        restTimer,
-        startRestTimer,
-        dismissRestTimer,
-        adjustRestTimer,
-      }}
-    >
+    <WorkoutContext.Provider value={contextValue}>
       {children}
     </WorkoutContext.Provider>
   );

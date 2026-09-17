@@ -1,8 +1,9 @@
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { shareAsync } from 'expo-sharing';
 import { getDocumentAsync } from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
-import { FitTrackerData, WorkoutSession, BodyMeasurement, getSessionBlocks } from '../types';
+import { FitTrackerData, WorkoutSession, BodyMeasurement, WorkoutTemplate, getSessionBlocks } from '../types';
 
 function calculateEpley1RM(weight?: number, reps?: number): string {
   if (weight && reps && reps > 0) {
@@ -95,6 +96,34 @@ export const ExportService = {
     await shareAsync(fileUri, { mimeType, dialogTitle: filename, UTI: mimeType });
   },
 
+  async saveOrDownloadFile(filename: string, content: string, mimeType: string): Promise<boolean> {
+    if (Platform.OS === 'android') {
+      try {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          return false;
+        }
+        const fileNameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+        const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          fileNameWithoutExt,
+          mimeType
+        );
+        await FileSystem.writeAsStringAsync(fileUri, content, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        return true;
+      } catch (err) {
+        console.warn('StorageAccessFramework error, fallback to shareFile:', err);
+        await this.shareFile(filename, content, mimeType);
+        return true;
+      }
+    } else {
+      await this.shareFile(filename, content, mimeType);
+      return true;
+    }
+  },
+
   async pickAndParseJSONBackup(): Promise<FitTrackerData | null> {
     const result = await getDocumentAsync({
       type: 'application/json',
@@ -114,5 +143,64 @@ export const ExportService = {
     }
 
     throw new Error('Fichier de sauvegarde invalide.');
-  }
+  },
+
+  exportTemplateToJSON(template: WorkoutTemplate): string {
+    const payload = {
+      citadel_version: 1,
+      type: 'citadel_workout_template',
+      exportedAt: new Date().toISOString(),
+      template: {
+        title: template.title,
+        description: template.description || '',
+        targetMuscles: template.targetMuscles || [],
+        exercises: template.exercises || [],
+        blocks: template.blocks || [],
+        isCircuit: template.isCircuit || false,
+        circuitRounds: template.circuitRounds,
+        restBetweenRoundsSeconds: template.restBetweenRoundsSeconds,
+        defaultRestSeconds: template.defaultRestSeconds,
+      },
+    };
+    return JSON.stringify(payload, null, 2);
+  },
+
+  async shareTemplate(template: WorkoutTemplate): Promise<void> {
+    const json = this.exportTemplateToJSON(template);
+    const safeTitle = (template.title || 'seance')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+    const filename = `citadel_seance_${safeTitle || 'partage'}.json`;
+    await this.shareFile(filename, json, 'application/json');
+  },
+
+  async pickAndParseTemplateJSON(): Promise<WorkoutTemplate | null> {
+    const result = await getDocumentAsync({
+      type: 'application/json',
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) {
+      return null;
+    }
+
+    const file = result.assets[0];
+    const content = await FileSystem.readAsStringAsync(file.uri);
+    const parsed = JSON.parse(content);
+
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.type === 'citadel_workout_template' && parsed.template && parsed.template.title) {
+        return parsed.template as WorkoutTemplate;
+      }
+      if (parsed.title && (parsed.blocks || parsed.exercises)) {
+        return parsed as WorkoutTemplate;
+      }
+    }
+
+    throw new Error('Fichier de séance invalide.');
+  },
 };

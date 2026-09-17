@@ -24,7 +24,6 @@ import {
   Play,
   Plus,
   Flame,
-  TrendingUp,
   ChevronRight,
   MoreHorizontal,
   Folder,
@@ -37,10 +36,11 @@ import {
   X,
   Tag,
   Check,
-  FolderInput,
+  Import as ImportIcon,
   BookOpen,
   Dumbbell,
   Sparkles,
+  Share2,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
@@ -57,6 +57,7 @@ import {
   getAverageWorkoutDurationMinutes,
 } from "../../src/types";
 import { StorageService } from "../../src/services/storage";
+import { ExportService } from "../../src/services/exportService";
 
 function getActiveBannerSubtitle(session: WorkoutSession): string {
   if (session.hasStarted === false) {
@@ -121,7 +122,10 @@ export default function WorkoutTab() {
     deleteFolder,
     toggleFolderCollapse,
     moveTemplateToFolder,
+    saveTemplate,
+    markFirstSessionCreated,
     completeOnboarding,
+    skipOnboarding,
     allExercises,
   } = useWorkout();
   const { theme } = useTheme();
@@ -212,6 +216,47 @@ export default function WorkoutTab() {
   const handleOpenTemplateMenu = (tpl: WorkoutTemplate) => {
     setSelectedTemplate(tpl);
     setShowTemplateMenuModal(true);
+  };
+
+  const handleShareTemplate = async (tpl: WorkoutTemplate) => {
+    try {
+      await ExportService.shareTemplate(tpl);
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible d'exporter la séance.");
+    }
+  };
+
+  const handleImportTemplate = async () => {
+    try {
+      const imported = await ExportService.pickAndParseTemplateJSON();
+      if (!imported) return;
+
+      const title = imported.title?.trim() || "Séance importée";
+      const existingTitles = (data?.templates || []).map((t) => t.title.toLowerCase());
+      let finalTitle = title;
+      if (existingTitles.includes(title.toLowerCase())) {
+        finalTitle = `${title} (Importé)`;
+      }
+
+      const newTemplate: WorkoutTemplate = {
+        ...imported,
+        id: `tpl_${Date.now()}`,
+        title: finalTitle,
+        createdAt: new Date().toISOString(),
+      };
+
+      await saveTemplate(newTemplate);
+      if (!data?.hasCreatedFirstSession) {
+        await markFirstSessionCreated();
+      }
+
+      Alert.alert(
+        "Séance importée avec succès !",
+        `La séance "${finalTitle}" a été ajoutée à votre bibliothèque.`
+      );
+    } catch (error: any) {
+      Alert.alert("Erreur d'importation", error?.message || "Impossible d'importer le fichier de séance.");
+    }
   };
 
   const handleConfirmRenameTemplate = async () => {
@@ -372,18 +417,6 @@ export default function WorkoutTab() {
           </View>
 
           <View style={styles.cardHeaderIcons}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                router.push({
-                  pathname: "/workout-analytics",
-                  params: { id: tpl.id },
-                });
-              }}
-            >
-              <TrendingUp size={17} color={theme.text} />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={(e) => {
@@ -628,27 +661,46 @@ export default function WorkoutTab() {
             </Animated.View>
           </View>
 
-          {/* Section Header with "Nouveau dossier" button */}
+          {/* Section Header with "Importer" & "Nouveau dossier" buttons */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
               MES DOSSIERS & SÉANCES
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.newFolderBtn,
-                { borderColor: theme.border, backgroundColor: theme.surface },
-              ]}
-              onPress={() => setShowCreateFolderModal(true)}
-            >
-              <FolderPlus
-                size={14}
-                color={theme.accent}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.newFolderText, { color: theme.accent }]}>
-                Nouveau dossier
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <TouchableOpacity
+                style={[
+                  styles.newFolderBtn,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                ]}
+                onPress={handleImportTemplate}
+              >
+                <ImportIcon
+                  size={13}
+                  color={theme.accent}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.newFolderText, { color: theme.accent }]}>
+                  Importer
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.newFolderBtn,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                ]}
+                onPress={() => setShowCreateFolderModal(true)}
+              >
+                <FolderPlus
+                  size={13}
+                  color={theme.accent}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.newFolderText, { color: theme.accent }]}>
+                  Nouveau dossier
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Folders List */}
@@ -949,6 +1001,26 @@ export default function WorkoutTab() {
                 <Copy size={18} color={theme.text} />
                 <Text style={[styles.menuOptionText, { color: theme.text }]}>
                   Dupliquer la séance
+                </Text>
+              </TouchableOpacity>
+
+              {/* 5. Partager la séance */}
+              <TouchableOpacity
+                style={[
+                  styles.menuOptionRow,
+                  { borderBottomColor: theme.border, borderBottomWidth: 0.5 },
+                ]}
+                onPress={() => {
+                  const tpl = selectedTemplate;
+                  setShowTemplateMenuModal(false);
+                  if (tpl) {
+                    handleShareTemplate(tpl);
+                  }
+                }}
+              >
+                <Share2 size={18} color={theme.text} />
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>
+                  Partager la séance (.json)
                 </Text>
               </TouchableOpacity>
 
@@ -1291,6 +1363,7 @@ export default function WorkoutTab() {
         <OnboardingModal
           visible={!loading && !!data && !data.hasCompletedOnboarding}
           onComplete={completeOnboarding}
+          onSkip={skipOnboarding}
         />
       </SafeAreaView>
     </TabSwipeWrapper>

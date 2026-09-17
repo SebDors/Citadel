@@ -1,0 +1,71 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'V*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK & Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🏗 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🐘 Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: ⚙️ Prebuild Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: 🔨 Build Android Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: 📝 Prepare APK Artifact
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          if [[ -z "$TAG_NAME" || "$TAG_NAME" == "main" ]]; then
+            VERSION=$(node -p "require('./package.json').version")
+            TAG_NAME="v$VERSION"
+          fi
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [[ -f "$APK_PATH" ]]; then
+            cp "$APK_PATH" "Citadel-${TAG_NAME}.apk"
+            echo "APK ready: Citadel-${TAG_NAME}.apk"
+          else
+            echo "Error: No APK found in android/app/build/outputs/apk/release"
+            exit 1
+          fi
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Citadel-*.apk
+          name: Citadel ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false

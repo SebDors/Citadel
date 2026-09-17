@@ -7,6 +7,10 @@ const STORAGE_KEY = '@citadel_app_data_v1';
 const LEGACY_STORAGE_KEY = '@warriorfit_app_data_v1';
 const COLLAPSED_CARDS_KEY = '@citadel_collapsed_cards_v1';
 const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
+const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
+
+let saveCurrentWorkoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let lastPendingSession: WorkoutSession | null = null;
 
 export const StorageService = {
   /**
@@ -26,6 +30,17 @@ export const StorageService = {
         if (!parsed.folders) {
           parsed.folders = INITIAL_MOCK_DATA.folders || [];
         }
+
+        // Vérifier si une session active isolée et plus récente existe
+        try {
+          const activeSessionJson = await AsyncStorage.getItem(CURRENT_WORKOUT_KEY);
+          if (activeSessionJson !== null) {
+            parsed.currentWorkout = JSON.parse(activeSessionJson) as WorkoutSession;
+          }
+        } catch {
+          // Ignorer si échec de lecture de la clé isolée
+        }
+
         return parsed;
       }
       // Première utilisation : Sauvegarder les données mock initiales
@@ -61,6 +76,17 @@ export const StorageService = {
    * Enregistre une séance terminée dans l'historique et met à jour le profil.
    */
   async saveWorkoutSession(session: WorkoutSession): Promise<FitTrackerData> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    lastPendingSession = null;
+    try {
+      await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+    } catch (e) {
+      console.error('Erreur suppression CURRENT_WORKOUT_KEY:', e);
+    }
+
     const currentData = await this.loadData();
     const updatedHistory = [session, ...currentData.history.filter((s) => s.id !== session.id)];
     const updatedData: FitTrackerData = {
@@ -96,18 +122,52 @@ export const StorageService = {
     return updatedData;
   },
 
+  /**
+   * Sauvegarde non-bloquante et entièrement débouncée de la séance en cours.
+   * Enregistre EXCLUSIVEMENT la clé isolée CURRENT_WORKOUT_KEY (~2 Ko) sans jamais
+   * charger ni réécrire la base globale complète (évite les 2.1s de blocage du pont Android).
+   */
+  saveCurrentWorkout(session: WorkoutSession | null): void {
+    lastPendingSession = session;
+
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+    }
+
+    saveCurrentWorkoutDebounceTimer = setTimeout(async () => {
+      const targetSession = lastPendingSession;
+      try {
+        if (targetSession === null) {
+          await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+        } else {
+          await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
+        }
+      } catch (e) {
+        console.error('Erreur debounce saveCurrentWorkout:', e);
+      }
+    }, 2000);
+  },
 
   /**
-   * Sauvegarde ou met à jour la séance en cours (en direct).
+   * Force l'écriture immédiate de la session active en cours (ex: fermeture de l'app ou mise en arrière-plan).
    */
-  async saveCurrentWorkout(session: WorkoutSession | null): Promise<FitTrackerData> {
-    const currentData = await this.loadData();
-    const updatedData: FitTrackerData = {
-      ...currentData,
-      currentWorkout: session,
-    };
-    await this.saveData(updatedData);
-    return updatedData;
+  async flushCurrentWorkout(): Promise<void> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    const targetSession = lastPendingSession;
+    if (targetSession !== undefined) {
+      try {
+        if (targetSession === null) {
+          await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+        } else {
+          await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
+        }
+      } catch (e) {
+        console.error('Erreur flushCurrentWorkout:', e);
+      }
+    }
   },
 
   /**
@@ -456,11 +516,17 @@ export const StorageService = {
    * Efface toutes les données de stockage local pour repartir sur une application neuve.
    */
   async resetAllData(): Promise<FitTrackerData> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    lastPendingSession = null;
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
       await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
       await AsyncStorage.removeItem(COLLAPSED_CARDS_KEY);
       await AsyncStorage.removeItem(LEGACY_COLLAPSED_CARDS_KEY);
+      await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
     } catch (e) {
       console.error('Erreur lors de la réinitialisation des données:', e);
     }
@@ -488,6 +554,22 @@ export const StorageService = {
       };
       updatedData.measurements = [newM, ...(updatedData.measurements || [])];
     }
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  async skipOnboarding(): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      hasCompletedOnboarding: true,
+      hasCreatedFirstSession: true,
+      hasCompletedFirstWorkout: true,
+      profile: {
+        ...currentData.profile,
+        name: currentData.profile.name || 'Athlète',
+      },
+    };
     await this.saveData(updatedData);
     return updatedData;
   },

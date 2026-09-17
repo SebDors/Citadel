@@ -9,10 +9,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { parseFloatFrench, formatWeight } from '../../utils/numberUtils';
+import { parseFloatFrench } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import {
@@ -194,15 +195,44 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     });
   };
 
-  // Formatage pour l'affichage de la date dans la liste (ex: 2026-08-30 -> 30/08/2026)
+  // Formatage pour l'affichage de la date dans la liste (ex: 2026-08-30 -> 30/08/26)
   const formatDateToListDisplay = (dateStr: string): string => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       const [year, month, day] = parts;
-      return `${day}/${month}/${year}`;
+      return `${day}/${month}/${year.slice(-2)}`;
     }
     return dateStr;
+  };
+
+  // Toujours 2 chiffres après la virgule pour le poids (ex: 75.00, 82.50)
+  const formatFixedWeight = (val?: number | null): string => {
+    if (val === undefined || val === null || isNaN(val)) return '-';
+    return Number(val).toFixed(2);
+  };
+
+  // Toujours 1 chiffre après la virgule pour les mensurations (ex: 102.0, 38.5)
+  const formatFixedMeasurement = (val?: number | null): string => {
+    if (val === undefined || val === null || isNaN(val)) return '-';
+    return Number(val).toFixed(1);
+  };
+
+  const handleConfirmDelete = (m: BodyMeasurement) => {
+    const displayDate = formatDateToListDisplay(m.date);
+    const displayWeight = m.weightKg ? ` (${formatFixedWeight(m.weightKg)} kg)` : '';
+    Alert.alert(
+      'Supprimer la mesure',
+      `Voulez-vous vraiment supprimer la mesure du ${displayDate}${displayWeight} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => onDeleteMeasurement(m.id),
+        },
+      ]
+    );
   };
 
   return (
@@ -223,34 +253,68 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
           Aucune mesure enregistrée. Cliquez sur + pour en ajouter.
         </Text>
       ) : (
-        sortedMeasurements.map((m) => (
-          <View key={m.id} style={[styles.mRow, { borderBottomColor: theme.border }]}>
-            <Text style={[styles.mDate, { color: theme.textMuted }]}>
-              {formatDateToListDisplay(m.date)}
-            </Text>
-            <View style={styles.mStats}>
-              <Text style={[styles.mVal, { color: theme.text }]}>{m.weightKg ? formatWeight(m.weightKg) : ''} kg</Text>
-              {m.chestCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>P: {formatWeight(m.chestCm)}cm</Text>}
-              {m.thighCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>C: {formatWeight(m.thighCm)}cm</Text>}
-              {m.bicepsCm !== undefined && <Text style={[styles.mSub, { color: theme.textMuted }]}>B: {formatWeight(m.bicepsCm)}cm</Text>}
+        sortedMeasurements.map((m) => {
+          const secondaryParts: string[] = [];
+          if (m.chestCm !== undefined) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
+          if (m.thighCm !== undefined) secondaryParts.push(`C ${formatFixedMeasurement(m.thighCm)}`);
+          if (m.bicepsCm !== undefined) secondaryParts.push(`B ${formatFixedMeasurement(m.bicepsCm)}`);
+          const secondarySummary = secondaryParts.join(' · ');
 
+          return (
+            <View key={m.id} style={[styles.mCompactRow, { borderBottomColor: theme.border }]}>
+              {/* Zone principale cliquable sur toute la ligne pour ouvrir la modification */}
               <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => handleEditMeasurement(m)}
-                style={{ marginLeft: 10, marginRight: 2 }}
+                style={styles.mClickableZone}
                 accessibilityLabel="Modifier cette mesure"
               >
-                <Edit2 size={15} color={theme.accent} />
+                <Text style={[styles.mDate, { color: theme.textMuted }]}>
+                  {formatDateToListDisplay(m.date)}
+                </Text>
+
+                {m.weightKg !== undefined && (
+                  <Text style={[styles.mWeight, { color: theme.text }]}>
+                    {formatFixedWeight(m.weightKg)}
+                    <Text style={[styles.mUnit, { color: theme.textMuted }]}> kg</Text>
+                  </Text>
+                )}
+
+                {secondarySummary.length > 0 && (
+                  <Text
+                    style={[styles.mSecondarySummary, { color: theme.textMuted }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {secondarySummary}
+                  </Text>
+                )}
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => onDeleteMeasurement(m.id)}
-                style={{ marginLeft: 6 }}
-                accessibilityLabel="Supprimer cette mesure"
-              >
-                <Trash2 size={15} color={theme.danger} />
-              </TouchableOpacity>
+
+              {/* Boutons d'action compacts à droite : Edit et Delete */}
+              <View style={styles.mActions}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleEditMeasurement(m)}
+                  style={styles.miniActionBtn}
+                  accessibilityLabel="Modifier cette mesure"
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <Edit2 size={14} color={theme.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleConfirmDelete(m)}
+                  style={styles.miniActionBtn}
+                  accessibilityLabel="Supprimer cette mesure"
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <Trash2 size={14} color={theme.danger} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))
+          );
+        })
       )}
 
       {/* ---------------- MODALE POP-UP DE SAISIE AVEC CALENDRIER REPLIABLE ---------------- */}
@@ -493,29 +557,47 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 10,
   },
-  mRow: {
+  mCompactRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 7,
     borderBottomWidth: 1,
   },
-  mDate: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  mStats: {
+  mClickableZone: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginRight: 8,
   },
-  mVal: {
-    fontSize: 14,
-    fontWeight: '800',
-    marginRight: 4,
-  },
-  mSub: {
+  mDate: {
     fontSize: 12,
-    marginLeft: 4,
+    fontWeight: '600',
+  },
+  mWeight: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  mUnit: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  mSecondarySummary: {
+    fontSize: 11,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  mActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  miniActionBtn: {
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   /* Modale Styles */
   modalOverlay: {

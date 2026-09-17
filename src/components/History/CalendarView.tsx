@@ -97,8 +97,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const monthStr = (currentMonthIndex + 1).toString().padStart(2, '0');
 
-  // Filtrer les séances pour le mois en cours
-  const workoutDates = history.map((s) => s.startTime.split('T')[0]);
+  // Filtrer les séances pour le mois affiché
+  const currentMonthPrefix = `${currentYear}-${monthStr}`;
+  const monthSessions = history.filter((s) => s.startTime.startsWith(currentMonthPrefix));
+  const monthWorkoutsCount = monthSessions.length;
+  const workoutDates = monthSessions.map((s) => s.startTime.split('T')[0]);
 
   const handleDayPress = (dateStr: string, hasWorkout: boolean) => {
     setSelectedDate(dateStr);
@@ -138,7 +141,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
             </Text>
           </TouchableOpacity>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            {workoutDates.length} séances réalisées
+            {monthWorkoutsCount} {monthWorkoutsCount > 1 ? 'séances réalisées' : 'séance réalisée'}
           </Text>
         </View>
 
