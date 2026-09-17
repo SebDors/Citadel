@@ -11,21 +11,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeDefinition } from '../../constants/colors';
 import { Palette, X, Moon, Sun, Check } from 'lucide-react-native';
 import { Button } from './Button';
+import { getContrastTextColor } from '../../utils/colorUtils';
 
 interface ThemeSelectorModalProps {
   visible: boolean;
   onClose: () => void;
 }
-
-const getContrastTextColor = (hex: string): string => {
-  if (!hex || hex.length < 6) return '#FFFFFF';
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.substring(0, 2), 16) || 0;
-  const g = parseInt(clean.substring(2, 4), 16) || 0;
-  const b = parseInt(clean.substring(4, 6), 16) || 0;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.55 ? '#0B0E14' : '#FFFFFF';
-};
 
 export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   visible,
@@ -207,13 +198,6 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                       ))}
                     </View>
                   </View>
-
-                  <Text
-                    style={[styles.themeDescription, { color: theme.textMuted }]}
-                    numberOfLines={2}
-                  >
-                    {t.description}
-                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -309,13 +293,13 @@ const styles = StyleSheet.create({
   },
   themeCard: {
     borderRadius: 14,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   themeCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
   },
   themeTitleRow: {
     flexDirection: 'row',
@@ -329,7 +313,7 @@ const styles = StyleSheet.create({
   themeSubtitle: {
     fontSize: 11,
     fontWeight: '600',
-    marginTop: 1,
+    marginTop: 2,
   },
   selectedBadge: {
     width: 18,
@@ -349,12 +333,6 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     borderWidth: 1,
-  },
-  themeDescription: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-    lineHeight: 15,
   },
   footer: {
     marginTop: 12,

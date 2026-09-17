@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Check, Trash2, X, Plus, CornerDownRight } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 import { parseFloatFrench } from '../../utils/numberUtils';
+import { getContrastTextColor } from '../../utils/colorUtils';
 
 interface SetTableRowProps {
   set: WorkoutSet;
@@ -296,7 +297,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
             },
           ]}
         >
-          {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
+          {set.completed && (
+            <Check
+              size={16}
+              color={getContrastTextColor(theme.success || '#618764')}
+              strokeWidth={3}
+            />
+          )}
         </TouchableOpacity>
 
         {/* Suppression de la série */}
