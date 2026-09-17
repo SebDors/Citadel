@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, StatusBar as RNStatusBar, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkout } from '../../src/context/WorkoutContext';
@@ -7,12 +7,14 @@ import { ProfileHeaderCard } from '../../src/components/Profile/ProfileHeaderCar
 import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { ModularMeasurementChartCard } from '../../src/components/Profile/ModularMeasurementChartCard';
 import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
-import { Sun, Moon } from 'lucide-react-native';
+import { ThemeSelectorModal } from '../../src/components/UI/ThemeSelectorModal';
+import { Palette } from 'lucide-react-native';
 import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 
 export default function ProfileTab() {
   const { data, addMeasurement, deleteMeasurement, updateUserProfile } = useWorkout();
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { theme } = useTheme();
+  const [themeModalVisible, setThemeModalVisible] = useState(false);
 
   if (!data) return null;
 
@@ -20,7 +22,7 @@ export default function ProfileTab() {
     <TabSwipeWrapper tabIndex={2}>
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Page Header avec bouton de bascule Thème (Soleil / Lune) dans l'angle supérieur droit */}
+        {/* Page Header avec bouton de sélection Thème dans l'angle supérieur droit */}
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
             <View style={{ flex: 1 }}>
@@ -32,11 +34,11 @@ export default function ProfileTab() {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={toggleTheme}
+              onPress={() => setThemeModalVisible(true)}
               style={[styles.themeToggleBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              accessibilityLabel="Basculer le thème"
+              accessibilityLabel="Choisir un thème"
             >
-              {isDark ? <Sun size={20} color={theme.accent} /> : <Moon size={20} color={theme.accent} />}
+              <Palette size={20} color={theme.accent} />
             </TouchableOpacity>
           </View>
         </View>
@@ -57,6 +59,12 @@ export default function ProfileTab() {
           onDeleteMeasurement={deleteMeasurement}
         />
       </ScrollView>
+
+      {/* Modale de sélection de Thème & Mode */}
+      <ThemeSelectorModal
+        visible={themeModalVisible}
+        onClose={() => setThemeModalVisible(false)}
+      />
     </SafeAreaView>
     </TabSwipeWrapper>
   );
