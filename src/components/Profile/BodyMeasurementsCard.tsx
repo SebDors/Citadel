@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { parseFloatFrench, formatWeight } from '../../utils/numberUtils';
+import { parseFloatFrench } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import {
@@ -195,31 +195,32 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     });
   };
 
-  // Formatage pour l'affichage de la date dans la liste (ex: 2026-08-30 -> 30/08/2026)
+  // Formatage pour l'affichage de la date dans la liste (ex: 2026-08-30 -> 30/08/26)
   const formatDateToListDisplay = (dateStr: string): string => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       const [year, month, day] = parts;
-      return `${day}/${month}/${year}`;
+      return `${day}/${month}/${year.slice(-2)}`;
     }
     return dateStr;
   };
 
-  // Formatage pour l'affichage de la date courte (ex: 2026-08-30 -> 30/08)
-  const formatShortDate = (dateStr: string): string => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const [, month, day] = parts;
-      return `${day}/${month}`;
-    }
-    return dateStr;
+  // Toujours 2 chiffres après la virgule pour le poids (ex: 75.00, 82.50)
+  const formatFixedWeight = (val?: number | null): string => {
+    if (val === undefined || val === null || isNaN(val)) return '-';
+    return Number(val).toFixed(2);
+  };
+
+  // Toujours 1 chiffre après la virgule pour les mensurations (ex: 102.0, 38.5)
+  const formatFixedMeasurement = (val?: number | null): string => {
+    if (val === undefined || val === null || isNaN(val)) return '-';
+    return Number(val).toFixed(1);
   };
 
   const handleConfirmDelete = (m: BodyMeasurement) => {
     const displayDate = formatDateToListDisplay(m.date);
-    const displayWeight = m.weightKg ? ` (${formatWeight(m.weightKg)} kg)` : '';
+    const displayWeight = m.weightKg ? ` (${formatFixedWeight(m.weightKg)} kg)` : '';
     Alert.alert(
       'Supprimer la mesure',
       `Voulez-vous vraiment supprimer la mesure du ${displayDate}${displayWeight} ?`,
@@ -254,22 +255,27 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       ) : (
         sortedMeasurements.map((m) => {
           const secondaryParts: string[] = [];
-          if (m.chestCm !== undefined) secondaryParts.push(`P ${formatWeight(m.chestCm)}`);
-          if (m.thighCm !== undefined) secondaryParts.push(`C ${formatWeight(m.thighCm)}`);
-          if (m.bicepsCm !== undefined) secondaryParts.push(`B ${formatWeight(m.bicepsCm)}`);
+          if (m.chestCm !== undefined) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
+          if (m.thighCm !== undefined) secondaryParts.push(`C ${formatFixedMeasurement(m.thighCm)}`);
+          if (m.bicepsCm !== undefined) secondaryParts.push(`B ${formatFixedMeasurement(m.bicepsCm)}`);
           const secondarySummary = secondaryParts.join(' · ');
 
           return (
             <View key={m.id} style={[styles.mCompactRow, { borderBottomColor: theme.border }]}>
-              {/* Contenu gauche : Date courte, Poids principal et Mensurations condensées */}
-              <View style={styles.mLeftContent}>
+              {/* Zone principale cliquable sur toute la ligne pour ouvrir la modification */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleEditMeasurement(m)}
+                style={styles.mClickableZone}
+                accessibilityLabel="Modifier cette mesure"
+              >
                 <Text style={[styles.mDate, { color: theme.textMuted }]}>
-                  {formatShortDate(m.date)}
+                  {formatDateToListDisplay(m.date)}
                 </Text>
 
                 {m.weightKg !== undefined && (
                   <Text style={[styles.mWeight, { color: theme.text }]}>
-                    {formatWeight(m.weightKg)}
+                    {formatFixedWeight(m.weightKg)}
                     <Text style={[styles.mUnit, { color: theme.textMuted }]}> kg</Text>
                   </Text>
                 )}
@@ -283,7 +289,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                     {secondarySummary}
                   </Text>
                 )}
-              </View>
+              </TouchableOpacity>
 
               {/* Boutons d'action compacts à droite : Edit et Delete */}
               <View style={styles.mActions}>
@@ -558,7 +564,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderBottomWidth: 1,
   },
-  mLeftContent: {
+  mClickableZone: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
