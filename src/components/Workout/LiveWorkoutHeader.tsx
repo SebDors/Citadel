@@ -1,8 +1,14 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from "react-native";
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
-import { CheckCircle, RotateCw, Timer, Pause } from "lucide-react-native";
+import { Pause, Play } from "lucide-react-native";
+import {
+  SWISS_COLORS,
+  SWISS_TYPOGRAPHY,
+  SWISS_GRID,
+} from "../../constants/swissTheme";
+import { SwissDivider } from "../Swiss";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -24,175 +30,178 @@ interface LiveWorkoutHeaderProps {
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
   circuitInfo,
+  onTogglePause,
 }) => {
-  const { theme } = useTheme();
+  const { isDark } = useTheme();
+  const palette = isDark ? SWISS_COLORS.dark : SWISS_COLORS.light;
 
-  const pauseAnim = useRef(new Animated.Value(1)).current;
+  const [elapsed, setElapsed] = useState<number>(() => {
+    if (!session.hasStarted || !session.startTime) return 0;
+    if (session.isPaused) return session.durationSeconds || 0;
+    return Math.max(0, Math.floor((Date.now() - new Date(session.startTime).getTime()) / 1000));
+  });
 
   useEffect(() => {
-    if (session.isPaused) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pauseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-          Animated.timing(pauseAnim, { toValue: 1, duration: 800, useNativeDriver: true })
-        ])
-      ).start();
-    } else {
-      pauseAnim.setValue(1);
-    }
-  }, [session.isPaused, pauseAnim]);
-
-  const formatMinutesSeconds = (totalSeconds: number = 0): string => {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  const renderSetsBadge = () => {
-    if (circuitInfo?.isCircuit) {
-      if (circuitInfo.isAmrap) {
-        return (
-          <View
-            style={[
-              styles.setsPillBadge,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-          >
-            <Timer size={13} color={theme.accent} />
-            <Text style={[styles.setsPillText, { color: theme.text }]}>
-              {formatMinutesSeconds(circuitInfo.amrapSecondsLeft ?? 0)}
-            </Text>
-          </View>
-        );
-      }
-      return (
-        <View
-          style={[
-            styles.setsPillBadge,
-            { backgroundColor: theme.cardBg, borderColor: theme.border },
-          ]}
-        >
-          <RotateCw size={13} color={theme.accent} />
-          <Text style={[styles.setsPillText, { color: theme.text }]}>
-            {circuitInfo.currentRound}/{circuitInfo.totalRounds} tours
-          </Text>
-        </View>
-      );
+    if (!session.hasStarted || session.isPaused) {
+      setElapsed(session.durationSeconds || 0);
+      return;
     }
 
-    return (
-      <View
-        style={[
-          styles.setsPillBadge,
-          { backgroundColor: theme.cardBg, borderColor: theme.border },
-        ]}
-      >
-        <CheckCircle size={13} color={theme.accent} />
-        <Text style={[styles.setsPillText, { color: theme.text }]}>
-          {session.completedSetsCount || 0}/{session.totalSetsCount || 0} séries
-        </Text>
-      </View>
-    );
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const start = new Date(session.startTime).getTime();
+      setElapsed(Math.max(0, Math.floor((now - start) / 1000)));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session.hasStarted, session.startTime, session.isPaused, session.durationSeconds]);
+
+  const formatTimer = (totalSecs: number = 0): string => {
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
   };
+
+  const volumeStr = session.totalVolumeKg
+    ? session.totalVolumeKg.toLocaleString('fr-FR')
+    : '0';
+
+  const completedSets = session.completedSetsCount || 0;
+  const totalSets = session.totalSetsCount || 0;
 
   return (
-    <View
-      style={[
-        styles.headerContainer,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}
-    >
-      <View style={styles.singleRow}>
-        {/* Titre de la séance à Gauche */}
-        <View style={styles.titleBox}>
-          <Text
-            style={[styles.title, { color: theme.text }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {session.title}
+    <View style={styles.container}>
+      {/* 1. LIGNE SUPÉRIEURE DE TITRE // STATUT */}
+      <View style={styles.topStatusRow}>
+        <Text style={[styles.sessionTitle, { color: palette.text }]}>
+          {session.title.toUpperCase()}
+        </Text>
+        {session.isPaused ? (
+          <View style={styles.pauseIndicator}>
+            <Text style={[styles.pauseText, { color: palette.accent }]}>
+              EN PAUSE
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* 2. CHRONOMÈTRE MONUMENTAL (48px - 56px) */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={onTogglePause}
+        style={styles.timerRow}
+      >
+        <Text
+          style={[
+            styles.monumentalTimer,
+            { color: palette.text, fontFamily: SWISS_TYPOGRAPHY.fonts.sans },
+          ]}
+        >
+          {formatTimer(elapsed)}
+        </Text>
+        <View style={styles.pauseIconBox}>
+          {session.isPaused ? (
+            <Play size={18} color={palette.accent} />
+          ) : (
+            <Pause size={18} color={palette.textDimmed} />
+          )}
+        </View>
+      </TouchableOpacity>
+
+      <SwissDivider subtle style={{ marginVertical: 10 }} />
+
+      {/* 3. TÉLÉMÉTRIE DUAL (VOLUME & SÉRIES) */}
+      <View style={styles.metricsRow}>
+        <View style={styles.metricCol}>
+          <Text style={[styles.metricLabel, { color: palette.textMuted }]}>
+            VOLUME CUMULÉ
+          </Text>
+          <Text style={[styles.metricValue, { color: palette.text }]}>
+            {volumeStr}
+            <Text style={[styles.metricUnit, { color: palette.accent }]}> KG</Text>
           </Text>
         </View>
 
-        {/* Badge "EN PAUSE" au centre si la séance est en pause */}
-        {session.isPaused && session.hasStarted !== false && (
-          <View style={styles.centerBadgeContainer}>
-            <Animated.View style={[styles.pauseBadge, { backgroundColor: `${theme.danger}20`, borderColor: theme.danger, opacity: pauseAnim }]}>
-              <Pause size={11} color={theme.danger} fill={theme.danger} style={{ marginRight: 4 }} />
-              <Text style={[styles.pauseText, { color: theme.danger }]}>EN PAUSE</Text>
-            </Animated.View>
-          </View>
-        )}
+        <SwissDivider vertical subtle style={{ height: 28 }} />
 
-        {/* Badge pilule des séries avec mention 'séries' à Droite */}
-        <View style={styles.rightGroup}>
-          {renderSetsBadge()}
+        <View style={styles.metricCol}>
+          <Text style={[styles.metricLabel, { color: palette.textMuted }]}>
+            {circuitInfo?.isCircuit ? 'TOURS EXÉCUTÉS' : 'PROGRESSION SÉRIES'}
+          </Text>
+          <Text style={[styles.metricValue, { color: palette.text }]}>
+            {circuitInfo?.isCircuit
+              ? `${circuitInfo.currentRound} / ${circuitInfo.totalRounds}`
+              : `${completedSets} / ${totalSets}`}
+          </Text>
         </View>
       </View>
+
+      <SwissDivider subtle style={{ marginTop: 10 }} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginBottom: 0,
-    elevation: 8,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+  container: {
+    width: '100%',
+    paddingBottom: 4,
   },
-  singleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  topStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  titleBox: {
-    flex: 1,
-    flexShrink: 1,
-    marginRight: 6,
+  sessionTitle: {
+    fontSize: SWISS_TYPOGRAPHY.label,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
-  title: {
-    fontSize: 17,
-    fontWeight: "900",
-    textAlign: "left",
-  },
-  centerBadgeContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 6,
-  },
-  rightGroup: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-  },
-  setsPillBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  setsPillText: {
-    fontSize: 11.5,
-    fontWeight: "800",
-  },
-  pauseBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
+  pauseIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   pauseText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 12,
+  },
+  monumentalTimer: {
+    fontSize: SWISS_TYPOGRAPHY.display,
+    fontWeight: '900',
+    letterSpacing: SWISS_TYPOGRAPHY.letterSpacingDisplay,
+    lineHeight: 62,
+  },
+  pauseIconBox: {
+    paddingBottom: 8,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  metricCol: {
+    flex: 1,
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  metricUnit: {
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: '800',
   },
 });

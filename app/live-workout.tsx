@@ -234,6 +234,7 @@ export default function LiveWorkoutScreen() {
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(
     new Set(),
   );
+  const [activeStageIndex, setActiveStageIndex] = useState(0);
   
   const { reorderActiveSessionBlocks } = useWorkout();
 
@@ -269,6 +270,12 @@ export default function LiveWorkoutScreen() {
     if (!activeSession) return [];
     return getSessionBlocks(activeSession);
   }, [activeSession]);
+
+  const safeStageIndex =
+    blocks.length > 0
+      ? Math.min(Math.max(0, activeStageIndex), blocks.length - 1)
+      : 0;
+  const activeBlock = blocks[safeStageIndex];
 
   // Helper to get state of a specific CircuitBlock
   const getCircuitState = (block: CircuitBlock): CircuitState => {
@@ -784,32 +791,174 @@ export default function LiveWorkoutScreen() {
           {activeSession.hasStarted === false && (
             <TouchableOpacity
               activeOpacity={0.85}
-              style={[
-                styles.startSessionBanner,
-                { backgroundColor: theme.accent },
-              ]}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                backgroundColor: "#FF2A2A",
+                marginTop: 8,
+                marginBottom: 8,
+              }}
               onPress={startSessionTimer}
             >
-              <View style={styles.startSessionIconCircle}>
-                <Play size={18} color={theme.accent} fill={theme.accent} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.startSessionBannerTitle}>
-                  Commencer la séance
-                </Text>
-                <Text style={styles.startSessionBannerSub}>
-                  Préparez vos exercices puis appuyez pour lancer le chrono
-                </Text>
-              </View>
-              <ChevronRight size={20} color="#FFFFFF" />
+              <Text
+                style={{
+                  fontFamily: "monospace",
+                  fontWeight: "900",
+                  fontSize: 12,
+                  color: "#FFFFFF",
+                  letterSpacing: 1,
+                }}
+              >
+                → DÉMARRER LE CHRONOMÈTRE DE SÉANCE
+              </Text>
+              <Play size={16} color="#FFFFFF" fill="#FFFFFF" />
             </TouchableOpacity>
           )}
 
 
         </View>
 
-        {/* 2. Rendu séquentiel des Blocs (Exercices Individuels & Circuits) */}
-        {blocks.map((block, blockIdx) => {
+        {/* 2. Navigation Stage Viewport (Swiss Editorial) */}
+        {blocks.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            {/* Stepper Header */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingVertical: 12,
+                borderBottomWidth: 0.5,
+                borderBottomColor: theme.border,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setActiveStageIndex((prev) => Math.max(0, prev - 1))}
+                disabled={safeStageIndex === 0}
+                style={{
+                  opacity: safeStageIndex === 0 ? 0.25 : 1,
+                  paddingVertical: 4,
+                  paddingRight: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: theme.text,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  ← PRÉCÉDENT
+                </Text>
+              </TouchableOpacity>
+
+              <Text
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                  fontWeight: "900",
+                  color: "#FF2A2A",
+                  letterSpacing: 1.5,
+                }}
+              >
+                STAGE {String(safeStageIndex + 1).padStart(2, "0")} / {String(blocks.length).padStart(2, "0")}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setActiveStageIndex((prev) => Math.min(blocks.length - 1, prev + 1))
+                }
+                disabled={safeStageIndex === blocks.length - 1}
+                style={{
+                  opacity: safeStageIndex === blocks.length - 1 ? 0.25 : 1,
+                  paddingVertical: 4,
+                  paddingLeft: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: theme.text,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  SUIVANT →
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Stage Horizon Selector */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginTop: 8 }}
+              contentContainerStyle={{ gap: 16, paddingVertical: 4 }}
+            >
+              {blocks.map((blk, idx) => {
+                const isCurrent = idx === safeStageIndex;
+                const name =
+                  blk.type === "single"
+                    ? blk.exercise.exerciseName
+                    : blk.circuitType === "amrap"
+                      ? "AMRAP"
+                      : "CIRCUIT";
+                return (
+                  <TouchableOpacity
+                    key={blk.id || idx}
+                    onPress={() => setActiveStageIndex(idx)}
+                    style={{
+                      paddingBottom: 6,
+                      borderBottomWidth: isCurrent ? 2 : 0,
+                      borderBottomColor: "#FF2A2A",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 11,
+                        fontWeight: isCurrent ? "900" : "600",
+                        color: isCurrent ? theme.text : theme.textMuted,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {String(idx + 1).padStart(2, "0")}. {name.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* 3. Rendu focal du bloc actif (Stage Viewport) */}
+        {(() => {
+          if (!activeBlock) {
+            return (
+              <View style={{ paddingVertical: 48, alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color: theme.textMuted,
+                    letterSpacing: 1,
+                    marginBottom: 12,
+                  }}
+                >
+                  AUCUN EXERCICE DANS CETTE SÉANCE
+                </Text>
+              </View>
+            );
+          }
+          const block = activeBlock;
+          const blockIdx = safeStageIndex;
           if (block.type === "single") {
             const ex = block.exercise;
             return (
@@ -823,7 +972,10 @@ export default function LiveWorkoutScreen() {
                 onAddSet={() => addSet(ex.id)}
                 onRemoveSet={(setId) => removeSet(ex.id, setId)}
                 onDuplicateExercise={() => duplicateExercise(ex.id)}
-                onRemoveExercise={() => removeExercise(ex.id)}
+                onRemoveExercise={() => {
+                  removeExercise(ex.id);
+                  setActiveStageIndex((prev) => Math.max(0, prev - 1));
+                }}
                 onUpdateRestTime={(newRest) =>
                   updateExerciseRestTime(ex.id, newRest)
                 }
@@ -1417,77 +1569,128 @@ export default function LiveWorkoutScreen() {
             );
           }
           return null;
-        })}
+        })()}
 
-        {/* BOUTONS JUMEAUX AU BAS DE LA SÉANCE (+ EXERCICE & + CIRCUIT) */}
-        <View style={styles.twinButtonsRow}>
-          {/* [Exercice] (Contour pointillé accent) */}
+        {/* 4. Actions Suisses Typographiques & Fin de Séance */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            borderTopWidth: 0.5,
+            borderTopColor: theme.border,
+            paddingTop: 16,
+            marginTop: 24,
+            marginBottom: 20,
+          }}
+        >
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[
-              styles.twinBtn,
-              {
-                borderColor: theme.accent,
-                backgroundColor: theme.cardBg,
-              },
-            ]}
             onPress={() => {
               setTargetCircuitBlockId(null);
               setShowAddExModal(true);
             }}
+            style={{ paddingVertical: 6 }}
           >
-            <Plus size={16} color={theme.accent} style={{ marginRight: 6 }} />
-            <Text style={[styles.twinBtnText, { color: theme.accent }]}>
-              Exercice
+            <Text
+              style={{
+                fontFamily: "monospace",
+                fontSize: 11,
+                fontWeight: "700",
+                color: theme.text,
+                letterSpacing: 1,
+              }}
+            >
+              [ + EXERCICE ]
             </Text>
           </TouchableOpacity>
 
-          {/* [Circuit] (Contour pointillé accent) */}
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[
-              styles.twinBtn,
-              {
-                borderColor: theme.accent,
-                backgroundColor: theme.surface,
-              },
-            ]}
             onPress={addCircuitToActiveWorkout}
+            style={{ paddingVertical: 6 }}
           >
-            <Plus size={16} color={theme.accent} style={{ marginRight: 4 }} />
-            <Zap size={16} color={theme.accent} style={{ marginRight: 6 }} />
-            <Text style={[styles.twinBtnText, { color: theme.accent }]}>
-              Circuit
+            <Text
+              style={{
+                fontFamily: "monospace",
+                fontSize: 11,
+                fontWeight: "700",
+                color: theme.text,
+                letterSpacing: 1,
+              }}
+            >
+              [ + CIRCUIT ]
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowReorderModal(true)}
+            style={{ paddingVertical: 6 }}
+          >
+            <Text
+              style={{
+                fontFamily: "monospace",
+                fontSize: 11,
+                fontWeight: "700",
+                color: theme.textMuted,
+                letterSpacing: 1,
+              }}
+            >
+              [ RÉORGANISER ]
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Bouton Terminer l'entraînement (Cliquable à tout moment, vert/accent si tous les blocs sont complétés) */}
-        <Button
-          title="Terminer la séance"
-          variant={isAllCompleted ? "primary" : "outline"}
+        {/* Déclencheur Monumental : TERMINER LA SÉANCE */}
+        <TouchableOpacity
+          activeOpacity={0.85}
           onPress={handleFinish}
-          icon={
-            <Check size={18} color={isAllCompleted ? "#FFFFFF" : theme.text} />
-          }
-          style={{ marginTop: 10 }}
-        />
+          style={{
+            borderWidth: 1,
+            borderColor: isAllCompleted ? "#FF2A2A" : theme.border,
+            backgroundColor: isAllCompleted ? "#FF2A2A" : "transparent",
+            paddingVertical: 18,
+            paddingHorizontal: 20,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "monospace",
+              fontWeight: "900",
+              fontSize: 13,
+              letterSpacing: 1.5,
+              color: isAllCompleted ? "#FFFFFF" : theme.text,
+            }}
+          >
+            → TERMINER LA SÉANCE
+          </Text>
+          <Check size={18} color={isAllCompleted ? "#FFFFFF" : theme.text} />
+        </TouchableOpacity>
 
-        {/* Bouton Abandonner la séance (Texte rouge centré sans contour) */}
+        {/* Déclencheur Discret : ABANDONNER */}
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handleCancel}
           style={{
-            paddingVertical: 14,
+            paddingVertical: 12,
             alignItems: "center",
-            marginTop: 6,
-            marginBottom: 10,
+            marginBottom: 40,
           }}
         >
           <Text
-            style={{ color: theme.danger, fontSize: 15, fontWeight: "700" }}
+            style={{
+              fontFamily: "monospace",
+              color: "#FF2A2A",
+              fontSize: 11,
+              fontWeight: "700",
+              letterSpacing: 1,
+            }}
           >
-            Abandonner la séance
+            ABANDONNER LA SÉANCE
           </Text>
         </TouchableOpacity>
       </ScrollView>

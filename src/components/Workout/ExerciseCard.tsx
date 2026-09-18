@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
 import { WorkoutExercise, WorkoutSet } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { Card } from '../UI/Card';
-import { Badge } from '../UI/Badge';
-import { Button } from '../UI/Button';
 import { SetTableRow } from './SetTableRow';
-import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw } from 'lucide-react-native';
+import { Plus, Clock, Copy, Trash2, Layers, MoreHorizontal, X } from 'lucide-react-native';
+import {
+  SWISS_COLORS,
+  SWISS_TYPOGRAPHY,
+  SWISS_GRID,
+} from '../../constants/swissTheme';
+import { SwissDivider } from '../Swiss';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -31,7 +34,9 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   onUpdateRestTime,
   onSetSupersetGroup,
 }) => {
-  const { theme } = useTheme();
+  const { isDark } = useTheme();
+  const palette = isDark ? SWISS_COLORS.dark : SWISS_COLORS.light;
+
   const [showMenu, setShowMenu] = useState(false);
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
@@ -45,82 +50,89 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
     setShowRestModal(false);
   };
 
+  const musclesStr = [exercise.primaryMuscle, ...exercise.targetMuscles]
+    .filter(Boolean)
+    .join(' · ')
+    .toUpperCase();
+
   return (
-    <Card
-      style={[
-        styles.cardContainer,
-        exercise.supersetGroup ? { borderColor: theme.supersetTag, borderWidth: 2 } : undefined,
-      ]}
-    >
+    <View style={styles.container}>
       {/* Superset Group Badge Header */}
       {exercise.supersetGroup && (
-        <View style={[styles.supersetHeader, { backgroundColor: theme.supersetTag }]}>
-          <Layers size={14} color="#FFFFFF" />
-          <Text style={styles.supersetText}>{exercise.supersetGroup}</Text>
+        <View style={styles.supersetHeader}>
+          <Text style={[styles.supersetText, { color: palette.accent }]}>
+            SUPERSET // {exercise.supersetGroup.toUpperCase()}
+          </Text>
         </View>
       )}
 
       {/* Exercise Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleArea}>
-          <View style={styles.titleRow}>
-            <Dumbbell size={18} color={theme.accent} style={{ marginRight: 6 }} />
-            <Text style={[styles.exerciseName, { color: theme.text }]}>{exercise.exerciseName}</Text>
-          </View>
-
-          {/* Muscles travaillés (Affichage compact en 1 ou 2 lignes) */}
-          <View style={styles.musclesRow}>
-            <Badge label={exercise.primaryMuscle} variant="accent" style={styles.miniBadge} />
-            {exercise.targetMuscles.slice(0, 2).map((muscle, idx) => (
-              <Badge key={idx} label={muscle} variant="secondary" style={styles.miniBadge} />
-            ))}
-          </View>
+          <Text
+            style={[
+              styles.exerciseName,
+              { color: palette.text, fontFamily: SWISS_TYPOGRAPHY.fonts.sans },
+            ]}
+          >
+            {exercise.exerciseName.toUpperCase()}
+          </Text>
+          <Text style={[styles.musclesText, { color: palette.textMuted }]}>
+            {musclesStr || 'GÉNÉRAL'}
+          </Text>
         </View>
 
-        {/* Rest Timer (Cliquable pour modifier!) & Options */}
+        {/* Rest Timer (Cliquable) & Options */}
         <View style={styles.headerRight}>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setShowRestModal(true)}
-            style={[styles.restBadge, { borderColor: theme.accent, backgroundColor: theme.surface }]}
+            style={styles.restBadge}
           >
-            <Clock size={12} color={theme.accent} />
-            <Text style={[styles.restText, { color: theme.accent }]}>{exercise.restSeconds}s</Text>
+            <Clock size={12} color={palette.textMuted} style={{ marginRight: 4 }} />
+            <Text style={[styles.restText, { color: palette.textMuted }]}>
+              {exercise.restSeconds || 75}S
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowMenu(true)} style={styles.menuButton}>
-            <MoreVertical size={20} color={theme.text} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowMenu(true)}
+            style={styles.menuButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.optionsLabel, { color: palette.textMuted }]}>
+              OPTIONS //
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Table Header */}
-      <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
+      {/* Table Header (Hairline Swiss Grid) */}
+      <View style={[styles.tableHeader, { borderBottomColor: palette.border }]}>
         <View style={{ width: 30, marginRight: 4, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>#</Text>
+          <Text style={[styles.thText, { color: palette.textMuted }]}>SET</Text>
         </View>
         <View style={{ flex: 1.2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>PREV</Text>
+          <Text style={[styles.thText, { color: palette.textMuted }]}>PRÉV</Text>
         </View>
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>KG</Text>
+          <Text style={[styles.thText, { color: palette.textMuted }]}>KG</Text>
         </View>
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>REPS</Text>
+          <Text style={[styles.thText, { color: palette.textMuted }]}>REPS</Text>
         </View>
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>RIR</Text>
+          <Text style={[styles.thText, { color: palette.textMuted }]}>RIR</Text>
         </View>
-        <View style={{ width: 38, marginLeft: 4, alignItems: 'center' }}>
-          <Text numberOfLines={1} style={[styles.thText, { color: theme.textMuted, fontSize: 10 }]}>
-            Check
-          </Text>
+        <View style={{ width: 34, marginLeft: 6, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: palette.accent }]}>✓</Text>
         </View>
         <View style={{ width: 24, marginLeft: 4 }} />
       </View>
 
-      {/* Set Table Rows */}
-      {exercise.sets.map((set) => (
+      {/* Sets Rows */}
+      {exercise.sets.map((set, idx) => (
         <SetTableRow
           key={set.id}
           set={set}
@@ -131,67 +143,54 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
         />
       ))}
 
-      {/* Add Set Button */}
+      {/* Add Set Button (Typographic Link) */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onAddSet}
-        style={[styles.addSetButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        style={styles.addSetButton}
       >
-        <Plus size={16} color={theme.accent} />
-        <Text style={[styles.addSetText, { color: theme.accent }]}>Ajouter une série</Text>
+        <Plus size={14} color={palette.accent} style={{ marginRight: 6 }} />
+        <Text style={[styles.addSetText, { color: palette.accent }]}>
+          AJOUTER UNE SÉRIE
+        </Text>
       </TouchableOpacity>
 
-      {/* Modal Édition Temps de Repos (Steppers +/- 15s et Reset à gauche) */}
-      <Modal visible={showRestModal} transparent animationType="fade" onRequestClose={() => setShowRestModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRestModal(false)}>
-          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, alignItems: 'center' }]}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Temps de repos exercice</Text>
-            
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
-              {exercise.restSeconds !== 75 && (
-                <TouchableOpacity
-                  style={[styles.smallStepperBtn, { backgroundColor: theme.surface, borderColor: theme.border, marginRight: 8 }]}
-                  onPress={() => onUpdateRestTime(75)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <RotateCcw size={16} color={theme.textMuted} />
-                </TouchableOpacity>
-              )}
+      <SwissDivider subtle style={{ marginTop: 24 }} />
 
-              <TouchableOpacity
-                style={[styles.stepperActionBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => onUpdateRestTime(Math.max(0, (exercise.restSeconds || 75) - 15))}
-              >
-                <Text style={[styles.stepperActionText, { color: theme.text }]}>-15s</Text>
-              </TouchableOpacity>
-
-              <Text style={[styles.restDisplayValue, { color: theme.accent }]}>
-                {exercise.restSeconds || 75}s
+      {/* Options Menu Modal */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: palette.text }]}>
+                {exercise.exerciseName.toUpperCase()}
               </Text>
-
-              <TouchableOpacity
-                style={[styles.stepperActionBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => onUpdateRestTime((exercise.restSeconds || 75) + 15)}
-              >
-                <Text style={[styles.stepperActionText, { color: theme.text }]}>+15s</Text>
+              <TouchableOpacity onPress={() => setShowMenu(false)}>
+                <X size={18} color={palette.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <Button
-              title="Fermer"
-              variant="primary"
-              onPress={() => setShowRestModal(false)}
-              style={{ width: '100%', marginTop: 8 }}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Options Menu Modal */}
-      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
-          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>{exercise.exerciseName}</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                setShowRestModal(true);
+              }}
+            >
+              <Clock size={16} color={palette.text} />
+              <Text style={[styles.menuItemText, { color: palette.text }]}>
+                Temps de repos ({exercise.restSeconds || 75}s)
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.menuItem}
@@ -200,9 +199,11 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
                 setShowSupersetModal(true);
               }}
             >
-              <Layers size={16} color={theme.text} />
-              <Text style={[styles.menuItemText, { color: theme.text }]}>
-                {exercise.supersetGroup ? 'Modifier le Superset' : 'Convertir en Superset'}
+              <Layers size={16} color={palette.text} />
+              <Text style={[styles.menuItemText, { color: palette.text }]}>
+                {exercise.supersetGroup
+                  ? `Changer de Superset (${exercise.supersetGroup})`
+                  : 'Associer à un Superset'}
               </Text>
             </TouchableOpacity>
 
@@ -213,9 +214,13 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
                 onDuplicateExercise();
               }}
             >
-              <Copy size={16} color={theme.text} />
-              <Text style={[styles.menuItemText, { color: theme.text }]}>Dupliquer l'exercice</Text>
+              <Copy size={16} color={palette.text} />
+              <Text style={[styles.menuItemText, { color: palette.text }]}>
+                Dupliquer l'exercice
+              </Text>
             </TouchableOpacity>
+
+            <SwissDivider subtle style={{ marginVertical: 8 }} />
 
             <TouchableOpacity
               style={styles.menuItem}
@@ -224,223 +229,273 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
                 onRemoveExercise();
               }}
             >
-              <Trash2 size={16} color={theme.danger} />
-              <Text style={[styles.menuItemText, { color: theme.danger }]}>Retirer de la séance</Text>
+              <Trash2 size={16} color={palette.accent} />
+              <Text style={[styles.menuItemText, { color: palette.accent }]}>
+                Supprimer de la séance
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Modal Superset Group Selector */}
-      <Modal visible={showSupersetModal} transparent animationType="fade" onRequestClose={() => setShowSupersetModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSupersetModal(false)}>
-          <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Groupe Superset</Text>
-            {['Superset A', 'Superset B', 'Superset C'].map((group) => (
+      {/* Rest Time Modal */}
+      <Modal
+        visible={showRestModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRestModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowRestModal(false)}
+        >
+          <View style={[styles.modalCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.modalTitle, { color: palette.text, marginBottom: 12 }]}>
+              TEMPS DE REPOS (SECONDES)
+            </Text>
+            <TextInput
+              style={[
+                styles.modalInput,
+                { color: palette.text, borderColor: palette.border, backgroundColor: palette.background },
+              ]}
+              keyboardType="numeric"
+              value={tempRestSeconds}
+              onChangeText={setTempRestSeconds}
+              autoFocus
+            />
+            <View style={styles.modalButtonsRow}>
               <TouchableOpacity
-                key={group}
-                style={[styles.menuItem, exercise.supersetGroup === group && { backgroundColor: theme.surface }]}
-                onPress={() => {
-                  onSetSupersetGroup(group);
-                  setShowSupersetModal(false);
-                }}
+                onPress={() => setShowRestModal(false)}
+                style={styles.modalBtn}
               >
-                <Text style={[styles.menuItemText, { color: theme.text }]}>{group}</Text>
-                {exercise.supersetGroup === group && <Check size={16} color={theme.accent} />}
+                <Text style={[styles.modalBtnText, { color: palette.textMuted }]}>ANNULER</Text>
               </TouchableOpacity>
-            ))}
-
-            {exercise.supersetGroup && (
               <TouchableOpacity
-                style={[styles.menuItem, { marginTop: 6 }]}
-                onPress={() => {
-                  onSetSupersetGroup(undefined);
-                  setShowSupersetModal(false);
-                }}
+                onPress={handleSaveRestTime}
+                style={[styles.modalBtn, { borderBottomColor: palette.accent, borderBottomWidth: 2 }]}
               >
-                <Text style={[styles.menuItemText, { color: theme.danger }]}>Retirer du Superset</Text>
+                <Text style={[styles.modalBtnText, { color: palette.accent }]}>ENREGISTRER</Text>
               </TouchableOpacity>
-            )}
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
-    </Card>
+
+      {/* Superset Modal */}
+      <Modal
+        visible={showSupersetModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSupersetModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSupersetModal(false)}
+        >
+          <View style={[styles.modalCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.modalTitle, { color: palette.text, marginBottom: 12 }]}>
+              SUPERSET // GROUPE
+            </Text>
+            <View style={styles.supersetOptionsRow}>
+              {['A', 'B', 'C', 'D'].map((grp) => (
+                <TouchableOpacity
+                  key={grp}
+                  onPress={() => {
+                    onSetSupersetGroup(grp);
+                    setShowSupersetModal(false);
+                  }}
+                  style={[
+                    styles.supersetCircle,
+                    {
+                      borderColor: exercise.supersetGroup === grp ? palette.accent : palette.border,
+                      backgroundColor: exercise.supersetGroup === grp ? palette.accent : palette.background,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: exercise.supersetGroup === grp ? '#FFFFFF' : palette.text,
+                      fontWeight: '800',
+                    }}
+                  >
+                    {grp}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {exercise.supersetGroup ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    onSetSupersetGroup(undefined);
+                    setShowSupersetModal(false);
+                  }}
+                  style={[styles.supersetCircle, { borderColor: palette.border, backgroundColor: palette.background }]}
+                >
+                  <X size={16} color={palette.textMuted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
   );
 };
 
+export const ExerciseCard = React.memo(ExerciseCardComponent);
+
 const styles = StyleSheet.create({
-  cardContainer: {
-    paddingHorizontal: 12,
+  container: {
+    width: '100%',
     paddingVertical: 12,
   },
   supersetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
     marginBottom: 6,
-    alignSelf: 'flex-start',
   },
   supersetText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 11,
-    marginLeft: 4,
-    textTransform: 'uppercase',
+    fontSize: SWISS_TYPOGRAPHY.label,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   headerTitleArea: {
     flex: 1,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
+    marginRight: 12,
   },
   exerciseName: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    lineHeight: 28,
   },
-  musclesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 2,
-  },
-  miniBadge: {
-    transform: [{ scale: 0.85 }],
-    marginRight: 2,
+  musclesText: {
+    fontSize: SWISS_TYPOGRAPHY.label,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginTop: 4,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   restBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    marginRight: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
   },
   restText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    marginLeft: 4,
+    letterSpacing: 0.5,
   },
   menuButton: {
-    padding: 4,
+    paddingVertical: 2,
+  },
+  optionsLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     marginBottom: 4,
   },
   thText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
     textAlign: 'center',
   },
   addSetButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 8,
+    paddingVertical: 12,
   },
   addSetText: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
   },
-  menuContainer: {
-    width: '80%',
-    borderRadius: 16,
-    padding: 16,
+  modalContent: {
+    padding: 24,
+    borderTopWidth: 1,
+  },
+  modalCard: {
+    width: '90%',
+    alignSelf: 'center',
+    marginBottom: 'auto',
+    marginTop: 'auto',
+    padding: 20,
     borderWidth: 1,
   },
-  menuTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  modalInput: {
-    height: 42,
-    borderWidth: 1,
-    borderRadius: 10,
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  modalBtnText: {
-    fontSize: 14,
-    fontWeight: '800',
+  modalTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    gap: 12,
   },
   menuItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 12,
-    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  stepperActionBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+  modalInput: {
+    height: 44,
     borderWidth: 1,
-    marginHorizontal: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    marginBottom: 16,
   },
-  stepperActionText: {
-    fontSize: 15,
+  modalButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 16,
+  },
+  modalBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  modalBtnText: {
+    fontSize: 12,
     fontWeight: '800',
+    letterSpacing: 1,
   },
-  restDisplayValue: {
-    fontSize: 22,
-    fontWeight: '900',
-    minWidth: 60,
-    textAlign: 'center',
+  supersetOptionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
   },
-  smallStepperBtn: {
-    padding: 8,
-    borderRadius: 8,
+  supersetCircle: {
+    width: 38,
+    height: 38,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
-
-export const ExerciseCard = React.memo(
-  ExerciseCardComponent,
-  (prev, next) => prev.exercise === next.exercise
-);
-export default ExerciseCard;
