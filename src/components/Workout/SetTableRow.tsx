@@ -291,8 +291,8 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           style={[
             styles.checkButton,
             {
-              backgroundColor: set.completed ? (theme.success || '#618764') : 'transparent',
-              borderColor: theme.success || '#618764',
+              backgroundColor: set.completed ? '#00C805' : 'transparent',
+              borderColor: set.completed ? '#00C805' : theme.border,
             },
           ]}
         >
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   },
   cellBtn: {
     height: 34,
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 2,
@@ -510,9 +510,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   checkButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',

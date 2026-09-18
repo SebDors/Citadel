@@ -82,10 +82,10 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setShowRestModal(true)}
-            style={[styles.restBadge, { borderColor: theme.accent, backgroundColor: theme.surface }]}
+            style={[styles.restBadge, { borderColor: '#2C2C2E', backgroundColor: '#1C1C1E' }]}
           >
-            <Clock size={12} color={theme.accent} />
-            <Text style={[styles.restText, { color: theme.accent }]}>{exercise.restSeconds}s</Text>
+            <Clock size={11} color="#8E8E93" />
+            <Text style={[styles.restText, { color: '#FFFFFF' }]}>{exercise.restSeconds}s</Text>
           </TouchableOpacity>
 
           <TouchableOpacity activeOpacity={0.7} onPress={() => setShowMenu(true)} style={styles.menuButton}>
@@ -95,26 +95,24 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       </View>
 
       {/* Table Header */}
-      <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
+      <View style={[styles.tableHeader, { borderBottomColor: '#1F1F23' }]}>
         <View style={{ width: 30, marginRight: 4, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>#</Text>
+          <Text style={[styles.thText, { color: '#8E8E93' }]}>SÉRIE</Text>
         </View>
         <View style={{ flex: 1.2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>PREV</Text>
+          <Text style={[styles.thText, { color: '#8E8E93' }]}>PRÉC.</Text>
         </View>
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>KG</Text>
+          <Text style={[styles.thText, { color: '#8E8E93' }]}>KG</Text>
         </View>
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>REPS</Text>
+          <Text style={[styles.thText, { color: '#8E8E93' }]}>REPS</Text>
         </View>
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>RIR</Text>
+          <Text style={[styles.thText, { color: '#8E8E93' }]}>RIR</Text>
         </View>
-        <View style={{ width: 38, marginLeft: 4, alignItems: 'center' }}>
-          <Text numberOfLines={1} style={[styles.thText, { color: theme.textMuted, fontSize: 10 }]}>
-            Check
-          </Text>
+        <View style={{ width: 32, marginLeft: 6, alignItems: 'center' }}>
+          <Text style={[styles.thText, { color: '#8E8E93' }]}>✓</Text>
         </View>
         <View style={{ width: 24, marginLeft: 4 }} />
       </View>
@@ -135,10 +133,10 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onAddSet}
-        style={[styles.addSetButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        style={[styles.addSetButton, { backgroundColor: '#1C1C1E', borderColor: '#2C2C2E' }]}
       >
-        <Plus size={16} color={theme.accent} />
-        <Text style={[styles.addSetText, { color: theme.accent }]}>Ajouter une série</Text>
+        <Plus size={14} color="#FFFFFF" />
+        <Text style={[styles.addSetText, { color: '#FFFFFF' }]}>Ajouter une série</Text>
       </TouchableOpacity>
 
       {/* Modal Édition Temps de Repos (Steppers +/- 15s et Reset à gauche) */}
@@ -324,13 +322,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    paddingVertical: 3,
+    borderRadius: 9999,
+    borderWidth: 1,
     marginRight: 6,
   },
   restText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     marginLeft: 4,
   },
@@ -346,8 +344,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   thText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
   addSetButton: {

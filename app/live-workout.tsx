@@ -1664,13 +1664,13 @@ export default function LiveWorkoutScreen() {
         }}
       />
 
-      {/* 3. Card Sticky Bottom Timer Bar */}
+      {/* 3. Card Sticky Bottom Floating Action Bar */}
       <View
         style={[
           styles.bottomTimerBar,
           {
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
+            backgroundColor: '#141416',
+            borderColor: '#1F1F23',
             bottom: restTimer.active ? 78 : 22,
           },
         ]}
@@ -1689,38 +1689,54 @@ export default function LiveWorkoutScreen() {
           theme={theme}
         />
 
-        {/* Droite : Bouton Logo Pause / Reprendre (Bouton circulaire sans texte) */}
-        {activeSession.hasStarted !== false ? (
+        {/* Droite : Pause discret + Bouton Pilule Terminer */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {activeSession.hasStarted !== false ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.bottomPauseCircleBtn,
+                {
+                  backgroundColor: activeSession.isPaused
+                    ? '#FF9500'
+                    : '#1C1C1E',
+                },
+              ]}
+              onPress={togglePauseWorkoutSession}
+            >
+              {activeSession.isPaused ? (
+                <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
+              ) : (
+                <Pause size={14} color="#8E8E93" fill="#8E8E93" />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.bottomPauseCircleBtn,
+                { backgroundColor: '#00C805' },
+              ]}
+              onPress={startSessionTimer}
+            >
+              <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
-            activeOpacity={0.8}
+            activeOpacity={0.85}
+            onPress={handleFinish}
             style={[
-              styles.bottomPauseCircleBtn,
-              {
-                backgroundColor: activeSession.isPaused
-                  ? theme.danger
-                  : theme.accent,
-              },
+              styles.bottomFinishPill,
+              isAllCompleted && { backgroundColor: '#00C805' },
             ]}
-            onPress={togglePauseWorkoutSession}
           >
-            {activeSession.isPaused ? (
-              <Play size={17} color="#FFFFFF" fill="#FFFFFF" />
-            ) : (
-              <Pause size={17} color="#FFFFFF" fill="#FFFFFF" />
-            )}
+            <Check size={14} color={isAllCompleted ? "#FFFFFF" : "#000000"} strokeWidth={3} style={{ marginRight: 5 }} />
+            <Text style={[styles.bottomFinishPillText, isAllCompleted && { color: '#FFFFFF' }]}>
+              Terminer
+            </Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[
-              styles.bottomPauseCircleBtn,
-              { backgroundColor: theme.accent },
-            ]}
-            onPress={startSessionTimer}
-          >
-            <Play size={17} color="#FFFFFF" fill="#FFFFFF" />
-          </TouchableOpacity>
-        )}
+        </View>
       </View>
 
       {/* Floating Rest Timer Bar */}
@@ -1806,20 +1822,20 @@ const styles = StyleSheet.create({
   },
   bottomTimerBar: {
     position: "absolute",
-    left: 24,
-    right: 24,
+    left: 18,
+    right: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    elevation: 8,
+    borderRadius: 9999,
+    borderWidth: 1,
+    elevation: 10,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     zIndex: 90,
   },
   bottomTimerLeftRow: {
@@ -1828,21 +1844,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bottomTimerValueText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   bottomTimerLabelText: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: "600",
   },
   bottomPauseCircleBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 10,
+    marginRight: 8,
+  },
+  bottomFinishPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 9999,
+  },
+  bottomFinishPillText: {
+    color: "#000000",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
   emptyContainer: {
     flex: 1,
