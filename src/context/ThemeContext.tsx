@@ -24,7 +24,7 @@ interface ThemeContextType {
 const THEME_MODE_STORAGE_KEY = '@citadel_theme_mode';
 const THEME_ID_STORAGE_KEY = '@citadel_theme_id';
 
-const DEFAULT_THEME_ID: ThemeId = 'cyber';
+const DEFAULT_THEME_ID: ThemeId = 'fintech';
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: THEMES[DEFAULT_THEME_ID].dark,

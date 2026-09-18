@@ -1,4 +1,4 @@
-export type ThemeId = 'cyber' | 'forge' | 'glacial' | 'spartan' | 'gold' | 'citadel';
+export type ThemeId = 'fintech' | 'cyber' | 'forge' | 'glacial' | 'spartan' | 'gold' | 'citadel';
 export type ThemeMode = 'dark' | 'light';
 
 export interface ColorPalette {
@@ -32,6 +32,48 @@ export interface ThemeDefinition {
 }
 
 export const THEMES: Record<ThemeId, ThemeDefinition> = {
+  fintech: {
+    id: 'fintech',
+    name: 'Trade Republic Clean FinTech',
+    subtitle: 'Minimalisme & Performance',
+    description: 'Esthétique épurée bancaire, noir profond, chiffres monumentaux et vert néon de valorisation.',
+    previewColors: {
+      dark: ['#000000', '#141416', '#00C805', '#FFFFFF'],
+      light: ['#FFFFFF', '#F7F7F9', '#00C805', '#000000'],
+    },
+    dark: {
+      background: '#000000',
+      surface: '#141416',
+      cardBg: '#141416',
+      border: '#1F1F23',
+      accent: '#00C805',
+      primary: '#FFFFFF',
+      secondary: '#1C1C1E',
+      text: '#FFFFFF',
+      textMuted: '#8E8E93',
+      success: '#00C805',
+      warning: '#FF9500',
+      danger: '#FF3B30',
+      completedSet: '#07240E',
+      supersetTag: '#1F1F23',
+    },
+    light: {
+      background: '#FFFFFF',
+      surface: '#F7F7F9',
+      cardBg: '#F7F7F9',
+      border: '#E5E5EA',
+      accent: '#00C805',
+      primary: '#000000',
+      secondary: '#E5E5EA',
+      text: '#000000',
+      textMuted: '#8E8E93',
+      success: '#00C805',
+      warning: '#FF9500',
+      danger: '#FF3B30',
+      completedSet: '#E8F8EA',
+      supersetTag: '#E5E5EA',
+    },
+  },
   cyber: {
     id: 'cyber',
     name: 'Cyber-Athletic',
@@ -287,6 +329,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
 };
 
 export const THEME_LIST: ThemeDefinition[] = [
+  THEMES.fintech,
   THEMES.cyber,
   THEMES.forge,
   THEMES.glacial,
