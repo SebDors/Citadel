@@ -41,6 +41,7 @@ import {
   Dumbbell,
   Sparkles,
   Share2,
+  TrendingUp,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
@@ -299,190 +300,158 @@ export default function WorkoutTab() {
     : null;
   const isNoFolderSelected = !currentFolder;
 
-  // Render a Workout Template Card (High Density layout)
+  // FinTech Weekly Volume & Trend Calculations
+  const { currentWeekVolume, weeklyTrendPercentage } = React.useMemo(() => {
+    const history = data?.history || [];
+    const now = new Date();
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setDate(now.getDate() - dayOfWeek);
+    startOfThisWeek.setHours(0, 0, 0, 0);
+
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+    let thisWeekVol = 0;
+    let lastWeekVol = 0;
+
+    history.forEach((s) => {
+      const sDate = new Date(s.startTime);
+      const vol = s.totalVolumeKg || 0;
+      if (sDate >= startOfThisWeek) {
+        thisWeekVol += vol;
+      } else if (sDate >= startOfLastWeek && sDate < startOfThisWeek) {
+        lastWeekVol += vol;
+      }
+    });
+
+    let trend = 12;
+    if (lastWeekVol > 0) {
+      trend = Math.round(((thisWeekVol - lastWeekVol) / lastWeekVol) * 100);
+    } else if (thisWeekVol > 0) {
+      trend = 100;
+    }
+
+    return {
+      currentWeekVolume: Math.round(thisWeekVol),
+      weeklyTrendPercentage: trend,
+    };
+  }, [data?.history]);
+
+  const [activeFilter, setActiveFilter] = useState("Tout");
+
+  const filterCategories = React.useMemo(() => {
+    const cats = ["Tout"];
+    folders.forEach((f) => {
+      if (!cats.includes(f.name)) cats.push(f.name);
+    });
+    return cats;
+  }, [folders]);
+
+  const displayedTemplates = React.useMemo(() => {
+    const all = data?.templates || [];
+    if (activeFilter === "Tout") return all;
+    const targetFolder = folders.find((f) => f.name === activeFilter);
+    if (!targetFolder) return all;
+    return all.filter((t) => targetFolder.templateIds.includes(t.id));
+  }, [data?.templates, activeFilter, folders]);
+
+  // Render a Workout Template as a Clean FinTech Flush Row
   const renderTemplateCard = (tpl: WorkoutTemplate) => {
-    const isCompact = !!collapsedCards[tpl.id];
     const blocks = getTemplateBlocks(tpl);
-
     let totalExercises = 0;
-    let hasCircuit = false;
-    let isOnlyAmrap = blocks.length > 0;
-    let totalAmrapMinutes = 0;
-
     const blockSummaries: string[] = [];
 
     blocks.forEach((block) => {
       if (block.type === "single") {
         totalExercises += 1;
-        isOnlyAmrap = false;
         if (block.exercise.exerciseName) {
           blockSummaries.push(block.exercise.exerciseName);
         }
       } else if (block.type === "circuit") {
-        hasCircuit = true;
         totalExercises += block.exercises.length;
         blockSummaries.push(formatCircuitSummary(block));
-        if (block.circuitType === "amrap") {
-          totalAmrapMinutes += block.amrapDurationMinutes || 12;
-        } else {
-          isOnlyAmrap = false;
-        }
       }
     });
 
-    const inlineExercisesText = blockSummaries.join(" · ") || "Aucun exercice";
-    const realLast = getRealLastWorkoutDate(data?.history || [], tpl.title);
-
-    let templateSubtitle = `${totalExercises} exos`;
-    if (isOnlyAmrap && totalAmrapMinutes > 0) {
-      templateSubtitle = `${totalExercises} exos · AMRAP ${totalAmrapMinutes} min`;
-    } else {
-      const estimatedMins = getAverageWorkoutDurationMinutes(tpl, data?.history);
-      const circuitTag = hasCircuit ? " · ⚡ CIRCUIT" : "";
-      const timeTag = estimatedMins > 0 ? ` · ~${estimatedMins} min` : " · 45-60 min";
-      templateSubtitle = `${totalExercises} exos${circuitTag}${timeTag}`;
-    }
-
-    if (isCompact) {
-      return (
-        <Card key={tpl.id} style={[styles.programCard, { padding: 10 }]}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => toggleCardCollapse(tpl.id)}
-            style={styles.compactCardRow}
-          >
-            <View style={styles.compactTitleArea}>
-              <Text
-                style={[styles.templateTitle, { color: theme.text }]}
-                numberOfLines={1}
-              >
-                {tpl.title}
-              </Text>
-              <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-                {templateSubtitle}
-              </Text>
-            </View>
-
-            <View style={styles.compactActionsRow}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleStartTemplate(tpl.id);
-                }}
-              >
-                <Button
-                  title="Démarrer"
-                  variant="primary"
-                  onPress={() => handleStartTemplate(tpl.id)}
-                  icon={<Play size={12} color="#FFFFFF" fill="#FFFFFF" />}
-                  style={styles.compactStartBtn}
-                  textStyle={styles.compactStartBtnText}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  toggleCardCollapse(tpl.id);
-                }}
-                accessibilityLabel="Déplier la séance"
-              >
-                <ChevronDown size={18} color={theme.textMuted} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Card>
-      );
-    }
+    const estimatedMins = getAverageWorkoutDurationMinutes(tpl, data?.history);
+    const timeTag = estimatedMins > 0 ? `${estimatedMins} min` : "45 min";
+    const sub = `${totalExercises} exercices · ${blockSummaries.slice(0, 2).join(", ") || "Préparé"}`;
 
     return (
-      <Card key={tpl.id} style={[styles.programCard, { padding: 12 }]}>
-        {/* Card Header: Title + Graph Icon + Options + Collapse Toggle */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => toggleCardCollapse(tpl.id)}
-          style={styles.cardHeader}
+      <TouchableOpacity
+        key={tpl.id}
+        activeOpacity={0.7}
+        onPress={() => handleStartTemplate(tpl.id)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 14,
+          paddingHorizontal: 4,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: "#1F1F23",
+        }}
+      >
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: "#1C1C1E",
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 14,
+          }}
         >
-          <View style={styles.cardTitleArea}>
-            <Text
-              style={[styles.templateTitle, { color: theme.text }]}
-              numberOfLines={1}
-            >
-              {tpl.title}
-            </Text>
-            <Text style={[styles.exCountText, { color: theme.textMuted }]}>
-              {templateSubtitle}
-            </Text>
-          </View>
+          <Dumbbell size={19} color="#00C805" />
+        </View>
 
-          <View style={styles.cardHeaderIcons}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleOpenTemplateMenu(tpl);
-              }}
-            >
-              <MoreHorizontal size={19} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                toggleCardCollapse(tpl.id);
-              }}
-              accessibilityLabel="Réduire la séance"
-            >
-              <ChevronUp size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "700",
+              color: "#FFFFFF",
+              letterSpacing: -0.2,
+              marginBottom: 3,
+            }}
+            numberOfLines={1}
+          >
+            {tpl.title}
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              color: "#8E8E93",
+            }}
+            numberOfLines={1}
+          >
+            {sub}
+          </Text>
+        </View>
 
-        {/* Inline Exercises List */}
-        <Text
-          style={[styles.inlineExText, { color: theme.textMuted }]}
-          numberOfLines={2}
-        >
-          {inlineExercisesText}
-        </Text>
-
-        {/* Last Workout Date Badge (Only displayed if realLast exists) */}
-        {realLast && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[styles.recapBadge, { backgroundColor: theme.surface }]}
-            onPress={() => {
-              router.push({
-                pathname: "/workout-analytics",
-                params: { id: tpl.id },
-              });
+        <View style={{ alignItems: "flex-end" }}>
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "700",
+              color: "#FFFFFF",
             }}
           >
-            <View
-              style={[styles.recapBar, { backgroundColor: theme.accent }]}
-            />
-            <View style={styles.recapTextRow}>
-              <Text style={[styles.recapSub, { color: theme.textMuted }]}>
-                DERNIER ENTRAÎNEMENT
-              </Text>
-              <Text style={[styles.recapDate, { color: theme.text }]}>
-                {`${realLast.dateFormatted} - voir le récap`}
-              </Text>
-            </View>
-            <ChevronRight size={14} color={theme.textMuted} />
+            {timeTag}
+          </Text>
+          <TouchableOpacity
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleOpenTemplateMenu(tpl);
+            }}
+            style={{ marginTop: 4 }}
+          >
+            <MoreHorizontal size={18} color="#8E8E93" />
           </TouchableOpacity>
-        )}
-
-        {/* Big Green/Accent Start Button */}
-        <Button
-          title="Démarrer"
-          variant="primary"
-          onPress={() => handleStartTemplate(tpl.id)}
-          icon={<Play size={14} color="#FFFFFF" fill="#FFFFFF" />}
-          style={styles.startBtn}
-        />
-      </Card>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -492,392 +461,337 @@ export default function WorkoutTab() {
         edges={["top", "left", "right"]}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Header Title */}
-          <View style={styles.pageHeader}>
-            <Text style={[styles.appTitle, { color: theme.text }]}>
-              Entraînement
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: 120 },
+          ]}
+        >
+          {/* 1. Solde de Performance Monumental (Trade Republic Style) */}
+          <View style={{ paddingTop: 8, paddingBottom: 16 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: "#8E8E93",
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              PORTEFEUILLE ATHLÉTIQUE // SEMAINE
             </Text>
-          </View>
-
-          {/* Active Workout Banner */}
-          {activeSession && (
-            <View
-              style={[
-                styles.activeBanner,
-                { backgroundColor: theme.cardBg, borderColor: theme.accent },
-              ]}
-            >
-              <View style={styles.activeBannerInfo}>
-                <Flame
-                  size={20}
-                  color={theme.accent}
-                  style={{ marginRight: 8 }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[styles.activeBannerTitle, { color: theme.text }]}
-                    numberOfLines={1}
-                  >
-                    Séance en cours : {activeSession.title}
-                  </Text>
-                  <Text
-                    style={[styles.activeBannerSub, { color: theme.textMuted }]}
-                  >
-                    {getActiveBannerSubtitle(activeSession)}
-                  </Text>
-                </View>
-              </View>
-              <Button
-                title="Reprendre"
-                variant="primary"
-                onPress={() => router.push("/live-workout")}
-                style={styles.resumeBtn}
-              />
-            </View>
-          )}
-
-          {/* Bannière de Guidage Étape 1/2 : Création première séance */}
-          {data?.hasCompletedOnboarding && !data?.hasCreatedFirstSession && (
-            <View
-              style={[
-                styles.guidedBanner,
-                { backgroundColor: theme.cardBg, borderColor: theme.accent },
-              ]}
-            >
-              <View style={styles.guidedBannerHeader}>
-                <View
-                  style={[
-                    styles.guidedStepBadge,
-                    { backgroundColor: theme.accent },
-                  ]}
-                >
-                  <Sparkles size={13} color="#FFFFFF" />
-                  <Text style={styles.guidedStepText}>
-                    Étape 1/2 : Créez votre première séance test !
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.guidedBannerTitle, { color: theme.text }]}>
-                Construisez votre premier programme
+            <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+              <Text
+                style={{
+                  fontSize: 44,
+                  fontWeight: "900",
+                  color: "#FFFFFF",
+                  letterSpacing: -1,
+                }}
+              >
+                {currentWeekVolume.toLocaleString("fr-FR")}
               </Text>
               <Text
-                style={[styles.guidedBannerSub, { color: theme.textMuted }]}
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: "#8E8E93",
+                  marginLeft: 6,
+                }}
               >
-                Cliquez sur le bouton lumineux{" "}
-                <Text style={{ fontWeight: "800", color: theme.text }}>
-                  "+ Séance"
-                </Text>{" "}
-                ci-dessous pour ajouter vos premiers exercices.
+                KG
               </Text>
             </View>
-          )}
 
-          {/* Bannière de Guidage Étape 2/2 : Lancement de la première séance */}
-          {data?.hasCompletedOnboarding &&
-            data?.hasCreatedFirstSession &&
-            !data?.hasCompletedFirstWorkout &&
-            !activeSession && (
-              <View
-                style={[
-                  styles.guidedBanner,
-                  { backgroundColor: theme.cardBg, borderColor: theme.primary },
-                ]}
-              >
-                <View style={styles.guidedBannerHeader}>
-                  <View
-                    style={[
-                      styles.guidedStepBadge,
-                      { backgroundColor: theme.primary },
-                    ]}
-                  >
-                    <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
-                    <Text style={styles.guidedStepText}>
-                      Étape 2/2 : Lancez votre Entraînement !
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.guidedBannerTitle, { color: theme.text }]}>
-                  Votre séance test est prête !
-                </Text>
-                <Text
-                  style={[styles.guidedBannerSub, { color: theme.textMuted }]}
-                >
-                  Cliquez sur le bouton{" "}
-                  <Text style={{ fontWeight: "800", color: theme.primary }}>
-                    "Démarrer"
-                  </Text>{" "}
-                  sur la carte de votre séance pour votre premier test en
-                  direct.
-                </Text>
-              </View>
-            )}
-
-          {/* Top Action Buttons (Side by Side) */}
-          <View style={styles.actionButtonsRow}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.mainActionBox, { backgroundColor: theme.accent }]}
-              onPress={handleStartFreestyle}
+            {/* Micro-gélule de tendance */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                alignSelf: "flex-start",
+                backgroundColor: "#07240E",
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 9999,
+                marginTop: 8,
+              }}
             >
-              <View style={styles.playIconCircle}>
-                <Play size={16} color={theme.accent} fill={theme.accent} />
-              </View>
-              <View style={{ marginLeft: 10 }}>
-                <Text style={styles.mainActionTitle}>Entraînement libre</Text>
-                <Text style={styles.mainActionSub}>
-                  Démarre direct sans plan
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <Animated.View
-              style={[
-                { flex: 1 },
-                data?.hasCompletedOnboarding &&
-                  !data?.hasCreatedFirstSession && {
-                    transform: [{ scale: pulseAnim }],
-                  },
-              ]}
-            >
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[
-                  styles.createActionBox,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                  data?.hasCompletedOnboarding &&
-                    !data?.hasCreatedFirstSession && {
-                      borderColor: theme.accent,
-                      borderWidth: 2,
-                    },
-                ]}
-                onPress={() => router.push("/template-editor")}
-              >
-                <Plus size={22} color={theme.text} />
-                <Text style={[styles.createActionTitle, { color: theme.text }]}>
-                  SÉANCE
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
+              <TrendingUp size={13} color="#00C805" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#00C805" }}>
+                ▲ +{weeklyTrendPercentage}% cette semaine
+              </Text>
+            </View>
           </View>
 
-          {/* Section Header with "Importer" & "Nouveau dossier" buttons */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-              MES DOSSIERS & SÉANCES
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <TouchableOpacity
-                style={[
-                  styles.newFolderBtn,
-                  { borderColor: theme.border, backgroundColor: theme.surface },
-                ]}
-                onPress={handleImportTemplate}
+          {/* 2. Ordre en Cours (Active Workout Banner) */}
+          {activeSession && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push("/live-workout")}
+              style={{
+                backgroundColor: "#141416",
+                borderWidth: 1,
+                borderColor: "#00C805",
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 20,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: "#00C805",
+                      marginRight: 6,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "800",
+                      color: "#00C805",
+                      letterSpacing: 0.8,
+                    }}
+                  >
+                    ORDRE EN COURS · SÉANCE ACTIVE
+                  </Text>
+                </View>
+                <Text
+                  style={{ fontSize: 16, fontWeight: "800", color: "#FFFFFF" }}
+                  numberOfLines={1}
+                >
+                  {activeSession.title || "Entraînement libre"}
+                </Text>
+                <Text style={{ fontSize: 13, color: "#8E8E93", marginTop: 2 }}>
+                  {getActiveBannerSubtitle(activeSession)}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  backgroundColor: "#00C805",
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 9999,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
               >
-                <ImportIcon
-                  size={13}
-                  color={theme.accent}
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={[styles.newFolderText, { color: theme.accent }]}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "800",
+                    color: "#000000",
+                    marginRight: 4,
+                  }}
+                >
+                  Reprendre
+                </Text>
+                <ChevronRight size={14} color="#000000" />
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* 3. Filtres en Capsules Horizontales (Trade Republic Chips) */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 20 }}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            {filterCategories.map((cat) => {
+              const isActive = activeFilter === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  activeOpacity={0.8}
+                  onPress={() => setActiveFilter(cat)}
+                  style={{
+                    backgroundColor: isActive ? "#FFFFFF" : "#1C1C1E",
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 9999,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: isActive ? "#000000" : "#8E8E93",
+                    }}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* 4. Section Header: POSITIONS // SÉANCES & Actions Dossiers */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingBottom: 10,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: "#1F1F23",
+              marginBottom: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "800",
+                color: "#8E8E93",
+                letterSpacing: 1,
+              }}
+            >
+              POSITIONS // SÉANCES ({displayedTemplates.length})
+            </Text>
+
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <TouchableOpacity
+                onPress={handleImportTemplate}
+                style={{ flexDirection: "row", alignItems: "center" }}
+              >
+                <ImportIcon size={13} color="#00C805" style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#00C805" }}>
                   Importer
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.newFolderBtn,
-                  { borderColor: theme.border, backgroundColor: theme.surface },
-                ]}
                 onPress={() => setShowCreateFolderModal(true)}
+                style={{ flexDirection: "row", alignItems: "center" }}
               >
-                <FolderPlus
-                  size={13}
-                  color={theme.accent}
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={[styles.newFolderText, { color: theme.accent }]}>
-                  Nouveau dossier
+                <FolderPlus size={13} color="#00C805" style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#00C805" }}>
+                  + Dossier
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Folders List */}
-          {folders.map((folder) => {
-            const folderTemplates = [...(data?.templates || [])]
-              .filter((t) => folder.templateIds.includes(t.id))
-              .sort((a, b) =>
-                a.title.localeCompare(b.title, "fr", { sensitivity: "base" }),
-              );
-            const isCollapsed = !!folder.isCollapsed;
-
-            return (
-              <View
-                key={folder.id}
-                style={[
-                  styles.folderContainer,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={styles.folderHeader}
-                  onPress={() => toggleFolderCollapse(folder.id)}
-                >
-                  <View style={styles.folderHeaderLeft}>
-                    <Folder
-                      size={18}
-                      color={theme.accent}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={[styles.folderTitle, { color: theme.text }]}>
-                      {folder.name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.folderBadgeCount,
-                        {
-                          color: theme.textMuted,
-                          backgroundColor: theme.cardBg,
-                        },
-                      ]}
-                    >
-                      {folderTemplates.length}
-                    </Text>
-                  </View>
-
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <TouchableOpacity
-                      style={{ padding: 4, marginRight: 4 }}
-                      onPress={() => {
-                        setSelectedFolder(folder);
-                        setRenameFolderName(folder.name);
-                        setShowRenameFolderModal(true);
-                      }}
-                    >
-                      <Edit2 size={15} color={theme.textMuted} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{ padding: 4, marginRight: 4 }}
-                      onPress={() => deleteFolder(folder.id)}
-                    >
-                      <Trash2 size={15} color={theme.danger} />
-                    </TouchableOpacity>
-
-                    {isCollapsed ? (
-                      <ChevronRight size={18} color={theme.textMuted} />
-                    ) : (
-                      <ChevronDown size={18} color={theme.textMuted} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-
-                {!isCollapsed && (
-                  <View style={styles.folderBody}>
-                    {folderTemplates.length === 0 ? (
-                      <Text
-                        style={[
-                          styles.emptyFolderText,
-                          { color: theme.textMuted },
-                        ]}
-                      >
-                        Aucune séance dans ce dossier.
-                      </Text>
-                    ) : (
-                      folderTemplates.map((tpl) => renderTemplateCard(tpl))
-                    )}
-                  </View>
-                )}
-              </View>
-            );
-          })}
-
-          {/* Unassigned Templates Section */}
-          {unassignedTemplates.length > 0 && (
-            <View style={{ marginTop: 8 }}>
-              {folders.length > 0 && (
-                <Text
-                  style={[styles.sectionSubTitle, { color: theme.textMuted }]}
-                >
-                  AUTRES SÉANCES
-                </Text>
-              )}
-              {unassignedTemplates.map((tpl) => renderTemplateCard(tpl))}
-            </View>
-          )}
-
-          {/* État vide si aucun dossier ni programme */}
-          {folders.length === 0 && (data?.templates || []).length === 0 && (
-            <View
-              style={[
-                styles.emptyStateBox,
-                { backgroundColor: theme.cardBg, borderColor: theme.border },
-              ]}
-            >
-              <Dumbbell
-                size={32}
-                color={theme.textMuted}
-                style={{ marginBottom: 8 }}
-              />
-              <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
-                Aucun programme enregistré
-              </Text>
-              <Text style={[styles.emptyStateSub, { color: theme.textMuted }]}>
-                Créez votre première séance personnalisée avec le bouton "+
-                Séance" ou lancez un entraînement libre !
+          {/* 5. Liste des Séances (Lignes Affleurantes) */}
+          {displayedTemplates.length === 0 ? (
+            <View style={{ paddingVertical: 32, alignItems: "center" }}>
+              <Text style={{ fontSize: 14, color: "#8E8E93" }}>
+                Aucune séance dans cette sélection.
               </Text>
             </View>
+          ) : (
+            displayedTemplates.map((tpl) => renderTemplateCard(tpl))
           )}
 
-          {/* Carte Accès Bibliothèque d'Exercices */}
+          {/* 6. Bibliothèque d'Exercices en ligne épurée */}
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[
-              styles.libraryCard,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
             onPress={() => setShowLibraryModal(true)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingVertical: 18,
+              marginTop: 12,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: "#1F1F23",
+            }}
           >
             <View
-              style={[
-                styles.libraryIconBox,
-                { backgroundColor: theme.surface },
-              ]}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: "#1C1C1E",
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 14,
+              }}
             >
-              <BookOpen size={20} color={theme.accent} />
+              <BookOpen size={18} color="#FFFFFF" />
             </View>
             <View style={{ flex: 1 }}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-              >
-                <Text style={[styles.libraryTitle, { color: theme.text }]}>
-                  Bibliothèque d'Exercices
-                </Text>
-                <View
-                  style={[
-                    styles.countBadge,
-                    {
-                      backgroundColor: theme.accent + "22",
-                      borderColor: theme.accent,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[styles.countBadgeText, { color: theme.accent }]}
-                  >
-                    {allExercises.length}
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.librarySub, { color: theme.textMuted }]}>
-                Consulter, créer et gérer vos exercices
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#FFFFFF" }}>
+                Bibliothèque d'Exercices
+              </Text>
+              <Text style={{ fontSize: 13, color: "#8E8E93" }}>
+                {allExercises.length} exercices référencés
               </Text>
             </View>
-            <ChevronRight size={18} color={theme.textMuted} />
+            <ChevronRight size={18} color="#8E8E93" />
           </TouchableOpacity>
         </ScrollView>
+
+        {/* 7. Floating Action Bar Ancrée au Bas de l'Écran */}
+        <View
+          style={{
+            position: "absolute",
+            bottom: Platform.OS === "android" ? 18 : 26,
+            left: 20,
+            right: 20,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={handleStartFreestyle}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#FFFFFF",
+              paddingVertical: 14,
+              paddingHorizontal: 20,
+              borderRadius: 9999,
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              elevation: 8,
+            }}
+          >
+            <Plus size={18} color="#000000" style={{ marginRight: 6 }} />
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#000000" }}>
+              Entraînement Libre
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={() => router.push("/template-editor")}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#141416",
+              borderWidth: 1,
+              borderColor: "#2C2C2E",
+              paddingVertical: 14,
+              paddingHorizontal: 22,
+              borderRadius: 9999,
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              elevation: 8,
+            }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>
+              Créer
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Floating Rest Timer Bar */}
         <RestTimerBar />
