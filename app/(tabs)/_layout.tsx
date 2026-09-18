@@ -1,8 +1,8 @@
 import React from "react";
-import { Platform } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { Tabs } from "expo-router";
 import { useTheme } from "../../src/context/ThemeContext";
-import { Dumbbell, Calendar, User } from "lucide-react-native";
+import { TrendingUp, Activity, User } from "lucide-react-native";
 
 export default function TabLayout() {
   const { theme, isDark } = useTheme();
@@ -11,45 +11,50 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.accent,
+        tabBarActiveTintColor: theme.text,
         tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
           backgroundColor: theme.background,
           borderTopColor: theme.border,
-          borderTopWidth: 1,
-          height: Platform.OS === "android" ? 76 : 68,
-          paddingBottom: Platform.OS === "android" ? 18 : 12,
-          paddingTop: Platform.OS === "android" ? 8 : 6,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: Platform.OS === "android" ? 72 : 66,
+          paddingBottom: Platform.OS === "android" ? 14 : 10,
+          paddingTop: 8,
+          elevation: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "700",
+          letterSpacing: 0.3,
+          marginTop: 2,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Entraînement",
-          tabBarIcon: ({ color, size }) => (
-            <Dumbbell size={size} color={color} />
+          title: "Portefeuille",
+          tabBarIcon: ({ color, focused }) => (
+            <TrendingUp size={22} color={focused ? theme.accent : color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: "Historique",
-          tabBarIcon: ({ color, size }) => (
-            <Calendar size={size} color={color} />
+          title: "Activité",
+          tabBarIcon: ({ color, focused }) => (
+            <Activity size={22} color={focused ? theme.accent : color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profil",
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          title: "Compte",
+          tabBarIcon: ({ color, focused }) => (
+            <User size={22} color={focused ? theme.accent : color} strokeWidth={focused ? 2.5 : 2} />
+          ),
         }}
       />
     </Tabs>
