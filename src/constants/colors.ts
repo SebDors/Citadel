@@ -1,4 +1,4 @@
-export type ThemeId = 'cyber' | 'forge' | 'glacial' | 'spartan' | 'gold' | 'citadel';
+export type ThemeId = 'swiss' | 'cyber' | 'forge' | 'glacial' | 'spartan' | 'gold' | 'citadel';
 export type ThemeMode = 'dark' | 'light';
 
 export interface ColorPalette {
@@ -32,6 +32,48 @@ export interface ThemeDefinition {
 }
 
 export const THEMES: Record<ThemeId, ThemeDefinition> = {
+  swiss: {
+    id: 'swiss',
+    name: 'Minimalisme Suisse',
+    subtitle: 'Noir Absolu & Rouge Suisse',
+    description: 'Style typographique international (Müller-Brockmann). Zéro carte, grilles ultra-fines et hiérarchie monumentale.',
+    previewColors: {
+      dark: ['#0A0A0A', '#121212', '#FF2A2A', '#FFFFFF'],
+      light: ['#F6F6F4', '#FFFFFF', '#FF2A2A', '#0F0F0F'],
+    },
+    dark: {
+      background: '#0A0A0A',
+      surface: '#121212',
+      cardBg: '#0A0A0A',
+      border: '#262626',
+      accent: '#FF2A2A',
+      primary: '#FF2A2A',
+      secondary: '#737373',
+      text: '#FFFFFF',
+      textMuted: '#737373',
+      success: '#FF2A2A',
+      warning: '#F59E0B',
+      danger: '#EF4444',
+      completedSet: '#181818',
+      supersetTag: '#262626',
+    },
+    light: {
+      background: '#F6F6F4',
+      surface: '#FFFFFF',
+      cardBg: '#F6F6F4',
+      border: '#E5E5E5',
+      accent: '#FF2A2A',
+      primary: '#FF2A2A',
+      secondary: '#737373',
+      text: '#0F0F0F',
+      textMuted: '#737373',
+      success: '#FF2A2A',
+      warning: '#D97706',
+      danger: '#DC2626',
+      completedSet: '#EBEBEA',
+      supersetTag: '#E5E5E5',
+    },
+  },
   cyber: {
     id: 'cyber',
     name: 'Cyber-Athletic',
@@ -287,6 +329,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
 };
 
 export const THEME_LIST: ThemeDefinition[] = [
+  THEMES.swiss,
   THEMES.cyber,
   THEMES.forge,
   THEMES.glacial,
