@@ -95,6 +95,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
 
   const daysInMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const firstDayOfWeek = new Date(currentYear, currentMonthIndex, 1).getDay();
+  const leadingOffset = (firstDayOfWeek + 6) % 7; // 0 pour Lun, 1 pour Mar, ..., 6 pour Dim
+  const emptyLeadingDays = Array.from({ length: leadingOffset }, (_, i) => i);
   const monthStr = (currentMonthIndex + 1).toString().padStart(2, '0');
 
   // Filtrer les séances pour le mois affiché
@@ -159,6 +162,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
       </View>
 
       <View style={styles.grid}>
+        {emptyLeadingDays.map((_, idx) => (
+          <View key={`empty-${idx}`} style={styles.dayCell} />
+        ))}
         {days.map((d) => {
           const dayPad = d < 10 ? `0${d}` : `${d}`;
           const dateStr = `${currentYear}-${monthStr}-${dayPad}`;
