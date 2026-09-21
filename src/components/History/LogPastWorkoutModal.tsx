@@ -1,10 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity, TextInput, Alert, Animated, PanResponder } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Button } from '../UI/Button';
-import { X, Calendar as CalendarIcon, Clock, Zap, List, Plus, Trash2, Edit2, CheckCircle2, Search } from 'lucide-react-native';
-import { WorkoutSession, WorkoutBlock, getTemplateBlocks, SingleExerciseBlock, WorkoutSet, SET_TYPES_CONFIG } from '../../types';
+import {
+  X,
+  Calendar as CalendarIcon,
+  Clock,
+  Zap,
+  ListOrdered,
+  Plus,
+  Trash2,
+  Edit2,
+  CheckCircle2,
+  Search,
+  Sparkles,
+  Dumbbell,
+  Timer,
+  Bookmark,
+  Info,
+  Layers,
+  ChevronDown,
+  Check,
+} from 'lucide-react-native';
+import { WorkoutSession, WorkoutBlock, getTemplateBlocks, getSessionBlocks, SingleExerciseBlock, WorkoutSet, SET_TYPES_CONFIG } from '../../types';
 import { SharedExercise } from '../../constants/exerciseDatabase';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 
@@ -55,6 +74,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   const [durationMin, setDurationMin] = useState('45');
   const [sessionTitle, setSessionTitle] = useState('Séance libre');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [prefillSourceText, setPrefillSourceText] = useState<string | null>(null);
   
   const [mode, setMode] = useState<'express' | 'detailed'>('express');
   const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
@@ -67,7 +87,19 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Template Selector state (Dropdown Pop-up)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+
+  // Swipe-down to dismiss animated values
+  const translateY = useRef(new Animated.Value(0)).current;
+  const templateTranslateY = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
+    translateY.stopAnimation();
+    translateY.setValue(0);
+    templateTranslateY.stopAnimation();
+    templateTranslateY.setValue(0);
     if (visible) {
       setDateStr(formatISOToFrench(initialDate) || todayFrenchStr);
     } else {
@@ -77,42 +109,198 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
       setDurationMin('45');
       setSessionTitle('Séance libre');
       setSelectedTemplateId(null);
+      setPrefillSourceText(null);
       setMode('express');
       setBlocks([]);
       setKeypadVisible(false);
+      setShowTemplateSelector(false);
+      setTemplateSearchQuery('');
     }
-  }, [visible, initialDate]);
+  }, [visible, initialDate, translateY, templateTranslateY]);
 
-  const templates = data?.templates || [];
+  useEffect(() => {
+    if (showTemplateSelector) {
+      templateTranslateY.stopAnimation();
+      templateTranslateY.setValue(0);
+    }
+  }, [showTemplateSelector, templateTranslateY]);
+
+  const handleOpenTemplateSelector = useCallback(() => {
+    templateTranslateY.stopAnimation();
+    templateTranslateY.setValue(0);
+    setTemplateSearchQuery('');
+    setShowTemplateSelector(true);
+  }, [templateTranslateY]);
+
+  const handleCloseTemplateSelector = useCallback(() => {
+    templateTranslateY.stopAnimation();
+    templateTranslateY.setValue(0);
+    setShowTemplateSelector(false);
+  }, [templateTranslateY]);
+
+  const mainPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dy > 0) {
+            translateY.setValue(gesture.dy);
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 70 || gesture.vy > 0.5) {
+            Animated.timing(translateY, {
+              toValue: 600,
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              onClose();
+              setTimeout(() => {
+                translateY.stopAnimation();
+                translateY.setValue(0);
+              }, 150);
+            });
+          } else {
+            Animated.spring(translateY, {
+              toValue: 0,
+              bounciness: 4,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    [onClose, translateY]
+  );
+
+  const templatePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dy > 0) {
+            templateTranslateY.setValue(gesture.dy);
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 70 || gesture.vy > 0.5) {
+            Animated.timing(templateTranslateY, {
+              toValue: 600,
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              setShowTemplateSelector(false);
+              setTimeout(() => {
+                templateTranslateY.stopAnimation();
+                templateTranslateY.setValue(0);
+              }, 150);
+            });
+          } else {
+            Animated.spring(templateTranslateY, {
+              toValue: 0,
+              bounciness: 4,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    [templateTranslateY]
+  );
+
+  // Modèles triés dans l'ordre alphabétique
+  const templates = useMemo(() => {
+    return [...(data?.templates || [])].sort((a, b) =>
+      a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' })
+    );
+  }, [data?.templates]);
+
+  const selectedTemplate = useMemo(() => {
+    if (!selectedTemplateId) return null;
+    return templates.find(t => t.id === selectedTemplateId) || null;
+  }, [templates, selectedTemplateId]);
+
+  const filteredTemplates = useMemo(() => {
+    if (!templateSearchQuery.trim()) return templates;
+    return templates.filter(t => t.title.toLowerCase().includes(templateSearchQuery.toLowerCase()));
+  }, [templates, templateSearchQuery]);
 
   const handleSelectTemplate = (templateId: string) => {
     if (templateId === 'free') {
       setSelectedTemplateId(null);
       setSessionTitle('Séance libre');
       setBlocks([]);
+      setPrefillSourceText(null);
       return;
     }
     const t = templates.find(x => x.id === templateId);
     if (t) {
       setSelectedTemplateId(t.id);
       setSessionTitle(t.title);
-      const rawBlocks = getTemplateBlocks(t);
-      const readyBlocks: WorkoutBlock[] = JSON.parse(JSON.stringify(rawBlocks)).map((b: WorkoutBlock) => {
-        if (b.type === 'single') {
+
+      // Chercher la dernière séance passée correspondant à ce modèle
+      const sortedHistory = [...(data?.history || [])].sort(
+        (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      );
+      const lastSession = sortedHistory.find(
+        s => (s.templateId && s.templateId === t.id) ||
+             (s.title && s.title.toLowerCase().trim() === t.title.toLowerCase().trim())
+      );
+
+      if (lastSession) {
+        const lastDateFormatted = new Date(lastSession.startTime).toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'short',
+        });
+        setPrefillSourceText(`Données pré-remplies selon votre dernière séance du ${lastDateFormatted}`);
+        const pastBlocks = getSessionBlocks(lastSession);
+        const readyBlocks: WorkoutBlock[] = JSON.parse(JSON.stringify(pastBlocks)).map((b: WorkoutBlock) => {
+          if (b.type === 'single') {
+            return {
+              ...b,
+              id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              exercise: {
+                ...b.exercise,
+                id: `ex_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                sets: (b.exercise.sets || []).map((s, idx) => ({
+                  ...s,
+                  id: `set_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+                  completed: true,
+                  weightKg: s.weightKg,
+                  reps: s.reps,
+                  rir: s.rir,
+                }))
+              }
+            };
+          }
           return {
             ...b,
-            exercise: {
-              ...b.exercise,
-              sets: b.exercise.sets.map(s => ({
-                ...s,
-                completed: true
-              }))
-            }
+            id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
           };
-        }
-        return b;
-      });
-      setBlocks(readyBlocks);
+        });
+        setBlocks(readyBlocks);
+      } else {
+        setPrefillSourceText("Modèle neuf : pré-rempli avec les valeurs cibles par défaut");
+        const rawBlocks = getTemplateBlocks(t);
+        const readyBlocks: WorkoutBlock[] = JSON.parse(JSON.stringify(rawBlocks)).map((b: WorkoutBlock) => {
+          if (b.type === 'single') {
+            return {
+              ...b,
+              exercise: {
+                ...b.exercise,
+                sets: b.exercise.sets.map(s => ({
+                  ...s,
+                  completed: true
+                }))
+              }
+            };
+          }
+          return b;
+        });
+        setBlocks(readyBlocks);
+      }
     }
   };
 
@@ -152,6 +340,35 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   };
 
   const handleAddExercise = (ex: SharedExercise) => {
+    let prefilledSets: WorkoutSet[] = [
+      { id: `set_${Date.now()}_1`, setNumber: 1, type: 'normal', completed: true }
+    ];
+
+    if (data?.history && data.history.length > 0) {
+      const sortedHistory = [...data.history].sort(
+        (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      );
+      for (const sess of sortedHistory) {
+        const sessBlocks = getSessionBlocks(sess);
+        const matchingBlock = sessBlocks.find(
+          b => b.type === 'single' && b.exercise.exerciseName.toLowerCase().trim() === ex.name.toLowerCase().trim()
+        ) as SingleExerciseBlock | undefined;
+
+        if (matchingBlock && matchingBlock.exercise.sets && matchingBlock.exercise.sets.length > 0) {
+          prefilledSets = matchingBlock.exercise.sets.map((s, idx) => ({
+            id: `set_${Date.now()}_${idx + 1}`,
+            setNumber: idx + 1,
+            type: s.type || 'normal',
+            completed: true,
+            weightKg: s.weightKg,
+            reps: s.reps,
+            rir: s.rir,
+          }));
+          break;
+        }
+      }
+    }
+
     const newBlock: SingleExerciseBlock = {
       id: `block_${Date.now()}`,
       type: 'single',
@@ -162,9 +379,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
         primaryMuscle: ex.primaryMuscle,
         targetMuscles: ex.targetMuscles || [],
         restSeconds: 90,
-        sets: [
-          { id: `set_${Date.now()}_1`, setNumber: 1, type: 'normal', completed: true }
-        ]
+        sets: prefilledSets,
       }
     };
     setBlocks(prev => [...prev, newBlock]);
@@ -191,18 +406,40 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
     if (mode === 'express' && selectedTemplateId && blocks.length === 0) {
       const t = templates.find(x => x.id === selectedTemplateId);
       if (t) {
-        finalBlocks = getTemplateBlocks(t).map((b: WorkoutBlock) => {
-          if (b.type === 'single') {
-            return {
-              ...b,
-              exercise: {
-                ...b.exercise,
-                sets: b.exercise.sets.map(s => ({ ...s, completed: true }))
-              }
-            };
-          }
-          return b;
-        });
+        const sortedHistory = [...(data?.history || [])].sort(
+          (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+        );
+        const lastSession = sortedHistory.find(
+          s => (s.templateId && s.templateId === t.id) ||
+               (s.title && s.title.toLowerCase().trim() === t.title.toLowerCase().trim())
+        );
+        if (lastSession) {
+          finalBlocks = getSessionBlocks(lastSession).map((b: WorkoutBlock) => {
+            if (b.type === 'single') {
+              return {
+                ...b,
+                exercise: {
+                  ...b.exercise,
+                  sets: (b.exercise.sets || []).map(s => ({ ...s, completed: true }))
+                }
+              };
+            }
+            return b;
+          });
+        } else {
+          finalBlocks = getTemplateBlocks(t).map((b: WorkoutBlock) => {
+            if (b.type === 'single') {
+              return {
+                ...b,
+                exercise: {
+                  ...b.exercise,
+                  sets: b.exercise.sets.map(s => ({ ...s, completed: true }))
+                }
+              };
+            }
+            return b;
+          });
+        }
       }
     }
 
@@ -252,176 +489,354 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.content, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-          {/* Top Bar */}
-          <View style={[styles.header, { borderBottomColor: theme.border }]}>
-            <Text style={[styles.title, { color: theme.text }]}>Ajouter une séance passée</Text>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: theme.surface }]}>
-              <X size={20} color={theme.text} />
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+          accessibilityLabel="Fermer la modal"
+        />
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              backgroundColor: theme.background,
+              borderColor: theme.border,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          {/* Drag Handle & Top Bar / Header */}
+          <View style={[styles.headerContainer, { borderBottomColor: theme.border, backgroundColor: theme.surface }]}>
+            {/* Draggable surface covering the full header */}
+            <View style={StyleSheet.absoluteFillObject} {...mainPanResponder.panHandlers} />
+
+            <View pointerEvents="box-none" style={{ width: '100%' }}>
+              <View pointerEvents="none" style={styles.dragHandleContainer}>
+                <View style={[styles.dragHandle, { backgroundColor: theme.background }]} />
+              </View>
+
+              <View pointerEvents="box-none" style={styles.header}>
+                <View pointerEvents="none" style={styles.headerLeft}>
+                  <View style={[styles.headerIconBadge, { backgroundColor: `${theme.accent}18`, borderColor: `${theme.accent}30` }]}>
+                    <CalendarIcon size={18} color={theme.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.title, { color: theme.text }]}>Ajouter une séance passée</Text>
+                    <Text style={[styles.subtitle, { color: theme.textMuted }]}>Enregistrement rétroactif & historique</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={onClose}
+                  style={[styles.closeBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Fermer"
+                >
+                  <X size={18} color={theme.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* Section 1: Date & Heure */}
-            <View style={[styles.section, { backgroundColor: theme.surface }]}>
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionIconBadge, { backgroundColor: `${theme.accent}15` }]}>
+                  <Clock size={13} color={theme.accent} />
+                </View>
+                <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>DATE & HORAIRE</Text>
+              </View>
+
               <View style={styles.row}>
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: theme.textMuted }]}>Date (JJ/MM/AAAA)</Text>
-                  <TextInput
-                    style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                    value={dateStr}
-                    onChangeText={setDateStr}
-                    placeholder="ex: 29/08/2026"
-                    placeholderTextColor={theme.textMuted}
-                  />
+                  <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Date (JJ/MM/AAAA)</Text>
+                  <View style={[styles.inputBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <CalendarIcon size={15} color={theme.accent} style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={[styles.inputField, { color: theme.text }]}
+                      value={dateStr}
+                      onChangeText={setDateStr}
+                      placeholder="29/08/2026"
+                      placeholderTextColor={theme.textMuted}
+                    />
+                  </View>
                 </View>
+
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: theme.textMuted }]}>Heure (HH:MM)</Text>
-                  <TextInput
-                    style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                    value={timeStr}
-                    onChangeText={setTimeStr}
-                    placeholder="18:00"
-                    placeholderTextColor={theme.textMuted}
-                  />
+                  <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Heure (HH:MM)</Text>
+                  <View style={[styles.inputBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <Clock size={15} color={theme.accent} style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={[styles.inputField, { color: theme.text }]}
+                      value={timeStr}
+                      onChangeText={setTimeStr}
+                      placeholder="18:00"
+                      placeholderTextColor={theme.textMuted}
+                    />
+                  </View>
                 </View>
               </View>
-              <View style={[styles.inputGroup, { marginTop: 12 }]}>
-                <Text style={[styles.label, { color: theme.textMuted }]}>Durée (minutes)</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <TextInput
-                    style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border }]}
-                    value={durationMin}
-                    onChangeText={setDurationMin}
-                    keyboardType="numeric"
-                  />
-                  <View style={{ flexDirection: 'row', marginLeft: 12 }}>
-                    {[30, 45, 60, 90].map(m => (
-                      <TouchableOpacity
-                        key={m}
-                        style={[
-                          styles.quickBtn,
-                          { backgroundColor: durationMin === m.toString() ? theme.accent : theme.background }
-                        ]}
-                        onPress={() => setDurationMin(m.toString())}
-                      >
-                        <Text style={{ fontSize: 12, color: durationMin === m.toString() ? '#fff' : theme.text }}>{m}</Text>
-                      </TouchableOpacity>
-                    ))}
+
+              {/* Duration */}
+              <View style={{ marginTop: 14 }}>
+                <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Durée de la séance</Text>
+                <View style={styles.durationRow}>
+                  <View style={[styles.durationInputBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <Timer size={15} color={theme.accent} style={{ marginRight: 6 }} />
+                    <TextInput
+                      style={[styles.durationInput, { color: theme.text }]}
+                      value={durationMin}
+                      onChangeText={setDurationMin}
+                      keyboardType="numeric"
+                      placeholder="45"
+                      placeholderTextColor={theme.textMuted}
+                    />
+                    <Text style={[styles.unitText, { color: theme.textMuted }]}>min</Text>
+                  </View>
+
+                  <View style={styles.quickPresetsRow}>
+                    {[30, 45, 60, 90].map(m => {
+                      const isSel = durationMin === m.toString();
+                      return (
+                        <TouchableOpacity
+                          key={m}
+                          activeOpacity={0.7}
+                          style={[
+                            styles.presetChip,
+                            {
+                              backgroundColor: isSel ? theme.accent : theme.background,
+                              borderColor: isSel ? theme.accent : theme.border,
+                            }
+                          ]}
+                          onPress={() => setDurationMin(m.toString())}
+                        >
+                          <Text style={[styles.presetChipText, { color: isSel ? '#FFFFFF' : theme.text }]}>
+                            {m}m
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               </View>
             </View>
 
             {/* Section 2: Sélection Modèle */}
-            <View style={[styles.section, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.label, { color: theme.textMuted, marginBottom: 8 }]}>Séance à enregistrer</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                <TouchableOpacity
-                  style={[
-                    styles.templateChip,
-                    { backgroundColor: selectedTemplateId === null ? theme.accent : theme.background }
-                  ]}
-                  onPress={() => handleSelectTemplate('free')}
-                >
-                  <Text style={{ color: selectedTemplateId === null ? '#fff' : theme.text, fontWeight: '600' }}>
-                    Séance libre
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionIconBadge, { backgroundColor: `${theme.accent}15` }]}>
+                  <Dumbbell size={13} color={theme.accent} />
+                </View>
+                <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>PROGRAMME ASSOCIÉ</Text>
+              </View>
+
+              {/* Dropdown / Picker Trigger Button */}
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={[styles.dropdownTrigger, { backgroundColor: theme.background, borderColor: theme.border }]}
+                onPress={handleOpenTemplateSelector}
+              >
+                <View style={[styles.dropdownIconBadge, { backgroundColor: selectedTemplate ? `${theme.accent}18` : `${theme.textMuted}15` }]}>
+                  {selectedTemplate ? (
+                    <Dumbbell size={16} color={theme.accent} />
+                  ) : (
+                    <Sparkles size={16} color={theme.accent} />
+                  )}
+                </View>
+
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={[styles.dropdownTitle, { color: theme.text }]} numberOfLines={1}>
+                    {selectedTemplate ? selectedTemplate.title : 'Séance libre (aucun programme)'}
                   </Text>
-                </TouchableOpacity>
-                {templates.map(t => (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[
-                      styles.templateChip,
-                      { backgroundColor: selectedTemplateId === t.id ? theme.accent : theme.background }
-                    ]}
-                    onPress={() => handleSelectTemplate(t.id)}
-                  >
-                    <Text style={{ color: selectedTemplateId === t.id ? '#fff' : theme.text, fontWeight: '600' }}>
-                      {t.title}
+                  <Text style={[styles.dropdownSubtitle, { color: theme.textMuted }]} numberOfLines={1}>
+                    {selectedTemplate
+                      ? `${selectedTemplate.blocks?.length || 0} exercice${(selectedTemplate.blocks?.length || 0) > 1 ? 's' : ''} configuré${(selectedTemplate.blocks?.length || 0) > 1 ? 's' : ''}`
+                      : 'Enregistrement libre sans modèle prédéfini'}
+                  </Text>
+                </View>
+
+                <View style={[styles.dropdownChevronWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <ChevronDown size={16} color={theme.textMuted} />
+                </View>
+              </TouchableOpacity>
+
+              <View style={{ marginTop: 14 }}>
+                <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Nom personnalisé</Text>
+                <View style={[styles.inputBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <Bookmark size={15} color={theme.accent} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={[styles.inputField, { color: theme.text }]}
+                    value={sessionTitle}
+                    onChangeText={setSessionTitle}
+                    placeholder="Nom de la séance..."
+                    placeholderTextColor={theme.textMuted}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Section 3: Segmented Control pour le Mode */}
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, padding: 12 }]}>
+              <View style={[styles.segmentedContainer, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[
+                    styles.segmentTab,
+                    mode === 'express' && [styles.segmentTabActive, { backgroundColor: theme.surface, borderColor: theme.border }],
+                  ]}
+                  onPress={() => setMode('express')}
+                >
+                  <View style={[styles.tabIconBadge, { backgroundColor: mode === 'express' ? `${theme.accent}20` : 'transparent' }]}>
+                    <Zap size={14} color={mode === 'express' ? theme.accent : theme.textMuted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.tabTitle, { color: mode === 'express' ? theme.text : theme.textMuted }]}>
+                      Express
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              
-              <Text style={[styles.label, { color: theme.textMuted }]}>Nom de la séance</Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={sessionTitle}
-                onChangeText={setSessionTitle}
-              />
+                    <Text style={[styles.tabSub, { color: theme.textMuted }]}>
+                      Tout valider
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[
+                    styles.segmentTab,
+                    mode === 'detailed' && [styles.segmentTabActive, { backgroundColor: theme.surface, borderColor: theme.border }],
+                  ]}
+                  onPress={() => setMode('detailed')}
+                >
+                  <View style={[styles.tabIconBadge, { backgroundColor: mode === 'detailed' ? `${theme.accent}20` : 'transparent' }]}>
+                    <ListOrdered size={14} color={mode === 'detailed' ? theme.accent : theme.textMuted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.tabTitle, { color: mode === 'detailed' ? theme.text : theme.textMuted }]}>
+                      Détaillé
+                    </Text>
+                    <Text style={[styles.tabSub, { color: theme.textMuted }]}>
+                      Charges & reps
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modeNoteRow}>
+                <Info size={13} color={theme.textMuted} style={{ marginRight: 6, marginTop: 1 }} />
+                <Text style={[styles.modeNoteText, { color: theme.textMuted }]}>
+                  {mode === 'express'
+                    ? "En mode Express, les exercices et séries du modèle sont automatiquement validés selon votre dernière performance."
+                    : "En mode Détaillé, vous pouvez ajuster manuellement le poids et les répétitions pour chaque série."}
+                </Text>
+              </View>
             </View>
 
-            {/* Section 3: Mode */}
-            <View style={styles.modeToggleRow}>
-              <TouchableOpacity
-                style={[
-                  styles.modeBtn,
-                  { backgroundColor: mode === 'express' ? theme.accent : theme.surface }
-                ]}
-                onPress={() => setMode('express')}
-              >
-                <Zap size={16} color={mode === 'express' ? '#fff' : theme.text} />
-                <Text style={[styles.modeBtnText, { color: mode === 'express' ? '#fff' : theme.text }]}>Express</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modeBtn,
-                  { backgroundColor: mode === 'detailed' ? theme.accent : theme.surface }
-                ]}
-                onPress={() => setMode('detailed')}
-              >
-                <List size={16} color={mode === 'detailed' ? '#fff' : theme.text} />
-                <Text style={[styles.modeBtnText, { color: mode === 'detailed' ? '#fff' : theme.text }]}>Détaillé</Text>
-              </TouchableOpacity>
-            </View>
-
+            {/* Section 4: Détaillé */}
             {mode === 'detailed' && (
               <View style={styles.detailedSection}>
+                {prefillSourceText ? (
+                  <View style={[styles.prefillBanner, { backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }]}>
+                    <Sparkles size={15} color={theme.accent} style={{ marginRight: 8 }} />
+                    <Text style={[styles.prefillBannerText, { color: theme.text }]}>
+                      {prefillSourceText}
+                    </Text>
+                  </View>
+                ) : null}
+
                 {blocks.map((block, bIdx) => (
                   <View key={block.id} style={[styles.blockCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                     {block.type === 'single' && (
                       <>
+                        {/* Block Header */}
                         <View style={styles.blockHeader}>
-                          <Text style={[styles.blockTitle, { color: theme.text }]}>{block.exercise.exerciseName}</Text>
-                          <TouchableOpacity onPress={() => handleRemoveBlock(block.id)}>
-                            <Trash2 size={16} color={theme.danger} />
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                            <View style={[styles.orderBadge, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                              <Text style={[styles.orderBadgeText, { color: theme.accent }]}>#{bIdx + 1}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.blockTitle, { color: theme.text }]} numberOfLines={1}>
+                                {block.exercise.exerciseName}
+                              </Text>
+                              <Text style={[styles.muscleSub, { color: theme.textMuted }]}>
+                                {block.exercise.primaryMuscle}
+                              </Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleRemoveBlock(block.id)}
+                            style={[styles.trashBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Trash2 size={15} color={theme.danger} />
                           </TouchableOpacity>
                         </View>
-                        <View style={styles.tableHeader}>
-                          <Text style={[styles.colS, { color: theme.textMuted }]}>Série</Text>
-                          <Text style={[styles.colM, { color: theme.textMuted }]}>kg</Text>
-                          <Text style={[styles.colM, { color: theme.textMuted }]}>Reps</Text>
-                          <Text style={styles.colAction}></Text>
+
+                        {/* Table Header */}
+                        <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
+                          <Text style={[styles.colHead, styles.colS, { color: theme.textMuted }]}>SÉRIE</Text>
+                          <Text style={[styles.colHead, styles.colM, { color: theme.textMuted }]}>CHARGE (KG)</Text>
+                          <Text style={[styles.colHead, styles.colM, { color: theme.textMuted }]}>REPS</Text>
+                          <View style={styles.colAction} />
                         </View>
+
+                        {/* Set Rows */}
                         {block.exercise.sets.map((set, sIdx) => (
-                          <View key={set.id} style={styles.tableRow}>
-                            <Text style={[styles.colS, { color: theme.text, fontWeight: '700' }]}>{set.setNumber}</Text>
+                          <View key={set.id} style={[styles.tableRow, { borderBottomColor: `${theme.border}40` }]}>
+                            <View style={[styles.setNumBadge, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                              <Text style={[styles.setNumText, { color: theme.text }]}>
+                                {set.setNumber}
+                              </Text>
+                            </View>
+
                             <TouchableOpacity
+                              activeOpacity={0.75}
                               style={[styles.cellBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                               onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'weightKg', setNumber: set.setNumber, value: set.weightKg?.toString() || '' })}
                             >
-                              <Text style={{ color: theme.text }}>{set.weightKg || '-'}</Text>
+                              <Text style={[styles.cellVal, { color: set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted }]}>
+                                {set.weightKg !== undefined && set.weightKg !== null ? `${set.weightKg}` : '-'}
+                              </Text>
+                              <Text style={[styles.cellUnit, { color: theme.textMuted }]}>kg</Text>
                             </TouchableOpacity>
+
                             <TouchableOpacity
+                              activeOpacity={0.75}
                               style={[styles.cellBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                               onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'reps', setNumber: set.setNumber, value: set.reps?.toString() || '' })}
                             >
-                              <Text style={{ color: theme.text }}>{set.reps || '-'}</Text>
+                              <Text style={[styles.cellVal, { color: set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted }]}>
+                                {set.reps !== undefined && set.reps !== null ? `${set.reps}` : '-'}
+                              </Text>
+                              <Text style={[styles.cellUnit, { color: theme.textMuted }]}>reps</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.colAction} onPress={() => handleRemoveSet(block.id, set.id)}>
-                              <Trash2 size={16} color={theme.textMuted} />
+
+                            <TouchableOpacity
+                              style={styles.colAction}
+                              onPress={() => handleRemoveSet(block.id, set.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Trash2 size={14} color={theme.textMuted} />
                             </TouchableOpacity>
                           </View>
                         ))}
-                        <Button
-                          title="Ajouter série"
-                          variant="outline"
+
+                        {/* Add Set in card */}
+                        <TouchableOpacity
+                          activeOpacity={0.75}
+                          style={[styles.addSetBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
                           onPress={() => handleAddSet(block.id)}
-                          style={{ marginTop: 8 }}
-                        />
+                        >
+                          <Plus size={14} color={theme.accent} style={{ marginRight: 6 }} />
+                          <Text style={[styles.addSetText, { color: theme.text }]}>Ajouter une série</Text>
+                        </TouchableOpacity>
                       </>
                     )}
+
                     {block.type === 'circuit' && (
                       <>
                         <View style={styles.blockHeader}>
@@ -457,15 +872,15 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                                 }}
                               >
                                 <View
-                                  style={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: 11,
-                                    backgroundColor: theme.accent,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginRight: 8,
-                                  }}
+                                 style={{
+                                   width: 22,
+                                   height: 22,
+                                   borderRadius: 11,
+                                   backgroundColor: theme.accent,
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   marginRight: 8,
+                                 }}
                                 >
                                   <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>{letter}</Text>
                                 </View>
@@ -500,21 +915,33 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                   </View>
                 ))}
 
-                <Button
-                  title="Ajouter un exercice"
-                  variant="outline"
-                  icon={<Plus size={18} color={theme.text} />}
+                {/* Add Exercise Hero Button */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[styles.addExDashedCard, { borderColor: theme.accent, backgroundColor: `${theme.accent}0A` }]}
                   onPress={() => setShowExerciseSelector(true)}
-                  style={{ marginBottom: 20 }}
-                />
+                >
+                  <View style={[styles.addExIconCircle, { backgroundColor: `${theme.accent}20` }]}>
+                    <Plus size={18} color={theme.accent} />
+                  </View>
+                  <Text style={[styles.addExText, { color: theme.text }]}>Ajouter un exercice à la séance</Text>
+                </TouchableOpacity>
               </View>
             )}
           </ScrollView>
 
-          <View style={[styles.footer, { borderTopColor: theme.border }]}>
-            <Button title="Enregistrer" variant="primary" onPress={handleSave} style={{ flex: 1 }} />
+          {/* Sticky Footer */}
+          <View style={[styles.footer, { borderTopColor: theme.border, backgroundColor: theme.surface }]}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleSave}
+              style={[styles.saveBtn, { backgroundColor: theme.accent }]}
+            >
+              <CheckCircle2 size={20} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 8 }} />
+              <Text style={styles.saveBtnText}>Enregistrer la séance</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </View>
 
       {/* Numeric Keypad for Detailed Mode */}
@@ -546,9 +973,170 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
         />
       )}
 
+      {/* Template Selector Modal (Dropdown Pop-up) */}
+      <Modal
+        visible={showTemplateSelector}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseTemplateSelector}
+      >
+        <View style={styles.overlay}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={handleCloseTemplateSelector}
+            accessibilityLabel="Fermer le sélecteur de programme"
+          />
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                backgroundColor: theme.background,
+                borderColor: theme.border,
+                height: '75%',
+                transform: [{ translateY: templateTranslateY }],
+              },
+            ]}
+          >
+            {/* Drag Handle & Header */}
+            <View style={[styles.headerContainer, { borderBottomColor: theme.border, backgroundColor: theme.surface }]}>
+              {/* Draggable surface covering the full header */}
+              <View style={StyleSheet.absoluteFillObject} {...templatePanResponder.panHandlers} />
+
+              <View pointerEvents="box-none" style={{ width: '100%' }}>
+                <View pointerEvents="none" style={styles.dragHandleContainer}>
+                  <View style={[styles.dragHandle, { backgroundColor: theme.background }]} />
+                </View>
+
+                <View pointerEvents="box-none" style={styles.header}>
+                  <View pointerEvents="none" style={styles.headerLeft}>
+                    <View style={[styles.headerIconBadge, { backgroundColor: `${theme.accent}18`, borderColor: `${theme.accent}30` }]}>
+                      <Dumbbell size={18} color={theme.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.title, { color: theme.text }]}>Choisir un programme</Text>
+                      <Text style={[styles.subtitle, { color: theme.textMuted }]}>Ordre alphabétique</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleCloseTemplateSelector}
+                    style={[styles.closeBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Fermer"
+                  >
+                    <X size={18} color={theme.text} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {templates.length > 3 && (
+              <View style={{ padding: 12, paddingBottom: 6 }}>
+                <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}>
+                  <Search size={16} color={theme.textMuted} />
+                  <TextInput
+                    style={[styles.searchInput, { color: theme.text }]}
+                    placeholder="Rechercher un programme..."
+                    placeholderTextColor={theme.textMuted}
+                    value={templateSearchQuery}
+                    onChangeText={setTemplateSearchQuery}
+                  />
+                  {templateSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setTemplateSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <X size={16} color={theme.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
+            <ScrollView style={{ flex: 1, padding: 12 }} showsVerticalScrollIndicator={false}>
+              {/* Option 1 : Séance libre */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[
+                  styles.templateSelectCard,
+                  {
+                    backgroundColor: selectedTemplateId === null ? `${theme.accent}12` : theme.surface,
+                    borderColor: selectedTemplateId === null ? theme.accent : theme.border,
+                  },
+                ]}
+                onPress={() => {
+                  handleSelectTemplate('free');
+                  handleCloseTemplateSelector();
+                }}
+              >
+                <View style={[styles.templateSelectIconBadge, { backgroundColor: selectedTemplateId === null ? `${theme.accent}25` : theme.background }]}>
+                  <Sparkles size={18} color={selectedTemplateId === null ? theme.accent : theme.textMuted} />
+                </View>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={[styles.templateSelectTitle, { color: selectedTemplateId === null ? theme.accent : theme.text }]}>
+                    Séance libre
+                  </Text>
+                  <Text style={[styles.templateSelectSub, { color: theme.textMuted }]}>
+                    Aucun programme prédéfini, exercices ajoutés librement
+                  </Text>
+                </View>
+                {selectedTemplateId === null && (
+                  <View style={[styles.checkCircle, { backgroundColor: theme.accent }]}>
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Templates list */}
+              {filteredTemplates.map(t => {
+                const isSelected = selectedTemplateId === t.id;
+                const blocksCount = t.blocks?.length || 0;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.templateSelectCard,
+                      {
+                        backgroundColor: isSelected ? `${theme.accent}12` : theme.surface,
+                        borderColor: isSelected ? theme.accent : theme.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      handleSelectTemplate(t.id);
+                      handleCloseTemplateSelector();
+                    }}
+                  >
+                    <View style={[styles.templateSelectIconBadge, { backgroundColor: isSelected ? `${theme.accent}25` : theme.background }]}>
+                      <Dumbbell size={18} color={isSelected ? theme.accent : theme.textMuted} />
+                    </View>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[styles.templateSelectTitle, { color: isSelected ? theme.accent : theme.text }]}>
+                        {t.title}
+                      </Text>
+                      <Text style={[styles.templateSelectSub, { color: theme.textMuted }]}>
+                        {blocksCount} exercice{blocksCount > 1 ? 's' : ''} configuré{blocksCount > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <View style={[styles.checkCircle, { backgroundColor: theme.accent }]}>
+                        <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+
       {/* Exercise Selector Modal for Detailed Mode */}
       <Modal visible={showExerciseSelector} transparent animationType="slide" onRequestClose={() => setShowExerciseSelector(false)}>
         <View style={styles.overlay}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => setShowExerciseSelector(false)}
+            accessibilityLabel="Fermer le sélecteur d'exercice"
+          />
           <View style={[styles.content, { backgroundColor: theme.cardBg, borderColor: theme.border, height: '80%' }]}>
             <View style={[styles.header, { borderBottomColor: theme.border }]}>
               <Text style={[styles.title, { color: theme.text }]}>Sélectionner un exercice</Text>
@@ -590,37 +1178,104 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.68)',
     justifyContent: 'flex-end',
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   content: {
-    height: '92%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderBottomWidth: 0,
+    height: '93%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
     overflow: 'hidden',
+  },
+  headerContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomWidth: 1,
+    overflow: 'hidden',
+  },
+  dragHandleContainer: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 8,
+    minHeight: 26,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    paddingTop: 6,
+    paddingBottom: 14,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  headerIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
   },
   closeBtn: {
-    padding: 8,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  section: {
+  scrollContent: {
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    paddingBottom: 24,
+  },
+  card: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionIconBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   row: {
     flexDirection: 'row',
@@ -629,58 +1284,207 @@ const styles = StyleSheet.create({
   inputGroup: {
     flex: 1,
   },
-  label: {
+  fieldLabel: {
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 6,
   },
-  input: {
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    height: 44,
-    fontSize: 15,
+    height: 46,
   },
-  quickBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginLeft: 6,
+  inputField: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  durationInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 46,
+    width: 105,
+  },
+  durationInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  unitText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 2,
+  },
+  quickPresetsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  presetChip: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  templateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginRight: 8,
+  presetChipText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
-  modeToggleRow: {
+  dropdownTrigger: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
   },
-  modeBtn: {
+  dropdownIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  dropdownTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  dropdownSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  dropdownChevronWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  templateSelectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  templateSelectIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  templateSelectTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  templateSelectSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  checkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  segmentedContainer: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    gap: 6,
+  },
+  segmentTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'transparent',
     gap: 8,
   },
-  modeBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
+  segmentTabActive: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  tabIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  tabSub: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  modeNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  modeNoteText: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 16,
+    flex: 1,
   },
   detailedSection: {
+    marginTop: 4,
     marginBottom: 20,
+  },
+  prefillBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  prefillBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    flex: 1,
   },
   blockCard: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   blockHeader: {
     flexDirection: 'row',
@@ -688,38 +1492,130 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  orderBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  orderBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
   blockTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  muscleSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  trashBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tableHeader: {
     flexDirection: 'row',
-    marginBottom: 8,
+    alignItems: 'center',
+    paddingBottom: 6,
+    marginBottom: 6,
+    borderBottomWidth: 1,
     paddingHorizontal: 4,
+  },
+  colHead: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
   },
-  colS: { width: 40, fontSize: 13, textAlign: 'center' },
-  colM: { flex: 1, fontSize: 13, textAlign: 'center' },
-  colAction: { width: 40, alignItems: 'center' },
+  colS: { width: 34, textAlign: 'center' },
+  colM: { flex: 1, textAlign: 'center' },
+  colAction: { width: 34, alignItems: 'center' },
+  setNumBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  setNumText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
   cellBtn: {
     flex: 1,
-    height: 36,
+    height: 42,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 4,
+    paddingHorizontal: 6,
+  },
+  cellVal: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  cellUnit: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 3,
+  },
+  addSetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  addSetText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  addExDashedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    marginBottom: 20,
+    gap: 8,
+  },
+  addExIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addExText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    height: 44,
+    height: 46,
   },
   searchInput: {
     flex: 1,
@@ -741,5 +1637,24 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     borderTopWidth: 1,
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 14,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
