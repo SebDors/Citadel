@@ -18,6 +18,7 @@ export interface CustomNumericKeypadProps {
   setNumber: number;
   activeField: NumericFieldType;
   value: string;
+  previousValue?: string;
   onChangeValue?: (val: string) => void;
   onNextField?: (currentVal: string) => void;
   onPreviousField?: (currentVal: string) => void;
@@ -215,6 +216,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   setNumber,
   activeField,
   value,
+  previousValue,
   onChangeValue,
   onNextField,
   onPreviousField,
@@ -331,8 +333,13 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           {/* En-tête du Clavier */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerTitleContainer}>
-              <Text style={[styles.headerSubTitle, { color: theme.textMuted }]}>
+              <Text style={[styles.headerSubTitle, { color: theme.textMuted }]} numberOfLines={1}>
                 {title}
+                {previousValue ? (
+                  <Text style={{ color: theme.accent, fontWeight: '700' }}>
+                    {` · Prev: ${previousValue}`}
+                  </Text>
+                ) : null}
               </Text>
               <View style={styles.valueDisplayRow}>
                 <Text

@@ -393,6 +393,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           setNumber={set.setNumber}
           activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
+          previousValue={set.previous}
           onNextField={handleKeypadNext}
           onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}
