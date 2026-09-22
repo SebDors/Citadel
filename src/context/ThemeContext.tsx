@@ -24,7 +24,7 @@ interface ThemeContextType {
 const THEME_MODE_STORAGE_KEY = '@citadel_theme_mode';
 const THEME_ID_STORAGE_KEY = '@citadel_theme_id';
 
-const DEFAULT_THEME_ID: ThemeId = 'cyber';
+const DEFAULT_THEME_ID: ThemeId = 'citadel';
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: THEMES[DEFAULT_THEME_ID].dark,
@@ -54,6 +54,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         if (savedThemeId && savedThemeId in THEMES) {
           setThemeIdState(savedThemeId as ThemeId);
+        } else if (savedThemeId && savedThemeId.startsWith('emerald')) {
+          setThemeIdState('emerald');
+        } else if (savedThemeId) {
+          // Fallback en cas d'ancien thème supprimé (ex: cyber, forge, ocean, etc.)
+          setThemeIdState('citadel');
         }
       })
       .catch((e) => console.warn('[ThemeContext] Error loading theme preferences:', e));

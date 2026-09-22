@@ -56,14 +56,9 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
               >
                 <Palette size={20} color={theme.accent} />
               </View>
-              <View>
-                <Text style={[styles.title, { color: theme.text }]}>
-                  Thèmes & Couleurs
-                </Text>
-                <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                  Personnalisez l'ambiance visuelle
-                </Text>
-              </View>
+              <Text style={[styles.title, { color: theme.text }]}>
+                Thèmes
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -104,7 +99,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                   { color: mode === 'dark' ? activeTextOnAccent : theme.textMuted },
                 ]}
               >
-                Sombre (OLED)
+                Sombre
               </Text>
             </TouchableOpacity>
 
@@ -129,15 +124,15 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                   { color: mode === 'light' ? activeTextOnAccent : theme.textMuted },
                 ]}
               >
-                Clair (Clean)
+                Clair
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Liste des Palettes de Thèmes */}
+          {/* Grille 2 colonnes des Nuanciers de Thèmes */}
           <ScrollView
             style={styles.themeList}
-            contentContainerStyle={styles.themeListContent}
+            contentContainerStyle={styles.themeGrid}
             showsVerticalScrollIndicator={false}
           >
             {allThemes.map((t: ThemeDefinition) => {
@@ -147,56 +142,54 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
               return (
                 <TouchableOpacity
                   key={t.id}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                   onPress={() => setThemeId(t.id)}
                   style={[
                     styles.themeCard,
                     {
-                      backgroundColor: theme.surface,
+                      backgroundColor: isSelected ? `${theme.accent}14` : theme.surface,
                       borderColor: isSelected ? theme.accent : theme.border,
                       borderWidth: isSelected ? 2 : 1,
                     },
                   ]}
                 >
-                  <View style={styles.themeCardTop}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.themeTitleRow}>
-                        <Text style={[styles.themeName, { color: theme.text }]}>
-                          {t.name}
-                        </Text>
-                        {isSelected && (
-                          <View
-                            style={[
-                              styles.selectedBadge,
-                              { backgroundColor: theme.accent },
-                            ]}
-                          >
-                            <Check size={12} color={activeTextOnAccent} />
-                          </View>
-                        )}
-                      </View>
-                      <Text
-                        style={[styles.themeSubtitle, { color: theme.textMuted }]}
-                      >
-                        {t.subtitle}
-                      </Text>
-                    </View>
+                  {/* Nuancier Swatch Preview */}
+                  <View
+                    style={[
+                      styles.swatchContainer,
+                      {
+                        borderColor: isSelected ? `${theme.accent}40` : 'rgba(128, 128, 128, 0.25)',
+                      },
+                    ]}
+                  >
+                    <View style={[styles.swatchSegment, { backgroundColor: previewDots[0], flex: 3 }]} />
+                    <View style={[styles.swatchSegment, { backgroundColor: previewDots[1], flex: 2 }]} />
+                    <View style={[styles.swatchSegment, { backgroundColor: previewDots[2], flex: 2 }]} />
+                    <View style={[styles.swatchSegment, { backgroundColor: previewDots[3], flex: 1.2 }]} />
+                  </View>
 
-                    {/* Pastilles d'Aperçu des Couleurs */}
-                    <View style={styles.dotsRow}>
-                      {previewDots.map((color, idx) => (
-                        <View
-                          key={`${t.id}-dot-${idx}`}
-                          style={[
-                            styles.colorDot,
-                            {
-                              backgroundColor: color,
-                              borderColor: theme.border,
-                            },
-                          ]}
-                        />
-                      ))}
-                    </View>
+                  {/* Ligne Titre & Badge de sélection */}
+                  <View style={styles.cardFooter}>
+                    <Text
+                      style={[
+                        styles.themeName,
+                        { color: isSelected ? theme.accent : theme.text },
+                        isSelected && { fontWeight: '800' },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {t.name}
+                    </Text>
+                    {isSelected && (
+                      <View
+                        style={[
+                          styles.selectedBadge,
+                          { backgroundColor: theme.accent },
+                        ]}
+                      >
+                        <Check size={10} color={activeTextOnAccent} strokeWidth={3} />
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -229,7 +222,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '94%',
     maxWidth: 420,
-    maxHeight: '85%',
+    maxHeight: '88%',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
@@ -254,13 +247,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-  },
-  subtitle: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 1,
   },
   closeBtn: {
     padding: 4,
@@ -285,56 +273,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   themeList: {
-    maxHeight: 380,
+    maxHeight: 400,
   },
-  themeListContent: {
-    gap: 8,
+  themeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
     paddingBottom: 4,
   },
   themeCard: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    width: '48.5%',
+    borderRadius: 12,
+    padding: 8,
   },
-  themeCardTop: {
+  swatchContainer: {
+    height: 42,
+    borderRadius: 8,
+    overflow: 'hidden',
     flexDirection: 'row',
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  swatchSegment: {
+    height: '100%',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  themeTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    paddingHorizontal: 2,
+    minHeight: 20,
   },
   themeName: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  themeSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
+    fontSize: 12.5,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 4,
   },
   selectedBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  colorDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 1,
-  },
   footer: {
-    marginTop: 12,
+    marginTop: 14,
   },
 });

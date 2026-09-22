@@ -8,6 +8,7 @@ import { Button } from '../UI/Button';
 import { User, Scale, Flame, Settings, RotateCcw, Sparkles, Download } from 'lucide-react-native';
 import { ExportDataModal } from './ExportDataModal';
 import { formatWeight } from '../../utils/numberUtils';
+import Constants from 'expo-constants';
 
 interface ProfileHeaderCardProps {
   profile: UserProfile;
@@ -166,6 +167,19 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, o
                 Réinitialiser les données de l'application
               </Text>
             </TouchableOpacity>
+
+            {/* Version de l'application */}
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: 11,
+                fontWeight: '500',
+                color: theme.textMuted,
+                marginTop: 14,
+              }}
+            >
+              Version {Constants.expoConfig?.version || '1.5.1'}
+            </Text>
           </View>
         </TouchableOpacity>
       </Modal>
