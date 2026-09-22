@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -9,6 +9,7 @@ import { parseFloatFrench } from '../../utils/numberUtils';
 interface SetTableRowProps {
   set: WorkoutSet;
   exerciseId: string;
+  isNextSet?: boolean;
   onUpdate: (field: keyof WorkoutSet, value: any) => void;
   onToggleComplete: () => void;
   onDelete: () => void;
@@ -21,6 +22,8 @@ type KeypadTarget =
 
 const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   set,
+  exerciseId,
+  isNextSet,
   onUpdate,
   onToggleComplete,
   onDelete,
@@ -83,12 +86,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     }
   }, [onUpdate, set.dropSteps]);
 
-  // Passage au champ suivant (KG ➔ REPS ➔ RIR)
+  // Passage au champ suivant (KG ➔ REPS ➔ RIR) — Réactivité instantanée (<1ms)
   const handleKeypadNext = useCallback((currentVal?: string) => {
     if (!keypadTarget) return;
+    const targetToCommit = keypadTarget;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
-    commitValue(keypadTarget, valToCommit);
 
+    // 1. Ouvrir immédiatement le champ suivant sans attendre le recalcul global / I/O
     if (keypadTarget.type === 'main') {
       if (keypadTarget.field === 'weightKg') {
         handleOpenMainKeypad('reps');
@@ -107,13 +111,18 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
         setKeypadTarget(null);
       }
     }
+
+    // 2. Commit asynchrone non-bloquant pour 0ms de latence perçue
+    setTimeout(() => {
+      commitValue(targetToCommit, valToCommit);
+    }, 0);
   }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad, set.type, set.completed, onToggleComplete]);
 
   // Retour au champ précédent (RIR ➔ REPS ➔ KG)
   const handleKeypadPrevious = useCallback((currentVal?: string) => {
     if (!keypadTarget) return;
+    const targetToCommit = keypadTarget;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
-    commitValue(keypadTarget, valToCommit);
 
     if (keypadTarget.type === 'main') {
       if (keypadTarget.field === 'rir') {
@@ -126,6 +135,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
         handleOpenDropKeypad(keypadTarget.stepId, 'weightKg');
       }
     }
+
+    setTimeout(() => {
+      commitValue(targetToCommit, valToCommit);
+    }, 0);
   }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad]);
 
   // Validation finale
@@ -165,14 +178,39 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     onUpdate('dropSteps', next);
   };
 
+  // Extraction des valeurs fantômes de la performance précédente (Ghost values)
+  const previousMatch = useMemo(() => {
+    if (!set.previous) return null;
+    const m = set.previous.match(/([0-9.]+)\s*(?:kg)?\s*[×x*]\s*([0-9]+)/i);
+    if (m) {
+      return { weight: m[1], reps: m[2] };
+    }
+    return null;
+  }, [set.previous]);
+
+  const isNextToFill = Boolean(isNextSet && !set.completed);
+  const isWeightActive = keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg';
+  const isRepsActive = keypadTarget?.type === 'main' && keypadTarget.field === 'reps';
+  const isRirActive = keypadTarget?.type === 'main' && keypadTarget.field === 'rir';
+
+  const isWeightEmpty = set.weightKg === undefined || set.weightKg === null;
+  const isRepsEmpty = set.reps === undefined || set.reps === null;
+
   return (
     <View style={styles.containerCol}>
       <View
         style={[
           styles.row,
           {
-            backgroundColor: set.completed ? theme.completedSet : 'transparent',
-            borderBottomColor: theme.border,
+            backgroundColor: set.completed
+              ? theme.completedSet
+              : isNextToFill
+              ? `${theme.accent}12`
+              : 'transparent',
+            borderBottomColor: isNextToFill ? theme.accent : theme.border,
+            borderColor: isNextToFill ? theme.accent : 'transparent',
+            borderWidth: isNextToFill ? 1.5 : 0,
+            borderBottomWidth: isNextToFill ? 1.5 : 1,
           },
         ]}
       >
@@ -200,9 +238,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
             style={[
               styles.cellBtn,
               {
-                borderColor: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg' ? theme.accent : theme.border,
-                borderWidth: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg' ? 2 : 1,
-                backgroundColor: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg' ? `${theme.accent}35` : theme.surface,
+                borderColor: isWeightActive
+                  ? theme.accent
+                  : isNextToFill && isWeightEmpty
+                  ? theme.accent
+                  : theme.border,
+                borderWidth: isWeightActive ? 2 : (isNextToFill && isWeightEmpty ? 1.5 : 1),
+                backgroundColor: isWeightActive
+                  ? `${theme.accent}35`
+                  : isNextToFill && isWeightEmpty
+                  ? `${theme.accent}18`
+                  : theme.surface,
               },
             ]}
           >
@@ -210,10 +256,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
               style={[
                 styles.cellText,
                 {
-                  color: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg'
-                    ? (theme.accent)
+                  color: isWeightActive
+                    ? theme.accent
                     : (set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted),
-                  fontWeight: keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg' ? '900' : '700',
+                  fontWeight: isWeightActive || (isNextToFill && isWeightEmpty) ? '900' : '700',
                 },
               ]}
             >
@@ -230,9 +276,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
             style={[
               styles.cellBtn,
               {
-                borderColor: keypadTarget?.type === 'main' && keypadTarget.field === 'reps' ? theme.accent : theme.border,
-                borderWidth: keypadTarget?.type === 'main' && keypadTarget.field === 'reps' ? 2 : 1,
-                backgroundColor: keypadTarget?.type === 'main' && keypadTarget.field === 'reps' ? `${theme.accent}35` : theme.surface,
+                borderColor: isRepsActive
+                  ? theme.accent
+                  : isNextToFill && isRepsEmpty
+                  ? theme.accent
+                  : theme.border,
+                borderWidth: isRepsActive ? 2 : (isNextToFill && isRepsEmpty ? 1.5 : 1),
+                backgroundColor: isRepsActive
+                  ? `${theme.accent}35`
+                  : isNextToFill && isRepsEmpty
+                  ? `${theme.accent}18`
+                  : theme.surface,
               },
             ]}
           >
@@ -240,10 +294,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
               style={[
                 styles.cellText,
                 {
-                  color: keypadTarget?.type === 'main' && keypadTarget.field === 'reps'
-                    ? (theme.accent)
+                  color: isRepsActive
+                    ? theme.accent
                     : (set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted),
-                  fontWeight: keypadTarget?.type === 'main' && keypadTarget.field === 'reps' ? '900' : '700',
+                  fontWeight: isRepsActive || (isNextToFill && isRepsEmpty) ? '900' : '700',
                 },
               ]}
             >
@@ -261,9 +315,9 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
               style={[
                 styles.cellBtn,
                 {
-                  borderColor: keypadTarget?.type === 'main' && keypadTarget.field === 'rir' ? theme.accent : theme.border,
-                  borderWidth: keypadTarget?.type === 'main' && keypadTarget.field === 'rir' ? 2 : 1,
-                  backgroundColor: keypadTarget?.type === 'main' && keypadTarget.field === 'rir' ? `${theme.accent}35` : theme.surface,
+                  borderColor: isRirActive ? theme.accent : theme.border,
+                  borderWidth: isRirActive ? 2 : 1,
+                  backgroundColor: isRirActive ? `${theme.accent}35` : theme.surface,
                 },
               ]}
             >
@@ -271,10 +325,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 style={[
                   styles.cellText,
                   {
-                    color: keypadTarget?.type === 'main' && keypadTarget.field === 'rir'
-                      ? (theme.accent)
+                    color: isRirActive
+                      ? theme.accent
                       : (set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted),
-                    fontWeight: keypadTarget?.type === 'main' && keypadTarget.field === 'rir' ? '900' : '700',
+                    fontWeight: isRirActive ? '900' : '700',
                   },
                 ]}
               >
@@ -291,8 +345,8 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           style={[
             styles.checkButton,
             {
-              backgroundColor: set.completed ? (theme.success || '#618764') : 'transparent',
-              borderColor: theme.success || '#618764',
+              backgroundColor: set.completed ? theme.accent : 'transparent',
+              borderColor: set.completed ? theme.accent : (theme.primary || theme.accent),
             },
           ]}
         >
@@ -394,6 +448,15 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
           previousValue={set.previous}
+          ghostValue={
+            keypadTarget.type === 'main' && previousMatch
+              ? keypadTarget.field === 'weightKg'
+                ? previousMatch.weight
+                : keypadTarget.field === 'reps'
+                ? previousMatch.reps
+                : undefined
+              : undefined
+          }
           onNextField={handleKeypadNext}
           onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}
@@ -457,7 +520,10 @@ SetTableRowComponent.displayName = 'SetTableRowComponent';
 
 export const SetTableRow = React.memo(
   SetTableRowComponent,
-  (prev, next) => prev.set === next.set && prev.exerciseId === next.exerciseId
+  (prev, next) =>
+    prev.set === next.set &&
+    prev.exerciseId === next.exerciseId &&
+    prev.isNextSet === next.isNextSet
 );
 export default SetTableRow;
 
@@ -634,5 +700,10 @@ const styles = StyleSheet.create({
   addDropText: {
     fontSize: 11,
     fontWeight: '800',
+  },
+  ghostText: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontStyle: 'italic',
   },
 });

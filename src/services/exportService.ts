@@ -90,6 +90,7 @@ export const ExportService = {
     return JSON.stringify(data, null, 2);
   },
 
+
   async shareFile(filename: string, content: string, mimeType: string): Promise<void> {
     const fileUri = FileSystem.cacheDirectory + filename;
     await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });

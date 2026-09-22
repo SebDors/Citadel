@@ -42,6 +42,7 @@ export interface WorkoutExercise {
   exerciseName: string;
   targetMuscles: string[];
   primaryMuscle: string;
+  primaryMuscles?: string[];
   notes?: string;
   restSeconds: number;
   supersetGroup?: string;
@@ -52,6 +53,7 @@ export interface CircuitExerciseItem {
   id: string;
   exerciseName: string;
   primaryMuscle: string;
+  primaryMuscles?: string[];
   targetMuscles?: string[];
   targetValue: number;
   targetType: 'reps' | 'time';
@@ -92,6 +94,7 @@ export interface WorkoutSession {
   status: 'in_progress' | 'completed';
   hasStarted?: boolean;
   isPaused?: boolean;
+  pausedAt?: string;
   isCircuit?: boolean;
   circuitRounds?: number;
   currentCircuitRound?: number;
@@ -138,6 +141,7 @@ export interface UserProfile {
   avatarUrl?: string;
   currentWeightKg: number;
   totalWorkouts: number;
+  availablePlates?: number[];
 }
 
 import { SharedExercise } from '../constants/exerciseDatabase';

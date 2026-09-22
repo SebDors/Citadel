@@ -16,6 +16,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { parseFloatFrench } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
+import { StorageService } from '../../services/storage';
 import {
   Activity,
   Plus,
@@ -58,6 +59,24 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   onDeleteMeasurement,
 }) => {
   const { theme } = useTheme();
+
+  // Collapsible state with persistence
+  const [isCardCollapsed, setIsCardCollapsed] = useState(false);
+
+  React.useEffect(() => {
+    StorageService.loadCollapsedCards().then((saved) => {
+      if (saved && typeof saved['profile_body_measurements'] === 'boolean') {
+        setIsCardCollapsed(saved['profile_body_measurements']);
+      }
+    });
+  }, []);
+
+  const toggleCardCollapsed = async () => {
+    const nextVal = !isCardCollapsed;
+    setIsCardCollapsed(nextVal);
+    const saved = await StorageService.loadCollapsedCards();
+    await StorageService.saveCollapsedCards({ ...saved, profile_body_measurements: nextVal });
+  };
 
   // Modal & Collapsible Calendar State
   const [modalVisible, setModalVisible] = useState(false);
@@ -237,22 +256,53 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
   return (
     <Card>
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
+      <View style={[styles.header, isCardCollapsed && { marginBottom: 0 }]}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={toggleCardCollapsed}
+          style={styles.titleRow}
+        >
           <Activity size={18} color={theme.accent} />
           <Text style={[styles.title, { color: theme.text }]}>Poids & Mensurations</Text>
-        </View>
-        <TouchableOpacity activeOpacity={0.7} onPress={handleOpenModal}>
-          <Plus size={20} color={theme.accent} />
+          {isCardCollapsed && sortedMeasurements.length > 0 && (
+            <View style={[styles.collapsedBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text style={[styles.collapsedBadgeText, { color: theme.textMuted }]}>
+                {sortedMeasurements.length}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleOpenModal}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Ajouter une mesure"
+          >
+            <Plus size={20} color={theme.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={toggleCardCollapsed}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={isCardCollapsed ? 'Développer' : 'Réduire'}
+          >
+            {isCardCollapsed ? (
+              <ChevronDown size={18} color={theme.textMuted} />
+            ) : (
+              <ChevronUp size={18} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Liste des dernières mesures */}
-      {sortedMeasurements.length === 0 ? (
-        <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-          Aucune mesure enregistrée. Cliquez sur + pour en ajouter.
-        </Text>
-      ) : (
+      {!isCardCollapsed && (
+        sortedMeasurements.length === 0 ? (
+          <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+            Aucune mesure enregistrée. Cliquez sur + pour en ajouter.
+          </Text>
+        ) : (
         sortedMeasurements.map((m) => {
           const secondaryParts: string[] = [];
           if (m.chestCm !== undefined) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
@@ -315,7 +365,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
             </View>
           );
         })
-      )}
+      ))}
 
       {/* ---------------- MODALE POP-UP DE SAISIE AVEC CALENDRIER REPLIABLE ---------------- */}
       <Modal
@@ -543,14 +593,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   title: {
     fontSize: 16,
     fontWeight: '800',
     marginLeft: 6,
+  },
+  collapsedBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  collapsedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   emptyText: {
     fontSize: 12,

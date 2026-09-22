@@ -189,7 +189,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
       success: '#68B684',
       warning: '#E5A84B',
       danger: '#E05252',
-      completedSet: '#422339',
+      completedSet: '#3A1C32',
       supersetTag: '#2F394D',
     },
     light: {
@@ -205,7 +205,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
       success: '#15803D',
       warning: '#B45309',
       danger: '#991B1B',
-      completedSet: '#E8E2D1',
+      completedSet: '#F2E8F0',
       supersetTag: '#DCD4BF',
     },
   },

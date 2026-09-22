@@ -44,8 +44,9 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'Pectoraux' | 'Dos' | 'Épaules' | 'Bras' | 'Jambes' | 'Abdos'>('Pectoraux');
-  const [primaryMuscle, setPrimaryMuscle] = useState('');
-  const [isCustomPrimary, setIsCustomPrimary] = useState(false);
+  const [selectedPrimaryMuscles, setSelectedPrimaryMuscles] = useState<string[]>([]);
+  const [customPrimaryInput, setCustomPrimaryInput] = useState('');
+  const [isAddingCustomPrimary, setIsAddingCustomPrimary] = useState(false);
   const [selectedSecondaryMuscles, setSelectedSecondaryMuscles] = useState<string[]>([]);
   const [customSecondaryInput, setCustomSecondaryInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -57,19 +58,23 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
     if (initialExercise) {
       setName(initialExercise.name);
       setCategory(initialExercise.category);
-      setPrimaryMuscle(initialExercise.primaryMuscle);
 
-      const options = MUSCLE_OPTIONS_PER_CATEGORY[initialExercise.category]?.primary || [];
-      setIsCustomPrimary(!options.includes(initialExercise.primaryMuscle));
+      const parsedPrimaries = (initialExercise.primaryMuscles && initialExercise.primaryMuscles.length > 0)
+        ? initialExercise.primaryMuscles
+        : (initialExercise.primaryMuscle || '').split(',').map((s) => s.trim()).filter(Boolean);
 
+      setSelectedPrimaryMuscles(parsedPrimaries);
       setSelectedSecondaryMuscles(initialExercise.targetMuscles || []);
+      setCustomPrimaryInput('');
+      setIsAddingCustomPrimary(false);
       setCustomSecondaryInput('');
     } else {
       setName('');
       setCategory('Pectoraux');
       const defaultPrimary = MUSCLE_OPTIONS_PER_CATEGORY['Pectoraux'].primary[0];
-      setPrimaryMuscle(defaultPrimary);
-      setIsCustomPrimary(false);
+      setSelectedPrimaryMuscles([defaultPrimary]);
+      setIsAddingCustomPrimary(false);
+      setCustomPrimaryInput('');
       setSelectedSecondaryMuscles([]);
       setCustomSecondaryInput('');
     }
@@ -81,10 +86,31 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
     setCategory(newCat);
     const newOptions = MUSCLE_OPTIONS_PER_CATEGORY[newCat];
     if (newOptions && newOptions.primary.length > 0) {
-      setPrimaryMuscle(newOptions.primary[0]);
-      setIsCustomPrimary(false);
+      setSelectedPrimaryMuscles([newOptions.primary[0]]);
+    } else {
+      setSelectedPrimaryMuscles([]);
     }
+    setIsAddingCustomPrimary(false);
     setSelectedSecondaryMuscles([]);
+  };
+
+  const togglePrimaryMuscle = (muscle: string) => {
+    setSelectedPrimaryMuscles((prev) => {
+      if (prev.includes(muscle)) {
+        return prev.filter((m) => m !== muscle);
+      } else {
+        return [...prev, muscle];
+      }
+    });
+  };
+
+  const handleAddCustomPrimary = () => {
+    const trimmed = customPrimaryInput.trim();
+    if (trimmed && !selectedPrimaryMuscles.includes(trimmed)) {
+      setSelectedPrimaryMuscles((prev) => [...prev, trimmed]);
+      setCustomPrimaryInput('');
+      setIsAddingCustomPrimary(false);
+    }
   };
 
   const toggleSecondaryMuscle = (muscle: string) => {
@@ -98,8 +124,8 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
       setErrorMsg("Veuillez saisir un nom d'exercice.");
       return;
     }
-    if (!primaryMuscle.trim()) {
-      setErrorMsg('Veuillez sélectionner ou saisir le muscle principal.');
+    if (selectedPrimaryMuscles.length === 0) {
+      setErrorMsg('Veuillez sélectionner au moins un muscle principal.');
       return;
     }
 
@@ -114,14 +140,16 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
         .filter((m) => m.length > 0);
 
       const allSecondary = Array.from(new Set([...selectedSecondaryMuscles, ...parsedCustomSecondary]));
+      const primaryString = selectedPrimaryMuscles.join(', ');
 
       if (initialExercise) {
         const updated: SharedExercise = {
           ...initialExercise,
           name: name.trim(),
           category,
-          primaryMuscle: primaryMuscle.trim(),
-          targetMuscles: allSecondary.length > 0 ? allSecondary : [primaryMuscle.trim()],
+          primaryMuscle: primaryString,
+          primaryMuscles: selectedPrimaryMuscles,
+          targetMuscles: allSecondary.length > 0 ? allSecondary : selectedPrimaryMuscles,
         };
         await updateCustomExercise(updated);
         if (onSuccess) onSuccess(updated);
@@ -129,8 +157,9 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
         const created = await addCustomExercise({
           name: name.trim(),
           category,
-          primaryMuscle: primaryMuscle.trim(),
-          targetMuscles: allSecondary.length > 0 ? allSecondary : [primaryMuscle.trim()],
+          primaryMuscle: primaryString,
+          primaryMuscles: selectedPrimaryMuscles,
+          targetMuscles: allSecondary.length > 0 ? allSecondary : selectedPrimaryMuscles,
           defaultRestSeconds: 75,
         });
         if (onSuccess) onSuccess(created);
@@ -202,11 +231,18 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
                 })}
               </View>
 
-              {/* Muscle principal (Dropdown / Chips normés) */}
-              <Text style={[styles.label, { color: theme.text }]}>Muscle principal *</Text>
+              {/* Muscle principal (Chips multi-sélection normés) */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 4 }}>
+                <Text style={[styles.label, { marginBottom: 0, color: theme.text }]}>
+                  Muscles principaux * (sélection multiple)
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.accent }}>
+                  {selectedPrimaryMuscles.length} sélectionné{selectedPrimaryMuscles.length > 1 ? 's' : ''}
+                </Text>
+              </View>
               <View style={styles.chipsWrap}>
                 {availableOptions.primary.map((m) => {
-                  const isSelected = !isCustomPrimary && primaryMuscle === m;
+                  const isSelected = selectedPrimaryMuscles.includes(m);
                   return (
                     <TouchableOpacity
                       key={m}
@@ -218,49 +254,91 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
                           backgroundColor: isSelected ? theme.accent : theme.surface,
                         },
                       ]}
-                      onPress={() => {
-                        setPrimaryMuscle(m);
-                        setIsCustomPrimary(false);
-                      }}
+                      onPress={() => togglePrimaryMuscle(m)}
                     >
-                      <Text style={[styles.chipText, { color: isSelected ? '#FFFFFF' : theme.text }]}>
-                        {m}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isSelected && <Check size={12} color="#FFFFFF" style={{ marginRight: 4 }} />}
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: isSelected ? '#FFFFFF' : theme.text, fontWeight: isSelected ? '800' : '600' },
+                          ]}
+                        >
+                          {m}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
+
+                {/* Muscles principaux personnalisés déjà sélectionnés mais pas dans la liste officielle */}
+                {selectedPrimaryMuscles
+                  .filter((m) => !availableOptions.primary.includes(m))
+                  .map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.chip,
+                        {
+                          borderColor: theme.accent,
+                          backgroundColor: theme.accent,
+                        },
+                      ]}
+                      onPress={() => togglePrimaryMuscle(m)}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Check size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={[styles.chipText, { color: '#FFFFFF', fontWeight: '800' }]}>
+                          {m}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+
                 <TouchableOpacity
                   activeOpacity={0.7}
                   style={[
                     styles.chip,
                     {
-                      borderColor: isCustomPrimary ? theme.accent : theme.border,
-                      backgroundColor: isCustomPrimary ? theme.accent : theme.surface,
+                      borderColor: isAddingCustomPrimary ? theme.accent : theme.border,
+                      backgroundColor: theme.surface,
                     },
                   ]}
-                  onPress={() => {
-                    setIsCustomPrimary(true);
-                    if (!isCustomPrimary) setPrimaryMuscle('');
-                  }}
+                  onPress={() => setIsAddingCustomPrimary(!isAddingCustomPrimary)}
                 >
-                  <Text style={[styles.chipText, { color: isCustomPrimary ? '#FFFFFF' : theme.text }]}>
-                    + Autre...
+                  <Text style={[styles.chipText, { color: theme.accent, fontWeight: '700' }]}>
+                    + Autre muscle...
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {isCustomPrimary && (
-                <TextInput
-                  style={[
-                    styles.input,
-                    { color: theme.text, borderColor: theme.accent, backgroundColor: theme.surface, marginTop: 8 },
-                  ]}
-                  placeholder="Saisir un muscle principal personnalisé"
-                  placeholderTextColor={theme.textMuted}
-                  value={primaryMuscle}
-                  onChangeText={setPrimaryMuscle}
-                  autoFocus
-                />
+              {isAddingCustomPrimary && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { flex: 1, color: theme.text, borderColor: theme.accent, backgroundColor: theme.surface, marginBottom: 0 },
+                    ]}
+                    placeholder="Ex: Chef court du biceps"
+                    placeholderTextColor={theme.textMuted}
+                    value={customPrimaryInput}
+                    onChangeText={setCustomPrimaryInput}
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{
+                      backgroundColor: theme.accent,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      borderRadius: 10,
+                    }}
+                    onPress={handleAddCustomPrimary}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Ajouter</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {/* Muscles secondaires (Chips multi-sélection normés) */}

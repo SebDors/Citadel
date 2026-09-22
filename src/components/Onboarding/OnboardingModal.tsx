@@ -73,9 +73,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
   const handleSkip = () => {
     if (onSkip) {
       onSkip();
-    } else {
-      handleFinish();
     }
+    handleFinish();
   };
 
   if (!visible) return null;

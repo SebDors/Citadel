@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -16,10 +16,13 @@ import {
   Scale,
   FileJson,
   Upload,
+  CloudDownload,
+  HardDrive,
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { ExportService } from '../../services/exportService';
+import { StorageService } from '../../services/storage';
 
 interface ExportDataModalProps {
   visible: boolean;
@@ -33,6 +36,15 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
   const { theme } = useTheme();
   const { data, importFullData } = useWorkout();
   const [loading, setLoading] = useState(false);
+  const [storageUsage, setStorageUsage] = useState<string>('');
+
+  useEffect(() => {
+    if (visible) {
+      StorageService.getStorageUsage().then((res) => {
+        setStorageUsage(res.formattedSize);
+      });
+    }
+  }, [visible]);
 
   const handleExportWorkouts = async () => {
     if (!data) return;
@@ -120,36 +132,36 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
 
   const actions = [
     {
+      id: 'export-full',
+      title: 'Sauvegarder les données (JSON)',
+      description: 'Exporter une copie complète au format .json',
+      icon: FileJson,
+      onPress: handleExportFullData,
+      color: theme.accent,
+    },
+    {
+      id: 'import-backup',
+      title: 'Restaurer une Sauvegarde (.json)',
+      description: 'Importer un fichier de sauvegarde (.json) pour restaurer vos données',
+      icon: CloudDownload,
+      onPress: handleImportBackup,
+      color: '#34A853',
+    },
+    {
       id: 'export-workouts',
       title: 'Télécharger les Séances (CSV)',
-      description: 'Format tableur enregistré dans votre appareil',
+      description: 'Format tableur Excel/Sheets pour analyse',
       icon: FileSpreadsheet,
       onPress: handleExportWorkouts,
-      color: theme.primary,
+      color: theme.primary || theme.accent,
     },
     {
       id: 'export-measurements',
       title: 'Télécharger les Mensurations (CSV)',
-      description: 'Format tableur enregistré dans votre appareil',
+      description: 'Format tableur pour suivi du poids et mensurations',
       icon: Scale,
       onPress: handleExportMeasurements,
-      color: theme.secondary,
-    },
-    {
-      id: 'export-full',
-      title: 'Télécharger la Sauvegarde (JSON)',
-      description: 'Copie complète de vos données Citadel',
-      icon: FileJson,
-      onPress: handleExportFullData,
-      color: theme.success || '#4caf50',
-    },
-    {
-      id: 'import-backup',
-      title: 'Restaurer / Importer (.json)',
-      description: 'Restaurer depuis une sauvegarde JSON Citadel',
-      icon: Upload,
-      onPress: handleImportBackup,
-      color: theme.danger,
+      color: theme.secondary || theme.accent,
     },
   ];
 
@@ -180,6 +192,20 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
           </View>
 
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer} bounces={false}>
+            {/* Bandeau d'état du stockage local */}
+            <View style={[styles.storageBanner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <HardDrive size={15} color={theme.accent} style={{ marginRight: 6 }} />
+                <Text style={[styles.storageTitle, { color: theme.text }]}>
+                  Stockage local : {storageUsage || 'Calcul en cours...'}
+                </Text>
+              </View>
+              <Text style={[styles.storageSubtitle, { color: theme.textMuted }]}>
+                {data?.history.length || 0} séances • {data?.measurements.length || 0} mensurations.{'\n'}
+                Sauvegarder régulièrement vos données protège votre progression en cas de changement d'appareil.
+              </Text>
+            </View>
+
             {actions.map((action) => (
               <TouchableOpacity
                 key={action.id}
@@ -247,6 +273,20 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+  },
+  storageBanner: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  storageTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  storageSubtitle: {
+    fontSize: 11,
+    lineHeight: 16,
   },
   actionCard: {
     flexDirection: 'row',

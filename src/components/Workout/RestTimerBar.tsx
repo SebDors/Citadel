@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useWorkout } from '../../context/WorkoutContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Clock, Plus, Minus, X } from 'lucide-react-native';
+import { Plus, Minus, X } from 'lucide-react-native';
 
 export const RestTimerBar: React.FC = () => {
   const { restTimer, dismissRestTimer, adjustRestTimer } = useWorkout();
@@ -31,6 +31,9 @@ export const RestTimerBar: React.FC = () => {
 
   if (!restTimer.active || secondsRemaining <= 0) return null;
 
+  const isTransition = restTimer.timerType === 'transition';
+  const barColor = isTransition ? theme.supersetTag : theme.accent;
+
   const mins = Math.floor(secondsRemaining / 60);
   const secs = secondsRemaining % 60;
   const formatted = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -42,7 +45,9 @@ export const RestTimerBar: React.FC = () => {
     const details = hasDetails
       ? ` (${nextInfo.weightKg ? `${nextInfo.weightKg} kg` : ''}${nextInfo.weightKg && nextInfo.reps ? ' × ' : ''}${nextInfo.reps ? `${nextInfo.reps} reps` : ''})`
       : '';
-    if (nextInfo.isNextExercise) {
+    if (nextInfo.isTransition) {
+      nextText = `Enchaîner : ${nextInfo.exerciseName} · S${nextInfo.setNumber}${details}`;
+    } else if (nextInfo.isNextExercise) {
       nextText = `Suivant : ${nextInfo.exerciseName} · S${nextInfo.setNumber}${details}`;
     } else {
       nextText = `Prochaine : Série ${nextInfo.setNumber}${details}`;
@@ -50,22 +55,29 @@ export const RestTimerBar: React.FC = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
+    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: barColor }]}>
       <View style={styles.left}>
-        <Clock size={20} color={theme.accent} style={{ marginRight: 8 }} />
         <View style={{ flex: 1, marginRight: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[styles.timerText, { color: theme.accent }]}>{formatted}</Text>
-            <Text style={[styles.exerciseText, { color: theme.textMuted, marginLeft: 8 }]} numberOfLines={1}>
-              Repos · {restTimer.exerciseName}
+            <Text style={[styles.timerText, { color: barColor }]}>{formatted}</Text>
+            <Text
+              style={[styles.exerciseText, { color: theme.textMuted, marginLeft: 6 }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {isTransition ? 'Transition' : 'Repos'} · {restTimer.exerciseName}
             </Text>
           </View>
           {nextInfo ? (
-            <Text style={[styles.nextSetText, { color: theme.text }]} numberOfLines={1}>
+            <Text
+              style={[styles.nextSetText, { color: theme.text }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {nextText}
             </Text>
           ) : (
-            <Text style={[styles.nextSetText, { color: theme.accent }]} numberOfLines={1}>
+            <Text style={[styles.nextSetText, { color: barColor }]} numberOfLines={1}>
               Dernière série terminée !
             </Text>
           )}
@@ -120,6 +132,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 6,
+    overflow: 'hidden',
   },
   timerText: {
     fontSize: 18,
@@ -128,7 +142,7 @@ const styles = StyleSheet.create({
   exerciseText: {
     fontSize: 11,
     fontWeight: '600',
-    maxWidth: 140,
+    flexShrink: 1,
   },
   nextSetText: {
     fontSize: 11,
@@ -138,6 +152,7 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   btnAdjust: {
     flexDirection: 'row',

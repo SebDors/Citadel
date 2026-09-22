@@ -19,11 +19,13 @@ export interface CustomNumericKeypadProps {
   activeField: NumericFieldType;
   value: string;
   previousValue?: string;
+  ghostValue?: string;
   onChangeValue?: (val: string) => void;
   onNextField?: (currentVal: string) => void;
   onPreviousField?: (currentVal: string) => void;
   onValidate?: (finalVal: string) => void;
   onClear?: () => void;
+  isLastField?: boolean;
 }
 
 interface KeyButtonProps {
@@ -58,14 +60,17 @@ export const computeNextValue = (
     }
   }
 
-  // Chiffres 0-9
+  // Si premier chiffre après 0 (sans point) : remplacer le 0 par le nouveau chiffre
   if (prevVal === '0') {
     return key;
   }
-  if (prevVal.length < 7) {
-    return prevVal + key;
+
+  // Limitation à 6 caractères au total (ex: 999.99)
+  if (prevVal.length >= 6) {
+    return prevVal;
   }
-  return prevVal;
+
+  return prevVal + key;
 };
 
 // Grille et options constantes (évite la ré-instanciation de tableaux à chaque frappe)
@@ -217,11 +222,13 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   activeField,
   value,
   previousValue,
+  ghostValue,
   onChangeValue,
   onNextField,
   onPreviousField,
   onValidate,
   onClear,
+  isLastField,
 }) => {
   const { theme } = useTheme();
 
@@ -266,6 +273,17 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     setLocalValue(key);
   }, []);
 
+  // Gestion des incréments rapides (+/-) au-dessus du pavé
+  // Si le champ est vide mais qu'une ghostValue existe, l'incrément prend la ghostValue comme point de départ
+  const handleQuickIncrement = useCallback((delta: number) => {
+    setLocalValue((prevVal) => {
+      const baseStr = prevVal !== '' ? prevVal : (ghostValue || '');
+      const currentNum = parseFloat(baseStr) || 0;
+      const nextNum = Math.max(0, Math.round((currentNum + delta) * 100) / 100);
+      return String(nextNum);
+    });
+  }, [ghostValue]);
+
   // Réinitialisation locale de la valeur saisie (sans commit synchrone bloquant)
   const handleClear = useCallback(() => {
     setLocalValue('');
@@ -298,7 +316,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     }
   }, [onValidate]);
 
-  const isLastField = activeField === 'rir';
+  const effectiveIsLastField = isLastField !== undefined ? isLastField : (!onNextField || activeField === 'rir');
 
   // Action Fermer (ferme le modal en transmettant la valeur locale en cours)
   const handleClose = useCallback(() => {
@@ -342,14 +360,32 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                 ) : null}
               </Text>
               <View style={styles.valueDisplayRow}>
-                <Text
-                  style={[
-                    styles.headerValue,
-                    { color: localValue ? theme.text : theme.textMuted },
-                  ]}
+                <TouchableOpacity
+                  activeOpacity={!localValue && ghostValue ? 0.7 : 1}
+                  onPress={() => {
+                    if (!localValue && ghostValue) {
+                      setLocalValue(ghostValue);
+                    }
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'baseline' }}
                 >
-                  {localValue || '-'}
-                </Text>
+                  <Text
+                    style={[
+                      styles.headerValue,
+                      {
+                        color: localValue ? theme.text : (ghostValue ? `${theme.textMuted}99` : theme.textMuted),
+                        fontStyle: !localValue && ghostValue ? 'italic' : 'normal',
+                      },
+                    ]}
+                  >
+                    {localValue || ghostValue || '-'}
+                  </Text>
+                  {Boolean(!localValue && ghostValue) && (
+                    <View style={[styles.ghostPill, { backgroundColor: `${theme.accent}18`, borderColor: theme.accent }]}>
+                      <Text style={[styles.ghostPillText, { color: theme.accent }]}>Précédent</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
                 <Text style={[styles.headerUnit, { color: theme.accent }]}>
                   {unit}
                 </Text>
@@ -387,6 +423,108 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
           ) : (
             /* Mode Standard (KG / REPS) : Grille Numérique 4x3 */
             <View style={styles.gridContainer}>
+              {/* Barre de puces d'incréments rapides (+/-) */}
+              <View style={styles.quickChipsBar}>
+                {activeField === 'weightKg' ? (
+                  <>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(-2.5)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.danger}25` : theme.surface,
+                          borderColor: pressed ? theme.danger : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.danger }]}>-2.5</Text>
+                    </Pressable>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(1.25)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                          borderColor: pressed ? theme.accent : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.accent }]}>+1.25</Text>
+                    </Pressable>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(2.5)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                          borderColor: pressed ? theme.accent : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.accent }]}>+2.5</Text>
+                    </Pressable>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(5)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                          borderColor: pressed ? theme.accent : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.accent }]}>+5</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(-1)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.danger}25` : theme.surface,
+                          borderColor: pressed ? theme.danger : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.danger }]}>-1</Text>
+                    </Pressable>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(1)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                          borderColor: pressed ? theme.accent : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.accent }]}>+1</Text>
+                    </Pressable>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={() => handleQuickIncrement(5)}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: pressed ? `${theme.accent}35` : theme.surface,
+                          borderColor: pressed ? theme.accent : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.accent }]}>+5</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+
               {KEYPAD_ROWS.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.gridRow}>
                   {row.map((key) => {
@@ -472,7 +610,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
             </Pressable>
 
             {/* Bouton Droit : Suivant ➔ ou Valider 🗸 */}
-            {isLastField ? (
+            {effectiveIsLastField ? (
               <Pressable
                 unstable_pressDelay={0}
                 onPress={handleValidate}
@@ -480,7 +618,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                   styles.actionBtn,
                   styles.validateBtn,
                   {
-                    backgroundColor: theme.success || theme.accent,
+                    backgroundColor: theme.accent,
                     transform: [{ scale: pressed ? 0.95 : 1 }],
                     opacity: pressed ? 0.85 : 1,
                   },
@@ -594,6 +732,37 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   /* Mode Standard : Pavé 4x3 */
+  quickChipsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  chipBtn: {
+    flex: 1,
+    height: 36,
+    borderRadius: 9,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  ghostPill: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  ghostPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   gridContainer: {
     marginBottom: 16,
   },

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -54,8 +54,10 @@ import {
   Trophy,
   ArrowUpDown,
   AlertTriangle,
+  Calculator,
 } from "lucide-react-native";
 import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
+import { WorkoutToolsModal } from "../src/components/Workout/WorkoutToolsModal";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -79,6 +81,7 @@ interface WorkoutDurationWidgetProps {
   startTime?: string;
   hasStarted?: boolean;
   isPaused?: boolean;
+  pausedAt?: string;
   durationSeconds?: number;
   onPress: () => void;
   theme: any;
@@ -88,6 +91,7 @@ const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo((
   startTime,
   hasStarted,
   isPaused,
+  pausedAt,
   durationSeconds,
   onPress,
   theme,
@@ -96,6 +100,13 @@ const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo((
     if (!hasStarted || !startTime) return 0;
     if (isPaused) return durationSeconds || 0;
     return Math.max(0, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
+  });
+
+  const [pauseElapsed, setPauseElapsed] = useState<number>(() => {
+    if (isPaused && pausedAt) {
+      return Math.max(0, Math.floor((Date.now() - new Date(pausedAt).getTime()) / 1000));
+    }
+    return 0;
   });
 
   useEffect(() => {
@@ -113,6 +124,21 @@ const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo((
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [startTime, hasStarted, isPaused, durationSeconds]);
+
+  useEffect(() => {
+    if (!isPaused || !pausedAt) {
+      setPauseElapsed(0);
+      return;
+    }
+
+    const tickPause = () => {
+      setPauseElapsed(Math.max(0, Math.floor((Date.now() - new Date(pausedAt).getTime()) / 1000)));
+    };
+
+    tickPause();
+    const interval = setInterval(tickPause, 1000);
+    return () => clearInterval(interval);
+  }, [isPaused, pausedAt]);
 
   return (
     <TouchableOpacity
@@ -163,7 +189,7 @@ const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo((
           {hasStarted === false
             ? "Séance non démarrée"
             : isPaused
-              ? "EN PAUSE"
+              ? `EN PAUSE (${formatDuration(pauseElapsed)})`
               : "Temps écoulé"}
         </Text>
       </View>
@@ -212,6 +238,8 @@ export default function LiveWorkoutScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
+  const blockLayouts = useRef<Record<string, number>>({});
+  const scrollYRef = useRef<number>(0);
 
   const handleCycleCircuitSetType = (
     blockId: string,
@@ -228,6 +256,7 @@ export default function LiveWorkoutScreen() {
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [showReorderModal, setShowReorderModal] = useState(false);
+  const [showToolsModal, setShowToolsModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
@@ -271,6 +300,137 @@ export default function LiveWorkoutScreen() {
     if (!activeSession) return [];
     return getSessionBlocks(activeSession);
   }, [activeSession]);
+
+  // Calcul de la prochaine série cible pour surbrillance intelligente du contour
+  const nextTargetSet = useMemo(() => {
+    if (restTimer.active && restTimer.nextSetInfo) {
+      return {
+        exerciseName: restTimer.nextSetInfo.exerciseName,
+        setNumber: restTimer.nextSetInfo.setNumber,
+      };
+    }
+    for (const block of blocks) {
+      if (block.type === 'single') {
+        const uncompleted = block.exercise.sets.find((s) => !s.completed);
+        if (uncompleted) {
+          return {
+            exerciseName: block.exercise.exerciseName,
+            setNumber: uncompleted.setNumber,
+          };
+        }
+      }
+    }
+    return null;
+  }, [restTimer.active, restTimer.nextSetInfo, blocks]);
+
+  const handleToggleSetComplete = useCallback(
+    (exerciseId: string, setId: string) => {
+      // 1. Trouver le statut actuel du set
+      let isCurrentlyCompleted = false;
+      for (const b of blocks) {
+        if (b.type === 'single' && b.exercise.id === exerciseId) {
+          const s = b.exercise.sets.find((set) => set.id === setId);
+          if (s) isCurrentlyCompleted = s.completed;
+          break;
+        }
+      }
+
+      // 2. Déclencher le toggle
+      toggleSetComplete(exerciseId, setId);
+
+      // 3. Si le set devient complété, auto-scroll vers le prochain set avec seuil de tolérance
+      if (!isCurrentlyCompleted) {
+        setTimeout(() => {
+          let nextBlockId: string | null = null;
+
+          const currentBlockIndex = blocks.findIndex(
+            (b) => b.type === 'single' && b.exercise.id === exerciseId
+          );
+          const currentBlock = currentBlockIndex >= 0 ? blocks[currentBlockIndex] : null;
+
+          if (currentBlock && currentBlock.type === 'single') {
+            const currentEx = currentBlock.exercise;
+            const currentSetIndex = currentEx.sets.findIndex((s) => s.id === setId);
+
+            // 3.a : Logique spécifique Superset
+            if (currentEx.supersetGroup) {
+              const groupBlocks = blocks.filter(
+                (b): b is SingleExerciseBlock =>
+                  b.type === 'single' && b.exercise.supersetGroup === currentEx.supersetGroup
+              );
+              const currIdxInGroup = groupBlocks.findIndex((b) => b.exercise.id === exerciseId);
+
+              if (currIdxInGroup >= 0 && currIdxInGroup < groupBlocks.length - 1) {
+                // Exercice suivant dans le superset (même tour)
+                const nextBlockInGroup = groupBlocks[currIdxInGroup + 1];
+                const targetSet =
+                  nextBlockInGroup.exercise.sets[currentSetIndex] ||
+                  nextBlockInGroup.exercise.sets.find((s) => !s.completed);
+                if (targetSet && !targetSet.completed) {
+                  nextBlockId = nextBlockInGroup.id;
+                }
+              } else if (currIdxInGroup === groupBlocks.length - 1) {
+                // Fin de tour de superset -> Premier exercice au tour suivant
+                const firstBlockInGroup = groupBlocks[0];
+                const nextRoundSet =
+                  firstBlockInGroup.exercise.sets[currentSetIndex + 1] ||
+                  firstBlockInGroup.exercise.sets.find((s) => !s.completed);
+                if (nextRoundSet && !nextRoundSet.completed) {
+                  nextBlockId = firstBlockInGroup.id;
+                }
+              }
+            }
+
+            // 3.b : Prochaine série non complétée dans le même exercice
+            if (!nextBlockId) {
+              for (let i = currentSetIndex + 1; i < currentEx.sets.length; i++) {
+                if (!currentEx.sets[i].completed) {
+                  nextBlockId = currentBlock.id;
+                  break;
+                }
+              }
+            }
+
+            // 3.c : Exercice suivant dans les blocs suivants
+            if (!nextBlockId) {
+              for (let i = currentBlockIndex + 1; i < blocks.length; i++) {
+                const b = blocks[i];
+                if (b.type === 'single' && b.exercise.sets.some((s) => !s.completed && s.id !== setId)) {
+                  nextBlockId = b.id;
+                  break;
+                }
+              }
+            }
+          }
+
+          // 3.d : Recherche globale de secours sur tous les blocs
+          if (!nextBlockId) {
+            for (const b of blocks) {
+              if (b.type === 'single') {
+                const uncompleted = b.exercise.sets.find((s) => !s.completed && s.id !== setId);
+                if (uncompleted) {
+                  nextBlockId = b.id;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (nextBlockId && blockLayouts.current[nextBlockId] !== undefined) {
+            const targetY = blockLayouts.current[nextBlockId];
+            const desiredScrollY = Math.max(0, targetY - 90);
+            const diff = Math.abs(desiredScrollY - scrollYRef.current);
+            const TOLERANCE_THRESHOLD = 50; // Seuil de tolérance anti micro-sauts
+
+            if (diff > TOLERANCE_THRESHOLD) {
+              scrollViewRef.current?.scrollTo({ y: desiredScrollY, animated: true });
+            }
+          }
+        }, 150);
+      }
+    },
+    [blocks, toggleSetComplete]
+  );
 
   // Helper to get state of a specific CircuitBlock
   const getCircuitState = (block: CircuitBlock): CircuitState => {
@@ -759,6 +919,10 @@ export default function LiveWorkoutScreen() {
         ref={scrollViewRef}
         stickyHeaderIndices={[0]}
         contentContainerStyle={styles.scrollContent}
+        onScroll={(e) => {
+          scrollYRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
       >
         {/* 1. Carte d'En-tête de Séance Sticky (Collée en haut au défilement) */}
         <View style={[styles.stickyHeaderWrapper]}>
@@ -819,25 +983,51 @@ export default function LiveWorkoutScreen() {
         {blocks.map((block, blockIdx) => {
           if (block.type === "single") {
             const ex = block.exercise;
+
+            // Calcul du poste dans le superset si applicable
+            let supersetOrder: { index: number; total: number } | undefined;
+            if (ex.supersetGroup) {
+              const groupBlocks = blocks.filter(
+                (b) => b.type === "single" && b.exercise.supersetGroup === ex.supersetGroup
+              );
+              const indexInGroup = groupBlocks.findIndex(
+                (b) => b.type === "single" && b.exercise.id === ex.id
+              );
+              if (indexInGroup >= 0) {
+                supersetOrder = {
+                  index: indexInGroup + 1,
+                  total: groupBlocks.length,
+                };
+              }
+            }
+
             return (
-              <ExerciseCard
+              <View
                 key={block.id || `single_${ex.id}_${blockIdx}`}
-                exercise={ex}
-                onUpdateSet={(setId, field, val) =>
-                  updateSet(ex.id, setId, field, val)
-                }
-                onToggleSetComplete={(setId) => toggleSetComplete(ex.id, setId)}
-                onAddSet={() => addSet(ex.id)}
-                onRemoveSet={(setId) => removeSet(ex.id, setId)}
-                onDuplicateExercise={() => duplicateExercise(ex.id)}
-                onRemoveExercise={() => removeExercise(ex.id)}
-                onUpdateRestTime={(newRest) =>
-                  updateExerciseRestTime(ex.id, newRest)
-                }
-                onSetSupersetGroup={(grp) =>
-                  setExerciseSupersetGroup(ex.id, grp)
-                }
-              />
+                onLayout={(e) => {
+                  blockLayouts.current[block.id] = e.nativeEvent.layout.y;
+                }}
+              >
+                <ExerciseCard
+                  exercise={ex}
+                  supersetOrder={supersetOrder}
+                  nextTargetSet={nextTargetSet}
+                  onUpdateSet={(setId, field, val) =>
+                    updateSet(ex.id, setId, field, val)
+                  }
+                  onToggleSetComplete={(setId) => handleToggleSetComplete(ex.id, setId)}
+                  onAddSet={() => addSet(ex.id)}
+                  onRemoveSet={(setId) => removeSet(ex.id, setId)}
+                  onDuplicateExercise={() => duplicateExercise(ex.id)}
+                  onRemoveExercise={() => removeExercise(ex.id)}
+                  onUpdateRestTime={(newRest) =>
+                    updateExerciseRestTime(ex.id, newRest)
+                  }
+                  onSetSupersetGroup={(grp) =>
+                    setExerciseSupersetGroup(ex.id, grp)
+                  }
+                />
+              </View>
             );
           } else if (block.type === "circuit") {
             const circuitState = getCircuitState(block);
@@ -1671,63 +1861,91 @@ export default function LiveWorkoutScreen() {
         }}
       />
 
-      {/* 3. Card Sticky Bottom Timer Bar */}
+      {/* 3. Floating Bottom Row: Barre de temps (10/12) + Bouton Outils (2/12) */}
       <View
         style={[
-          styles.bottomTimerBar,
+          styles.bottomFloatingRow,
           {
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
             bottom: restTimer.active ? 78 : 22,
           },
         ]}
       >
-        {/* Gauche : Icône Horloge + Timer (mm:ss ou hh:mm:ss) */}
-        <WorkoutDurationWidget
-          startTime={activeSession.startTime}
-          hasStarted={activeSession.hasStarted}
-          isPaused={activeSession.isPaused}
-          durationSeconds={activeSession.durationSeconds}
-          onPress={() => {
-            if (activeSession.hasStarted !== false) {
-              togglePauseWorkoutSession();
-            }
-          }}
-          theme={theme}
-        />
+        {/* Barre de temps écoulé (Ratio 10) */}
+        <View
+          style={[
+            styles.bottomTimerBar,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+            },
+          ]}
+        >
+          {/* Gauche : Icône Horloge + Timer (mm:ss ou hh:mm:ss) */}
+          <WorkoutDurationWidget
+            startTime={activeSession.startTime}
+            hasStarted={activeSession.hasStarted}
+            isPaused={activeSession.isPaused}
+            pausedAt={activeSession.pausedAt}
+            durationSeconds={activeSession.durationSeconds}
+            onPress={() => {
+              if (activeSession.hasStarted !== false) {
+                togglePauseWorkoutSession();
+              }
+            }}
+            theme={theme}
+          />
 
-        {/* Droite : Bouton Logo Pause / Reprendre (Bouton circulaire sans texte) */}
-        {activeSession.hasStarted !== false ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[
-              styles.bottomPauseCircleBtn,
-              {
-                backgroundColor: activeSession.isPaused
-                  ? theme.danger
-                  : theme.accent,
-              },
-            ]}
-            onPress={togglePauseWorkoutSession}
-          >
-            {activeSession.isPaused ? (
-              <Play size={17} color="#FFFFFF" fill="#FFFFFF" />
+          {/* Droite : Bouton Pause / Reprendre */}
+          <View style={styles.bottomTimerRightActions}>
+            {activeSession.hasStarted !== false ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.bottomPauseCircleBtn,
+                  {
+                    backgroundColor: activeSession.isPaused
+                      ? theme.danger
+                      : theme.accent,
+                  },
+                ]}
+                onPress={togglePauseWorkoutSession}
+              >
+                {activeSession.isPaused ? (
+                  <Play size={16} color="#FFFFFF" fill="#FFFFFF" />
+                ) : (
+                  <Pause size={16} color="#FFFFFF" fill="#FFFFFF" />
+                )}
+              </TouchableOpacity>
             ) : (
-              <Pause size={17} color="#FFFFFF" fill="#FFFFFF" />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.bottomPauseCircleBtn,
+                  { backgroundColor: theme.accent },
+                ]}
+                onPress={startSessionTimer}
+              >
+                <Play size={16} color="#FFFFFF" fill="#FFFFFF" />
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[
-              styles.bottomPauseCircleBtn,
-              { backgroundColor: theme.accent },
-            ]}
-            onPress={startSessionTimer}
-          >
-            <Play size={17} color="#FFFFFF" fill="#FFFFFF" />
-          </TouchableOpacity>
-        )}
+          </View>
+        </View>
+
+        {/* Bouton Outils / Calculatrice extérieur (Ratio 2) */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[
+            styles.bottomToolsExternalBtn,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+            },
+          ]}
+          onPress={() => setShowToolsModal(true)}
+          accessibilityLabel="Outils d'entraînement (Disques, 1RM)"
+        >
+          <Calculator size={18} color={theme.accent} />
+        </TouchableOpacity>
       </View>
 
       {/* Floating Rest Timer Bar */}
@@ -1845,6 +2063,11 @@ export default function LiveWorkoutScreen() {
         blocks={blocks}
         onReorder={reorderActiveSessionBlocks}
       />
+
+      <WorkoutToolsModal
+        visible={showToolsModal}
+        onClose={() => setShowToolsModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -1879,10 +2102,17 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 130,
   },
-  bottomTimerBar: {
+  bottomFloatingRow: {
     position: "absolute",
-    left: 24,
-    right: 24,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    zIndex: 90,
+  },
+  bottomTimerBar: {
+    flex: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1895,7 +2125,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
-    zIndex: 90,
+  },
+  bottomToolsExternalBtn: {
+    flex: 2,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 15,
+    borderWidth: 1.5,
+    elevation: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   bottomTimerLeftRow: {
     flexDirection: "row",
@@ -1911,13 +2153,18 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: "600",
   },
+  bottomTimerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginLeft: 10,
+  },
   bottomPauseCircleBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 10,
   },
   emptyContainer: {
     flex: 1,

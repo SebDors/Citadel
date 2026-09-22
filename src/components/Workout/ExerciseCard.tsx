@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
 import { WorkoutExercise, WorkoutSet } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -18,6 +18,8 @@ interface ExerciseCardProps {
   onRemoveExercise: () => void;
   onUpdateRestTime: (newRestSeconds: number) => void;
   onSetSupersetGroup: (supersetGroup?: string) => void;
+  supersetOrder?: { index: number; total: number };
+  nextTargetSet?: { exerciseName: string; setNumber: number } | null;
 }
 
 const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
@@ -30,12 +32,29 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   onRemoveExercise,
   onUpdateRestTime,
   onSetSupersetGroup,
+  supersetOrder,
+  nextTargetSet,
 }) => {
   const { theme } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
   const [tempRestSeconds, setTempRestSeconds] = useState(String(exercise.restSeconds || 75));
+
+  const primaryMusclesList = useMemo(() => {
+    if (exercise.primaryMuscles && exercise.primaryMuscles.length > 0) {
+      return exercise.primaryMuscles;
+    }
+    if (exercise.primaryMuscle) {
+      return exercise.primaryMuscle.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+  }, [exercise.primaryMuscles, exercise.primaryMuscle]);
+
+  const secondaryMusclesList = useMemo(() => {
+    const list = exercise.targetMuscles || [];
+    return list.filter((m) => !primaryMusclesList.includes(m));
+  }, [exercise.targetMuscles, primaryMusclesList]);
 
   const handleSaveRestTime = () => {
     const val = parseInt(tempRestSeconds, 10);
@@ -55,8 +74,14 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       {/* Superset Group Badge Header */}
       {exercise.supersetGroup && (
         <View style={[styles.supersetHeader, { backgroundColor: theme.supersetTag }]}>
-          <Layers size={14} color="#FFFFFF" />
-          <Text style={styles.supersetText}>{exercise.supersetGroup}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Layers size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
+            <Text style={styles.supersetText}>
+              {exercise.supersetGroup.toUpperCase()}
+              {supersetOrder ? ` · POSTE ${supersetOrder.index}/${supersetOrder.total}` : ''}
+            </Text>
+          </View>
+          <Text style={styles.supersetSub}>Alternance automatique</Text>
         </View>
       )}
 
@@ -68,12 +93,36 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
             <Text style={[styles.exerciseName, { color: theme.text }]}>{exercise.exerciseName}</Text>
           </View>
 
-          {/* Muscles travaillés (Affichage compact en 1 ou 2 lignes) */}
-          <View style={styles.musclesRow}>
-            <Badge label={exercise.primaryMuscle} variant="accent" style={styles.miniBadge} />
-            {exercise.targetMuscles.slice(0, 2).map((muscle, idx) => (
-              <Badge key={idx} label={muscle} variant="secondary" style={styles.miniBadge} />
-            ))}
+          {/* Muscles travaillés (Ligne 1 : Principaux, Ligne 2 : Secondaires) */}
+          <View style={styles.musclesContainer}>
+            {/* Ligne 1 : Principaux */}
+            {primaryMusclesList.length > 0 && (
+              <View style={styles.musclesLine}>
+                {primaryMusclesList.map((m, idx) => (
+                  <View key={`pm_${idx}`} style={[styles.compactPill, { backgroundColor: theme.accent }]}>
+                    <Text style={styles.compactPillText}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Ligne 2 : Secondaires */}
+            {secondaryMusclesList.length > 0 && (
+              <View style={[styles.musclesLine, { marginTop: 3 }]}>
+                {secondaryMusclesList.map((m, idx) => (
+                  <View
+                    key={`sm_${idx}`}
+                    style={[
+                      styles.compactPill,
+                      styles.secondaryPill,
+                      { backgroundColor: theme.surface, borderColor: theme.border },
+                    ]}
+                  >
+                    <Text style={[styles.compactPillText, { color: theme.textMuted }]}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </View>
 
@@ -120,16 +169,26 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       </View>
 
       {/* Set Table Rows */}
-      {exercise.sets.map((set) => (
-        <SetTableRow
-          key={set.id}
-          set={set}
-          exerciseId={exercise.id}
-          onUpdate={(field, val) => onUpdateSet(set.id, field, val)}
-          onToggleComplete={() => onToggleSetComplete(set.id)}
-          onDelete={() => onRemoveSet(set.id)}
-        />
-      ))}
+      {exercise.sets.map((set) => {
+        const isNext = Boolean(
+          nextTargetSet &&
+          nextTargetSet.exerciseName === exercise.exerciseName &&
+          nextTargetSet.setNumber === set.setNumber &&
+          !set.completed
+        );
+
+        return (
+          <SetTableRow
+            key={set.id}
+            set={set}
+            exerciseId={exercise.id}
+            isNextSet={isNext}
+            onUpdate={(field, val) => onUpdateSet(set.id, field, val)}
+            onToggleComplete={() => onToggleSetComplete(set.id)}
+            onDelete={() => onRemoveSet(set.id)}
+          />
+        );
+      })}
 
       {/* Add Set Button */}
       <TouchableOpacity
@@ -276,18 +335,22 @@ const styles = StyleSheet.create({
   supersetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginBottom: 6,
-    alignSelf: 'flex-start',
+    marginBottom: 8,
   },
   supersetText: {
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 11,
-    marginLeft: 4,
     textTransform: 'uppercase',
+  },
+  supersetSub: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 10,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
@@ -307,14 +370,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  musclesRow: {
+  musclesContainer: {
+    marginTop: 3,
+  },
+  musclesLine: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 2,
+    alignItems: 'center',
+    gap: 4,
   },
-  miniBadge: {
-    transform: [{ scale: 0.85 }],
-    marginRight: 2,
+  compactPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+  },
+  secondaryPill: {
+    borderWidth: 1,
+  },
+  compactPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   headerRight: {
     flexDirection: 'row',
@@ -441,6 +520,11 @@ const styles = StyleSheet.create({
 
 export const ExerciseCard = React.memo(
   ExerciseCardComponent,
-  (prev, next) => prev.exercise === next.exercise
+  (prev, next) =>
+    prev.exercise === next.exercise &&
+    prev.nextTargetSet?.exerciseName === next.nextTargetSet?.exerciseName &&
+    prev.nextTargetSet?.setNumber === next.nextTargetSet?.setNumber &&
+    prev.supersetOrder?.index === next.supersetOrder?.index &&
+    prev.supersetOrder?.total === next.supersetOrder?.total
 );
 export default ExerciseCard;

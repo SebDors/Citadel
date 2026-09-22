@@ -12,15 +12,33 @@ import { useWorkout } from "../../src/context/WorkoutContext";
 import { useTheme } from "../../src/context/ThemeContext";
 import { CalendarView } from "../../src/components/History/CalendarView";
 import { ActivitySummaryCard } from "../../src/components/History/ActivitySummaryCard";
-import { Calendar, Plus, Clock } from "lucide-react-native";
+import { WeeklyMuscleVolumeCard } from "../../src/components/Analytics/WeeklyMuscleVolumeCard";
+import { Calendar, Plus, Clock, ChevronDown, ChevronUp } from "lucide-react-native";
 import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import { LogPastWorkoutModal } from "../../src/components/History/LogPastWorkoutModal";
 import { TouchableOpacity } from "react-native";
+import { StorageService } from "../../src/services/storage";
 
 export default function HistoryTab() {
   const { data, deleteWorkoutSession } = useWorkout();
   const { theme } = useTheme();
   const [logModalVisible, setLogModalVisible] = React.useState(false);
+  const [isLastSessionsCollapsed, setIsLastSessionsCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    StorageService.loadCollapsedCards().then((saved) => {
+      if (saved && typeof saved['history_last_sessions'] === 'boolean') {
+        setIsLastSessionsCollapsed(saved['history_last_sessions']);
+      }
+    });
+  }, []);
+
+  const toggleLastSessionsCollapsed = async () => {
+    const nextVal = !isLastSessionsCollapsed;
+    setIsLastSessionsCollapsed(nextVal);
+    const saved = await StorageService.loadCollapsedCards();
+    await StorageService.saveCollapsedCards({ ...saved, history_last_sessions: nextVal });
+  };
 
   const historyList = data?.history || [];
 
@@ -56,33 +74,58 @@ export default function HistoryTab() {
           {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
           <CalendarView history={historyList} />
 
-          {/* 2. Bloc de Statistiques (Milieu de page) */}
+          {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
           <ActivitySummaryCard history={historyList} />
 
-          {/* 3. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
-          <View style={styles.listSectionHeader}>
-            <Calendar
-              size={18}
-              color={theme.accent}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.listTitle, { color: theme.text }]}>
-              Dernières Séances Effectuées
-            </Text>
-          </View>
+          {/* 3. Répartition Scientifique du Volume Musculaire (MEV / MAV) */}
+          <WeeklyMuscleVolumeCard />
 
-          {historyList.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              Aucune séance terminée pour le moment.
-            </Text>
-          ) : (
-            historyList.slice(0, 7).map((session) => (
-              <ActivitySummaryCard
-                key={session.id}
-                session={session}
-                onDeleteSession={deleteWorkoutSession}
+          {/* 4. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.listSectionHeader}
+            onPress={toggleLastSessionsCollapsed}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Calendar
+                size={18}
+                color={theme.accent}
+                style={{ marginRight: 6 }}
               />
-            ))
+              <Text style={[styles.listTitle, { color: theme.text }]}>
+                Dernières Séances Effectuées
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {isLastSessionsCollapsed && historyList.length > 0 && (
+                <View style={[styles.collapsedBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <Text style={[styles.collapsedBadgeText, { color: theme.textMuted }]}>
+                    {historyList.length}
+                  </Text>
+                </View>
+              )}
+              {isLastSessionsCollapsed ? (
+                <ChevronDown size={18} color={theme.textMuted} />
+              ) : (
+                <ChevronUp size={18} color={theme.textMuted} />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {!isLastSessionsCollapsed && (
+            historyList.length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                Aucune séance terminée pour le moment.
+              </Text>
+            ) : (
+              historyList.slice(0, 7).map((session) => (
+                <ActivitySummaryCard
+                  key={session.id}
+                  session={session}
+                  onDeleteSession={deleteWorkoutSession}
+                />
+              ))
+            )
           )}
         </ScrollView>
 
@@ -137,12 +180,24 @@ const styles = StyleSheet.create({
   listSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginTop: 16,
     marginBottom: 10,
   },
   listTitle: {
     fontSize: 18,
     fontWeight: "800",
+  },
+  collapsedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  collapsedBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   emptyText: {
     fontSize: 14,

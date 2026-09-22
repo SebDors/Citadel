@@ -2,18 +2,26 @@ import React, { useRef, useEffect } from 'react';
 import { StyleSheet, Animated, PanResponder, Dimensions, View } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 
 interface TabSwipeWrapperProps {
   children: React.ReactNode;
   tabIndex: number; // 0: Entraînement, 1: Historique, 2: Profil
+  disabled?: boolean;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabIndex }) => {
+export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabIndex, disabled = false }) => {
   const router = useRouter();
   const pathname = usePathname();
   const { theme } = useTheme();
+  const { data, loading } = useWorkout();
+
+  const isOnboarding = !loading && !!data && !data.hasCompletedOnboarding;
+  const isGestureDisabled = Boolean(disabled || isOnboarding);
+  const disabledRef = useRef(isGestureDisabled);
+  disabledRef.current = isGestureDisabled;
 
   const translateX = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
@@ -60,7 +68,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
       onStartShouldSetPanResponderCapture: () => false,
 
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (isNavigating.current) return false;
+        if (disabledRef.current || isNavigating.current) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
         const isSignificant = Math.abs(gestureState.dx) > 15;
 
@@ -71,7 +79,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
       },
 
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (isNavigating.current) return false;
+        if (disabledRef.current || isNavigating.current) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
         const isSignificant = Math.abs(gestureState.dx) > 18;
 
@@ -82,11 +90,13 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
       },
 
       onPanResponderGrant: () => {
+        if (disabledRef.current) return;
         translateX.stopAnimation();
         opacity.stopAnimation();
       },
 
       onPanResponderMove: (_, gestureState) => {
+        if (disabledRef.current) return;
         let dx = gestureState.dx;
         if ((tabIndex === 0 && dx > 0) || (tabIndex === 2 && dx < 0)) {
           dx = dx * 0.1;
@@ -98,6 +108,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
       },
 
       onPanResponderRelease: (_, gestureState) => {
+        if (disabledRef.current) return;
         const dx = gestureState.dx;
         const vx = gestureState.vx;
 

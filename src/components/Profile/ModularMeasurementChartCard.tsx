@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { BodyMeasurement } from '../../types';
@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { formatWeight } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Activity, TrendingUp } from 'lucide-react-native';
+import { calculateExponentialMovingAverage } from '../../services/analyticsService';
 
 interface ModularMeasurementChartCardProps {
   measurements: BodyMeasurement[];
@@ -35,19 +36,33 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
   const activeConfig = METRIC_CONFIGS.find((c) => c.key === activeMetricKey) || METRIC_CONFIGS[0];
 
   // Sort measurements chronologically
-  const sorted = [...(measurements || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sorted = useMemo(() => {
+    return [...(measurements || [])].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  }, [measurements]);
 
   // Extract points for active metric
-  const points = sorted
-    .filter((m) => m[activeConfig.field] !== undefined && m[activeConfig.field] !== null)
-    .map((m) => ({
-      date: m.date,
-      value: Number(m[activeConfig.field]),
-    }));
+  const points = useMemo(() => {
+    return sorted
+      .filter((m) => m[activeConfig.field] !== undefined && m[activeConfig.field] !== null)
+      .map((m) => ({
+        date: m.date,
+        value: Number(m[activeConfig.field]),
+      }));
+  }, [sorted, activeConfig.field]);
+
+  // Calcul du lissage par moyenne mobile exponentielle (EMA) pour le poids (MacroFactor)
+  const trendPoints = useMemo(() => {
+    if (activeMetricKey !== 'weight' || points.length === 0) return [];
+    return calculateExponentialMovingAverage(points, 0.15);
+  }, [points, activeMetricKey]);
 
   const latestPoint = points[points.length - 1];
   const previousPoint = points.length > 1 ? points[points.length - 2] : null;
   const delta = latestPoint && previousPoint ? (latestPoint.value - previousPoint.value).toFixed(2) : null;
+
+  const latestTrend = trendPoints[trendPoints.length - 1];
 
   // Chart dimensions & plotting logic
   const chartHeight = 120;
@@ -59,16 +74,20 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
   const innerHeight = chartHeight - paddingY * 2;
 
   let pathData = '';
-  let chartPoints: { x: number; y: number; val: number; date: string }[] = [];
+  let trendPathData = '';
+  let chartPoints: { x: number; y: number; val: number; date: string; trendVal?: number }[] = [];
   let minVal = 0;
   let maxVal = 0;
 
   if (points.length > 0) {
     const rawValues = points.map((p) => p.value);
-    minVal = Math.min(...rawValues);
-    maxVal = Math.max(...rawValues);
+    const trendValues = trendPoints.map((t) => t.trend);
+    const allValues = [...rawValues, ...trendValues];
 
-    // Give a margin if min === max
+    minVal = Math.min(...allValues);
+    maxVal = Math.max(...allValues);
+
+    // Margin if min === max
     if (minVal === maxVal) {
       minVal = Math.max(0, minVal - 5);
       maxVal = maxVal + 5;
@@ -79,7 +98,8 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
     chartPoints = points.map((p, idx) => {
       const x = points.length === 1 ? chartWidth / 2 : paddingX + (idx / (points.length - 1)) * innerWidth;
       const y = paddingY + innerHeight - ((p.value - minVal) / valRange) * innerHeight;
-      return { x, y, val: p.value, date: p.date };
+      const t = trendPoints[idx]?.trend;
+      return { x, y, val: p.value, date: p.date, trendVal: t };
     });
 
     if (chartPoints.length === 1) {
@@ -88,6 +108,15 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
       pathData = chartPoints.reduce((acc, pt, idx) => {
         return idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
       }, '');
+
+      // Tracé de la courbe de tendance lissée si applicable
+      if (trendPoints.length > 1) {
+        trendPathData = trendPoints.reduce((acc, pt, idx) => {
+          const x = paddingX + (idx / (trendPoints.length - 1)) * innerWidth;
+          const y = paddingY + innerHeight - ((pt.trend - minVal) / valRange) * innerHeight;
+          return idx === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
+        }, '');
+      }
     }
   }
 
@@ -135,22 +164,38 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
       {/* Current Metric Value Callout */}
       {latestPoint ? (
         <View style={styles.valueCalloutBox}>
-          <Text style={[styles.calloutLabel, { color: theme.textMuted }]}>
-            ÉVOLUTION · {activeConfig.label.toUpperCase()}
-          </Text>
-          <View style={styles.calloutValueRow}>
-            <Text style={[styles.calloutValue, { color: theme.text }]}>
-              {formatWeight(latestPoint.value)} {activeConfig.unit}
-            </Text>
-            {delta !== null && (
-              <Text
-                style={[
-                  styles.deltaText,
-                  { color: Number(delta) >= 0 ? theme.primary : theme.danger },
-                ]}
-              >
-                {Number(delta) >= 0 ? `+${delta}` : delta} {activeConfig.unit}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View>
+              <Text style={[styles.calloutLabel, { color: theme.textMuted }]}>
+                {activeConfig.label.toUpperCase()} ENREGISTRÉ
               </Text>
+              <View style={styles.calloutValueRow}>
+                <Text style={[styles.calloutValue, { color: theme.text }]}>
+                  {formatWeight(latestPoint.value)} {activeConfig.unit}
+                </Text>
+                {delta !== null && (
+                  <Text
+                    style={[
+                      styles.deltaText,
+                      { color: Number(delta) >= 0 ? theme.primary : theme.danger },
+                    ]}
+                  >
+                    {Number(delta) >= 0 ? `+${delta}` : delta} {activeConfig.unit}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Affichage de la tendance lissée (MacroFactor) si poids */}
+            {activeMetricKey === 'weight' && latestTrend && (
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.calloutLabel, { color: theme.textMuted }]}>
+                  TENDANCE LISSÉE
+                </Text>
+                <Text style={[styles.trendValue, { color: theme.primary }]}>
+                  {formatWeight(latestTrend.trend)} kg
+                </Text>
+              </View>
             )}
           </View>
         </View>
@@ -159,6 +204,20 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
           <Text style={[styles.noDataText, { color: theme.textMuted }]}>
             Aucune mesure enregistrée pour {activeConfig.label.toLowerCase()}
           </Text>
+        </View>
+      )}
+
+      {/* Légende si métrique = poids */}
+      {activeMetricKey === 'weight' && trendPoints.length > 1 && (
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
+            <Text style={[styles.legendText, { color: theme.textMuted }]}>Poids brut</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendLine, { backgroundColor: theme.primary }]} />
+            <Text style={[styles.legendText, { color: theme.textMuted }]}>Tendance lissée (EMA)</Text>
+          </View>
         </View>
       )}
 
@@ -179,9 +238,29 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
               {minVal} {activeConfig.unit}
             </SvgText>
 
-            {/* Main Polyline Path */}
+            {/* Main Polyline Path (Mesure brute) */}
             {pathData !== '' && (
-              <Path d={pathData} stroke={theme.accent} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              <Path
+                d={pathData}
+                stroke={theme.accent}
+                strokeWidth={activeMetricKey === 'weight' ? '1.5' : '3'}
+                strokeOpacity={activeMetricKey === 'weight' ? 0.45 : 1}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Tendance lissée (MacroFactor EMA) */}
+            {trendPathData !== '' && (
+              <Path
+                d={trendPathData}
+                stroke={theme.primary}
+                strokeWidth="3"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             )}
 
             {/* Plot Circles */}
@@ -200,7 +279,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
                   <Circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={isSelected ? "6" : "4.5"}
+                    r={isSelected ? "6" : "4"}
                     fill={isSelected ? theme.primary : theme.accent}
                     stroke={theme.cardBg}
                     strokeWidth={isSelected ? "3" : "2"}
@@ -248,6 +327,11 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
               <Text style={[styles.tooltipVal, { color: theme.background }]}>
                 {formatWeight(chartPoints[activePointIndex].val)} {activeConfig.unit}
               </Text>
+              {chartPoints[activePointIndex].trendVal !== undefined && (
+                <Text style={[styles.tooltipSub, { color: theme.background }]}>
+                  Tendance : {formatWeight(chartPoints[activePointIndex].trendVal!)} kg
+                </Text>
+              )}
               <Text style={[styles.tooltipDate, { color: theme.background }]}>
                 {new Date(chartPoints[activePointIndex].date).toLocaleDateString('fr-FR', {
                   day: 'numeric',
@@ -311,13 +395,44 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   calloutValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
+  },
+  trendValue: {
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 2,
   },
   deltaText: {
     fontSize: 12,
     fontWeight: '800',
     marginLeft: 8,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 6,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendLine: {
+    width: 14,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  legendText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   noDataBox: {
     paddingVertical: 16,
@@ -351,9 +466,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  tooltipDate: {
+  tooltipSub: {
     fontSize: 10,
+    fontWeight: '700',
+    opacity: 0.9,
+    marginTop: 1,
+  },
+  tooltipDate: {
+    fontSize: 9,
     fontWeight: '600',
     marginTop: 1,
+    opacity: 0.75,
   },
 });

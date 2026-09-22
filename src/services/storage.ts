@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder } from '../types';
+import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder, getSessionBlocks } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
 import { SharedExercise } from '../constants/exerciseDatabase';
 
@@ -239,6 +239,52 @@ export const StorageService = {
     const updatedData: FitTrackerData = {
       ...currentData,
       folders,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Met à jour une séance passée existante dans l'historique.
+   */
+  async updateWorkoutSession(updatedSession: WorkoutSession): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+
+    let totalVolume = 0;
+    let completedSetsCount = 0;
+    let totalSetsCount = 0;
+
+    const blocks = getSessionBlocks(updatedSession);
+    blocks.forEach((b) => {
+      if (b.type === 'single') {
+        b.exercise.sets.forEach((s) => {
+          totalSetsCount++;
+          if (s.completed) {
+            completedSetsCount++;
+            if (s.type !== 'warmup' && s.weightKg && s.reps) {
+              totalVolume += s.weightKg * s.reps;
+            }
+          }
+        });
+      } else if (b.type === 'circuit') {
+        totalSetsCount += b.rounds * b.exercises.length;
+        completedSetsCount += b.rounds * b.exercises.length;
+      }
+    });
+
+    const refreshedSession: WorkoutSession = {
+      ...updatedSession,
+      totalVolumeKg: Math.round(totalVolume * 10) / 10,
+      completedSetsCount,
+      totalSetsCount,
+    };
+
+    const updatedHistory = currentData.history.map((s) => (s.id === refreshedSession.id ? refreshedSession : s));
+    updatedHistory.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      history: updatedHistory,
     };
     await this.saveData(updatedData);
     return updatedData;
@@ -536,13 +582,14 @@ export const StorageService = {
 
   async completeOnboarding(profileData?: { name?: string; currentWeightKg?: number }): Promise<FitTrackerData> {
     const currentData = await this.loadData();
+    const currentProfile = currentData.profile || { name: 'Athlète', currentWeightKg: 0 };
     const updatedData: FitTrackerData = {
       ...currentData,
       hasCompletedOnboarding: true,
       profile: {
-        ...currentData.profile,
-        name: profileData?.name?.trim() || currentData.profile.name || 'Athlète',
-        currentWeightKg: profileData?.currentWeightKg || currentData.profile.currentWeightKg || 0,
+        ...currentProfile,
+        name: profileData?.name?.trim() || currentProfile.name || 'Athlète',
+        currentWeightKg: profileData?.currentWeightKg || currentProfile.currentWeightKg || 0,
       },
     };
     if (profileData?.currentWeightKg && profileData.currentWeightKg > 0) {
@@ -560,14 +607,15 @@ export const StorageService = {
 
   async skipOnboarding(): Promise<FitTrackerData> {
     const currentData = await this.loadData();
+    const currentProfile = currentData.profile || { name: 'Athlète', currentWeightKg: 0 };
     const updatedData: FitTrackerData = {
       ...currentData,
       hasCompletedOnboarding: true,
       hasCreatedFirstSession: true,
       hasCompletedFirstWorkout: true,
       profile: {
-        ...currentData.profile,
-        name: currentData.profile.name || 'Athlète',
+        ...currentProfile,
+        name: currentProfile.name || 'Athlète',
       },
     };
     await this.saveData(updatedData);
@@ -594,6 +642,26 @@ export const StorageService = {
     };
     await this.saveData(updatedData);
     return updatedData;
+  },
+
+  async getStorageUsage(): Promise<{ totalBytes: number; formattedSize: string }> {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const items = await AsyncStorage.multiGet(keys);
+      let totalBytes = 0;
+      items.forEach(([key, val]) => {
+        totalBytes += (key ? key.length : 0) + (val ? val.length : 0);
+      });
+      let formattedSize = `${totalBytes} B`;
+      if (totalBytes > 1024 * 1024) {
+        formattedSize = `${(totalBytes / (1024 * 1024)).toFixed(1)} Mo`;
+      } else if (totalBytes > 1024) {
+        formattedSize = `${(totalBytes / 1024).toFixed(1)} Ko`;
+      }
+      return { totalBytes, formattedSize };
+    } catch (e) {
+      return { totalBytes: 0, formattedSize: '0 Ko' };
+    }
   },
 };
 

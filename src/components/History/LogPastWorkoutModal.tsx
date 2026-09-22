@@ -76,7 +76,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [prefillSourceText, setPrefillSourceText] = useState<string | null>(null);
   
-  const [mode, setMode] = useState<'express' | 'detailed'>('express');
+  const [mode, setMode] = useState<'express' | 'detailed'>('detailed');
   const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
 
   // Keypad state
@@ -110,7 +110,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
       setSessionTitle('Séance libre');
       setSelectedTemplateId(null);
       setPrefillSourceText(null);
-      setMode('express');
+      setMode('detailed');
       setBlocks([]);
       setKeypadVisible(false);
       setShowTemplateSelector(false);
@@ -239,6 +239,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
     if (t) {
       setSelectedTemplateId(t.id);
       setSessionTitle(t.title);
+      setMode('detailed');
 
       // Chercher la dernière séance passée correspondant à ce modèle
       const sortedHistory = [...(data?.history || [])].sort(
@@ -338,6 +339,194 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   const handleRemoveBlock = (blockId: string) => {
     setBlocks(prev => prev.filter(b => b.id !== blockId));
   };
+
+  const handleCommitSetField = useCallback((blockId: string, setId: string, field: NumericFieldType, rawVal: string) => {
+    const num = parseFloat(rawVal);
+    const cleanNum = isNaN(num) ? undefined : num;
+    setBlocks(prev => prev.map(b => {
+      if (b.id === blockId && b.type === 'single') {
+        return {
+          ...b,
+          exercise: {
+            ...b.exercise,
+            sets: b.exercise.sets.map(s => s.id === setId ? { ...s, [field]: cleanNum } : s)
+          }
+        };
+      }
+      return b;
+    }));
+  }, []);
+
+  const isLastWorkoutField = useMemo(() => {
+    if (!keypadTarget) return false;
+    if (keypadTarget.field !== 'rir') return false;
+    const currentBlock = blocks.find(b => b.id === keypadTarget.blockId);
+    if (!currentBlock || currentBlock.type !== 'single') return true;
+    const sets = currentBlock.exercise.sets;
+    const setIdx = sets.findIndex(s => s.id === keypadTarget.setId);
+    if (setIdx !== sets.length - 1) return false;
+    const blockIdx = blocks.findIndex(b => b.id === keypadTarget.blockId);
+    for (let i = blockIdx + 1; i < blocks.length; i++) {
+      const nb = blocks[i];
+      if (nb.type === 'single' && (nb as SingleExerciseBlock).exercise.sets.length > 0) {
+        return false;
+      }
+    }
+    return true;
+  }, [keypadTarget, blocks]);
+
+  const handleKeypadNext = useCallback((currentVal: string) => {
+    if (!keypadTarget) return;
+    const { blockId, setId, field } = keypadTarget;
+    handleCommitSetField(blockId, setId, field, currentVal);
+
+    const currentBlock = blocks.find(b => b.id === blockId);
+    if (!currentBlock || currentBlock.type !== 'single') {
+      setKeypadTarget(null);
+      return;
+    }
+
+    const sets = currentBlock.exercise.sets;
+    const currentSetIndex = sets.findIndex(s => s.id === setId);
+    if (currentSetIndex === -1) {
+      setKeypadTarget(null);
+      return;
+    }
+    const currentSet = sets[currentSetIndex];
+
+    if (field === 'weightKg') {
+      setKeypadTarget({
+        blockId,
+        setId: currentSet.id,
+        field: 'reps',
+        setNumber: currentSet.setNumber,
+        value: currentSet.reps !== undefined && currentSet.reps !== null ? String(currentSet.reps) : '',
+      });
+    } else if (field === 'reps') {
+      setKeypadTarget({
+        blockId,
+        setId: currentSet.id,
+        field: 'rir',
+        setNumber: currentSet.setNumber,
+        value: currentSet.rir !== undefined && currentSet.rir !== null ? String(currentSet.rir) : '',
+      });
+    } else {
+      if (currentSetIndex < sets.length - 1) {
+        const nextSet = sets[currentSetIndex + 1];
+        setKeypadTarget({
+          blockId,
+          setId: nextSet.id,
+          field: 'weightKg',
+          setNumber: nextSet.setNumber,
+          value: nextSet.weightKg !== undefined && nextSet.weightKg !== null ? String(nextSet.weightKg) : '',
+        });
+      } else {
+        const blockIndex = blocks.findIndex(b => b.id === blockId);
+        let foundNext = false;
+        for (let i = blockIndex + 1; i < blocks.length; i++) {
+          const nb = blocks[i];
+          if (nb.type === 'single' && nb.exercise.sets.length > 0) {
+            const firstSet = nb.exercise.sets[0];
+            setKeypadTarget({
+              blockId: nb.id,
+              setId: firstSet.id,
+              field: 'weightKg',
+              setNumber: firstSet.setNumber,
+              value: firstSet.weightKg !== undefined && firstSet.weightKg !== null ? String(firstSet.weightKg) : '',
+            });
+            foundNext = true;
+            break;
+          }
+        }
+        if (!foundNext) {
+          setKeypadTarget(null);
+        }
+      }
+    }
+  }, [keypadTarget, blocks, handleCommitSetField]);
+
+  const handleKeypadPrevious = useCallback((currentVal: string) => {
+    if (!keypadTarget) return;
+    const { blockId, setId, field } = keypadTarget;
+    handleCommitSetField(blockId, setId, field, currentVal);
+
+    const currentBlock = blocks.find(b => b.id === blockId);
+    if (!currentBlock || currentBlock.type !== 'single') {
+      setKeypadTarget(null);
+      return;
+    }
+
+    const sets = currentBlock.exercise.sets;
+    const currentSetIndex = sets.findIndex(s => s.id === setId);
+    if (currentSetIndex === -1) {
+      setKeypadTarget(null);
+      return;
+    }
+    const currentSet = sets[currentSetIndex];
+
+    if (field === 'rir') {
+      setKeypadTarget({
+        blockId,
+        setId: currentSet.id,
+        field: 'reps',
+        setNumber: currentSet.setNumber,
+        value: currentSet.reps !== undefined && currentSet.reps !== null ? String(currentSet.reps) : '',
+      });
+    } else if (field === 'reps') {
+      setKeypadTarget({
+        blockId,
+        setId: currentSet.id,
+        field: 'weightKg',
+        setNumber: currentSet.setNumber,
+        value: currentSet.weightKg !== undefined && currentSet.weightKg !== null ? String(currentSet.weightKg) : '',
+      });
+    } else {
+      if (currentSetIndex > 0) {
+        const prevSet = sets[currentSetIndex - 1];
+        setKeypadTarget({
+          blockId,
+          setId: prevSet.id,
+          field: 'rir',
+          setNumber: prevSet.setNumber,
+          value: prevSet.rir !== undefined && prevSet.rir !== null ? String(prevSet.rir) : '',
+        });
+      } else {
+        const blockIndex = blocks.findIndex(b => b.id === blockId);
+        let foundPrev = false;
+        for (let i = blockIndex - 1; i >= 0; i--) {
+          const pb = blocks[i];
+          if (pb.type === 'single' && pb.exercise.sets.length > 0) {
+            const lastSet = pb.exercise.sets[pb.exercise.sets.length - 1];
+            setKeypadTarget({
+              blockId: pb.id,
+              setId: lastSet.id,
+              field: 'rir',
+              setNumber: lastSet.setNumber,
+              value: lastSet.rir !== undefined && lastSet.rir !== null ? String(lastSet.rir) : '',
+            });
+            foundPrev = true;
+            break;
+          }
+        }
+        if (!foundPrev) {
+          setKeypadTarget(null);
+        }
+      }
+    }
+  }, [keypadTarget, blocks, handleCommitSetField]);
+
+  const handleKeypadValidate = useCallback((finalVal: string) => {
+    if (!keypadTarget) return;
+    handleCommitSetField(keypadTarget.blockId, keypadTarget.setId, keypadTarget.field, finalVal);
+    setKeypadTarget(null);
+  }, [keypadTarget, handleCommitSetField]);
+
+  const handleKeypadClose = useCallback((currentVal?: string) => {
+    if (keypadTarget && currentVal !== undefined) {
+      handleCommitSetField(keypadTarget.blockId, keypadTarget.setId, keypadTarget.field, currentVal);
+    }
+    setKeypadTarget(null);
+  }, [keypadTarget, handleCommitSetField]);
 
   const handleAddExercise = (ex: SharedExercise) => {
     let prefilledSets: WorkoutSet[] = [
@@ -655,7 +844,10 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                   </Text>
                   <Text style={[styles.dropdownSubtitle, { color: theme.textMuted }]} numberOfLines={1}>
                     {selectedTemplate
-                      ? `${selectedTemplate.blocks?.length || 0} exercice${(selectedTemplate.blocks?.length || 0) > 1 ? 's' : ''} configuré${(selectedTemplate.blocks?.length || 0) > 1 ? 's' : ''}`
+                      ? (() => {
+                          const count = getTemplateBlocks(selectedTemplate).length;
+                          return `${count} exercice${count > 1 ? 's' : ''} configuré${count > 1 ? 's' : ''}`;
+                        })()
                       : 'Enregistrement libre sans modèle prédéfini'}
                   </Text>
                 </View>
@@ -762,9 +954,25 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                               <Text style={[styles.blockTitle, { color: theme.text }]} numberOfLines={1}>
                                 {block.exercise.exerciseName}
                               </Text>
-                              <Text style={[styles.muscleSub, { color: theme.textMuted }]}>
-                                {block.exercise.primaryMuscle}
-                              </Text>
+                              {/* Muscles travaillés */}
+                              <View style={{ marginTop: 3 }}>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                                  {(block.exercise.primaryMuscles && block.exercise.primaryMuscles.length > 0 ? block.exercise.primaryMuscles : (block.exercise.primaryMuscle ? [block.exercise.primaryMuscle] : [])).map((m, idx) => (
+                                    <View key={idx} style={{ backgroundColor: theme.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF', textTransform: 'uppercase' }}>{m}</Text>
+                                    </View>
+                                  ))}
+                                </View>
+                                {block.exercise.targetMuscles && block.exercise.targetMuscles.filter(m => !(block.exercise.primaryMuscles || [block.exercise.primaryMuscle]).includes(m)).length > 0 && (
+                                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
+                                    {block.exercise.targetMuscles.filter(m => !(block.exercise.primaryMuscles || [block.exercise.primaryMuscle]).includes(m)).map((m, idx) => (
+                                      <View key={idx} style={{ backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                                        <Text style={{ fontSize: 10, fontWeight: '600', color: theme.textMuted }}>{m}</Text>
+                                      </View>
+                                    ))}
+                                  </View>
+                                )}
+                              </View>
                             </View>
                           </View>
                           <TouchableOpacity
@@ -781,6 +989,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                           <Text style={[styles.colHead, styles.colS, { color: theme.textMuted }]}>SÉRIE</Text>
                           <Text style={[styles.colHead, styles.colM, { color: theme.textMuted }]}>CHARGE (KG)</Text>
                           <Text style={[styles.colHead, styles.colM, { color: theme.textMuted }]}>REPS</Text>
+                          <Text style={[styles.colHead, styles.colRir, { color: theme.textMuted }]}>RIR</Text>
                           <View style={styles.colAction} />
                         </View>
 
@@ -796,7 +1005,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                             <TouchableOpacity
                               activeOpacity={0.75}
                               style={[styles.cellBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
-                              onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'weightKg', setNumber: set.setNumber, value: set.weightKg?.toString() || '' })}
+                              onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'weightKg', setNumber: set.setNumber, value: set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '' })}
                             >
                               <Text style={[styles.cellVal, { color: set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted }]}>
                                 {set.weightKg !== undefined && set.weightKg !== null ? `${set.weightKg}` : '-'}
@@ -807,12 +1016,22 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
                             <TouchableOpacity
                               activeOpacity={0.75}
                               style={[styles.cellBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
-                              onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'reps', setNumber: set.setNumber, value: set.reps?.toString() || '' })}
+                              onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'reps', setNumber: set.setNumber, value: set.reps !== undefined && set.reps !== null ? String(set.reps) : '' })}
                             >
                               <Text style={[styles.cellVal, { color: set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted }]}>
                                 {set.reps !== undefined && set.reps !== null ? `${set.reps}` : '-'}
                               </Text>
                               <Text style={[styles.cellUnit, { color: theme.textMuted }]}>reps</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              activeOpacity={0.75}
+                              style={[styles.cellBtn, styles.cellRir, { backgroundColor: theme.background, borderColor: theme.border }]}
+                              onPress={() => setKeypadTarget({ blockId: block.id, setId: set.id, field: 'rir', setNumber: set.setNumber, value: set.rir !== undefined && set.rir !== null ? String(set.rir) : '' })}
+                            >
+                              <Text style={[styles.cellVal, { color: set.rir !== undefined && set.rir !== null ? theme.accent : theme.textMuted }]}>
+                                {set.rir !== undefined && set.rir !== null ? `${set.rir}` : '-'}
+                              </Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -948,28 +1167,16 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
       {keypadTarget && (
         <CustomNumericKeypad
           visible={!!keypadTarget}
-          onClose={() => setKeypadTarget(null)}
+          onClose={handleKeypadClose}
           setNumber={keypadTarget.setNumber}
           activeField={keypadTarget.field}
           value={keypadTarget.value}
           onChangeValue={(val) => setKeypadTarget({ ...keypadTarget, value: val })}
-          onValidate={(finalVal) => {
-            const num = parseFloat(finalVal);
-            setBlocks(prev => prev.map(b => {
-              if (b.id === keypadTarget.blockId && b.type === 'single') {
-                return {
-                  ...b,
-                  exercise: {
-                    ...b.exercise,
-                    sets: b.exercise.sets.map(s => s.id === keypadTarget.setId ? { ...s, [keypadTarget.field]: isNaN(num) ? undefined : num } : s)
-                  }
-                };
-              }
-              return b;
-            }));
-            setKeypadTarget(null);
-          }}
+          onNextField={handleKeypadNext}
+          onPreviousField={handleKeypadPrevious}
+          onValidate={handleKeypadValidate}
           onClear={() => setKeypadTarget({ ...keypadTarget, value: '' })}
+          isLastField={isLastWorkoutField}
         />
       )}
 
@@ -1087,7 +1294,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
               {/* Templates list */}
               {filteredTemplates.map(t => {
                 const isSelected = selectedTemplateId === t.id;
-                const blocksCount = t.blocks?.length || 0;
+                const blocksCount = getTemplateBlocks(t).length;
                 return (
                   <TouchableOpacity
                     key={t.id}
@@ -1541,6 +1748,7 @@ const styles = StyleSheet.create({
   },
   colS: { width: 34, textAlign: 'center' },
   colM: { flex: 1, textAlign: 'center' },
+  colRir: { width: 44, textAlign: 'center' },
   colAction: { width: 34, alignItems: 'center' },
   setNumBadge: {
     width: 26,
@@ -1563,8 +1771,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
-    paddingHorizontal: 6,
+    marginHorizontal: 3,
+    paddingHorizontal: 4,
+  },
+  cellRir: {
+    flex: 0,
+    width: 44,
   },
   cellVal: {
     fontSize: 15,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, 
 import { X, Trophy, Activity, Calendar, Dumbbell } from 'lucide-react-native';
 import { WorkoutSession, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { calculateE1RM, calculateMaxE1RM } from '../../services/analyticsService';
 
 interface ExerciseDetailModalProps {
   visible: boolean;
@@ -28,23 +29,23 @@ export default function ExerciseDetailModal({
     let bestWeight = 0;
     let bestReps = 0;
     let prDate = '';
-
     const historyItems: {
       date: string;
       dateFormatted: string;
-      sets: { weightKg: number; reps: number; isPr: boolean }[];
+      sets: { weightKg: number; reps: number; isPr?: boolean }[];
     }[] = [];
 
-    const sortedSessions = [...history].sort(
+    // Tri chronologique décroissant pour l'affichage de l'historique
+    const sortedHistory = [...history].sort(
       (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
     );
 
-    sortedSessions.forEach(session => {
-      let foundSets: { weightKg: number; reps: number; isPr: boolean }[] = [];
+    sortedHistory.forEach(session => {
+      const foundSets: { weightKg: number; reps: number; isPr?: boolean }[] = [];
       const sessionDate = new Date(session.startTime);
       const timeFormatted = sessionDate.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
-        minute: '2-digit',
+        minute: '2-digit'
       });
       const dateFormatted = `${sessionDate.toLocaleDateString('fr-FR', {
         day: 'numeric',
@@ -63,14 +64,12 @@ export default function ExerciseDetailModal({
               if (set.completed) {
                 const w = set.weightKg || 0;
                 const r = set.reps || 0;
-                let isPr = false;
                 if (w > bestWeight || (w === bestWeight && r > bestReps)) {
                   bestWeight = w;
                   bestReps = r;
                   prDate = dateFormatted;
-                  isPr = true;
                 }
-                foundSets.push({ weightKg: w, reps: r, isPr });
+                foundSets.push({ weightKg: w, reps: r });
               }
             });
           }
@@ -97,7 +96,8 @@ export default function ExerciseDetailModal({
       });
     });
 
-    const e1RM = bestWeight > 0 ? Math.round(bestWeight * (1 + bestReps / 30)) : 0;
+    const maxPrRecord = calculateMaxE1RM(history, exerciseName);
+    const e1RM = maxPrRecord ? maxPrRecord.e1RM : (bestWeight > 0 ? calculateE1RM(bestWeight, bestReps) : 0);
 
     return {
       exerciseHistory: historyItems,

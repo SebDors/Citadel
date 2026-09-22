@@ -28,6 +28,12 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   const { theme } = useTheme();
 
   const pauseAnim = useRef(new Animated.Value(1)).current;
+  const [pauseElapsed, setPauseElapsed] = React.useState<number>(() => {
+    if (session.isPaused && session.pausedAt) {
+      return Math.max(0, Math.floor((Date.now() - new Date(session.pausedAt).getTime()) / 1000));
+    }
+    return 0;
+  });
 
   useEffect(() => {
     if (session.isPaused) {
@@ -41,6 +47,19 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       pauseAnim.setValue(1);
     }
   }, [session.isPaused, pauseAnim]);
+
+  useEffect(() => {
+    if (!session.isPaused || !session.pausedAt) {
+      setPauseElapsed(0);
+      return;
+    }
+    const tick = () => {
+      setPauseElapsed(Math.max(0, Math.floor((Date.now() - new Date(session.pausedAt!).getTime()) / 1000)));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [session.isPaused, session.pausedAt]);
 
   const formatMinutesSeconds = (totalSeconds: number = 0): string => {
     const m = Math.floor(totalSeconds / 60);
@@ -119,7 +138,9 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           <View style={styles.centerBadgeContainer}>
             <Animated.View style={[styles.pauseBadge, { backgroundColor: `${theme.danger}20`, borderColor: theme.danger, opacity: pauseAnim }]}>
               <Pause size={11} color={theme.danger} fill={theme.danger} style={{ marginRight: 4 }} />
-              <Text style={[styles.pauseText, { color: theme.danger }]}>EN PAUSE</Text>
+              <Text style={[styles.pauseText, { color: theme.danger }]}>
+                EN PAUSE{pauseElapsed > 0 ? ` (${formatMinutesSeconds(pauseElapsed)})` : ""}
+              </Text>
             </Animated.View>
           </View>
         )}

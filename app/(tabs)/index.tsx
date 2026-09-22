@@ -487,7 +487,7 @@ export default function WorkoutTab() {
   };
 
   return (
-    <TabSwipeWrapper tabIndex={0}>
+    <TabSwipeWrapper tabIndex={0} disabled={!loading && !!data && !data.hasCompletedOnboarding}>
       <SafeAreaView
         edges={["top", "left", "right"]}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
@@ -1363,7 +1363,9 @@ export default function WorkoutTab() {
         <OnboardingModal
           visible={!loading && !!data && !data.hasCompletedOnboarding}
           onComplete={completeOnboarding}
-          onSkip={skipOnboarding}
+          onSkip={async () => {
+            await completeOnboarding({ name: 'Athlète' });
+          }}
         />
       </SafeAreaView>
     </TabSwipeWrapper>

@@ -20,6 +20,7 @@ import {
 } from '../types';
 import { StorageService } from '../services/storage';
 import { NotificationService } from '../services/notificationService';
+import { calculateWorkoutTotalVolume } from '../services/analyticsService';
 import { normalizeString } from '../utils/stringUtils';
 
 export interface NextSetPreview {
@@ -28,6 +29,9 @@ export interface NextSetPreview {
   weightKg?: number;
   reps?: number;
   isNextExercise: boolean;
+  isSuperset?: boolean;
+  supersetGroup?: string;
+  isTransition?: boolean;
 }
 
 export interface WorkoutContextType {
@@ -68,6 +72,7 @@ export interface WorkoutContextType {
   toggleFolderCollapse: (folderId: string) => Promise<void>;
   moveTemplateToFolder: (templateId: string, targetFolderId: string | null) => Promise<void>;
   logPastWorkout: (session: WorkoutSession) => Promise<void>;
+  updatePastWorkout: (updatedSession: WorkoutSession) => Promise<void>;
   deleteWorkoutSession: (sessionId: string) => Promise<void>;
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
@@ -91,8 +96,14 @@ export interface WorkoutContextType {
     nextSetInfo?: NextSetPreview | null;
     targetEndTime: number | null;
     secondsRemaining: number;
+    timerType?: 'rest' | 'transition';
   };
-  startRestTimer: (exerciseName: string, seconds: number, nextSetInfo?: NextSetPreview | null) => void;
+  startRestTimer: (
+    exerciseName: string,
+    seconds: number,
+    nextSetInfo?: NextSetPreview | null,
+    timerType?: 'rest' | 'transition'
+  ) => void;
   dismissRestTimer: () => void;
   adjustRestTimer: (deltaSeconds: number) => void;
 }
@@ -217,12 +228,14 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     nextSetInfo?: NextSetPreview | null;
     targetEndTime: number | null;
     secondsRemaining: number;
+    timerType?: 'rest' | 'transition';
   }>({
     active: false,
     exerciseName: '',
     nextSetInfo: null,
     targetEndTime: null,
     secondsRemaining: 0,
+    timerType: 'rest',
   });
 
   const hasPlayedEndSoundRef = React.useRef(false);
@@ -233,10 +246,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       NotificationService.playTimerEndSound();
       NotificationService.cancelScheduledNotification();
     }
-    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0 });
+    setRestTimer({ active: false, exerciseName: '', targetEndTime: null, secondsRemaining: 0, timerType: 'rest' });
   };
 
-  const startRestTimer = (exerciseName: string, seconds: number, nextSetInfo?: NextSetPreview | null) => {
+  const startRestTimer = (
+    exerciseName: string,
+    seconds: number,
+    nextSetInfo?: NextSetPreview | null,
+    timerType: 'rest' | 'transition' = 'rest'
+  ) => {
     if (seconds <= 0) return;
     hasPlayedEndSoundRef.current = false;
     const targetEnd = Date.now() + seconds * 1000;
@@ -246,6 +264,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       nextSetInfo: nextSetInfo || null,
       targetEndTime: targetEnd,
       secondsRemaining: seconds,
+      timerType,
     });
     NotificationService.scheduleTimerExpirationNotification(seconds, exerciseName, nextSetInfo);
   };
@@ -301,13 +320,23 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const completeOnboarding = async (profileData?: { name?: string; currentWeightKg?: number }) => {
-    const updated = await StorageService.completeOnboarding(profileData);
-    setData(updated);
+    try {
+      const updated = await StorageService.completeOnboarding(profileData);
+      setData(updated);
+    } catch (e) {
+      console.error('Erreur completeOnboarding:', e);
+      setData((prev) => (prev ? { ...prev, hasCompletedOnboarding: true } : prev));
+    }
   };
 
   const skipOnboarding = async () => {
-    const updated = await StorageService.skipOnboarding();
-    setData(updated);
+    try {
+      const updated = await StorageService.skipOnboarding();
+      setData(updated);
+    } catch (e) {
+      console.error('Erreur skipOnboarding:', e);
+      setData((prev) => (prev ? { ...prev, hasCompletedOnboarding: true } : prev));
+    }
   };
 
   const markFirstSessionCreated = async () => {
@@ -384,15 +413,23 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let updated: WorkoutSession;
 
       if (nextIsPaused) {
+        const currentElapsed = prev.startTime
+          ? Math.max(0, Math.floor((Date.now() - new Date(prev.startTime).getTime()) / 1000))
+          : (prev.durationSeconds || 0);
         updated = {
           ...prev,
           isPaused: true,
+          pausedAt: new Date().toISOString(),
+          durationSeconds: currentElapsed,
         };
       } else {
-        const newStartTimeMs = Date.now() - (prev.durationSeconds || 0) * 1000;
+        const savedDuration = prev.durationSeconds || 0;
+        const newStartTimeMs = Date.now() - savedDuration * 1000;
         updated = {
           ...prev,
           isPaused: false,
+          pausedAt: undefined,
+          durationSeconds: savedDuration,
           startTime: new Date(newStartTimeMs).toISOString(),
         };
       }
@@ -478,41 +515,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const calculateVolumeAndCompletedCount = (
     exercises?: WorkoutExercise[],
-    blocks?: WorkoutBlock[]
+    blocks?: WorkoutBlock[],
+    sessionMeta?: any
   ) => {
-    let volume = 0;
-    let completedCount = 0;
-    let totalCount = 0;
-
-    if (blocks && blocks.length > 0) {
-      blocks.forEach((block) => {
-        if (block.type === 'single') {
-          block.exercise.sets.forEach((s) => {
-            totalCount++;
-            if (s.completed) {
-              completedCount++;
-              if (s.type !== 'warmup' && s.weightKg && s.reps) {
-                volume += s.weightKg * s.reps;
-              }
-            }
-          });
-        }
-      });
-    } else if (exercises) {
-      exercises.forEach((ex) => {
-        ex.sets.forEach((s) => {
-          totalCount++;
-          if (s.completed) {
-            completedCount++;
-            if (s.type !== 'warmup' && s.weightKg && s.reps) {
-              volume += s.weightKg * s.reps;
-            }
-          }
-        });
-      });
-    }
-
-    return { volume, completedCount, totalCount };
+    return calculateWorkoutTotalVolume(exercises, blocks, sessionMeta);
   };
 
   const updateSet = (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => {
@@ -568,79 +574,96 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     currentExerciseId: string,
     currentSetId: string
   ): NextSetPreview | null => {
+    const exercises: WorkoutExercise[] = [];
     if (session.blocks && session.blocks.length > 0) {
-      let foundCurrentEx = false;
-      for (let i = 0; i < session.blocks.length; i++) {
-        const block = session.blocks[i];
-        if (block.type === 'single') {
-          const ex = block.exercise;
-          if (ex.id === currentExerciseId) {
-            foundCurrentEx = true;
-            let foundCurrentSet = false;
-            for (const s of ex.sets) {
-              if (s.id === currentSetId) {
-                foundCurrentSet = true;
-                continue;
-              }
-              if (foundCurrentSet && !s.completed) {
-                return {
-                  exerciseName: ex.exerciseName,
-                  setNumber: s.setNumber,
-                  weightKg: s.weightKg,
-                  reps: s.reps,
-                  isNextExercise: false,
-                };
-              }
-            }
-          } else if (foundCurrentEx) {
-            for (const s of ex.sets) {
-              if (!s.completed) {
-                return {
-                  exerciseName: ex.exerciseName,
-                  setNumber: s.setNumber,
-                  weightKg: s.weightKg,
-                  reps: s.reps,
-                  isNextExercise: true,
-                };
-              }
-            }
-          }
+      session.blocks.forEach((b) => {
+        if (b.type === 'single') exercises.push(b.exercise);
+      });
+    } else if (session.exercises && session.exercises.length > 0) {
+      exercises.push(...session.exercises);
+    }
+
+    if (exercises.length === 0) return null;
+
+    const currentEx = exercises.find((e) => e.id === currentExerciseId);
+    if (!currentEx) return null;
+
+    const currentSetIndex = currentEx.sets.findIndex((s) => s.id === currentSetId);
+
+    // CAS 1 : Moteur intelligent d'enchaînement de Superset (Exo A1 -> Exo B1 -> Repos Tour -> Exo A2)
+    if (currentEx.supersetGroup) {
+      const groupExercises = exercises.filter(
+        (e) => e.supersetGroup === currentEx.supersetGroup
+      );
+      const currIndexInGroup = groupExercises.findIndex((e) => e.id === currentExerciseId);
+
+      // Si l'exercice n'est pas le dernier du groupe superset :
+      // Transition courte immédiate vers l'exercice suivant du groupe (même tour)
+      if (currIndexInGroup >= 0 && currIndexInGroup < groupExercises.length - 1) {
+        const nextExInGroup = groupExercises[currIndexInGroup + 1];
+        const targetSet =
+          nextExInGroup.sets[currentSetIndex] || nextExInGroup.sets.find((s) => !s.completed);
+        if (targetSet && !targetSet.completed) {
+          return {
+            exerciseName: nextExInGroup.exerciseName,
+            setNumber: targetSet.setNumber,
+            weightKg: targetSet.weightKg,
+            reps: targetSet.reps,
+            isNextExercise: true,
+            isSuperset: true,
+            supersetGroup: currentEx.supersetGroup,
+            isTransition: true, // Transition courte 10s
+          };
+        }
+      } else if (currIndexInGroup === groupExercises.length - 1) {
+        // Dernier exercice du superset complété : Fin de tour !
+        // Prochain set = tour suivant du PREMIER exercice du superset
+        const firstExInGroup = groupExercises[0];
+        const nextRoundSet =
+          firstExInGroup.sets[currentSetIndex + 1] || firstExInGroup.sets.find((s) => !s.completed);
+        if (nextRoundSet && !nextRoundSet.completed) {
+          return {
+            exerciseName: firstExInGroup.exerciseName,
+            setNumber: nextRoundSet.setNumber,
+            weightKg: nextRoundSet.weightKg,
+            reps: nextRoundSet.reps,
+            isNextExercise: true,
+            isSuperset: true,
+            supersetGroup: currentEx.supersetGroup,
+            isTransition: false, // Vrai temps de repos complet du superset
+          };
         }
       }
-    } else if (session.exercises && session.exercises.length > 0) {
-      let foundCurrentEx = false;
-      for (let i = 0; i < session.exercises.length; i++) {
-        const ex = session.exercises[i];
-        if (ex.id === currentExerciseId) {
-          foundCurrentEx = true;
-          let foundCurrentSet = false;
-          for (const s of ex.sets) {
-            if (s.id === currentSetId) {
-              foundCurrentSet = true;
-              continue;
-            }
-            if (foundCurrentSet && !s.completed) {
-              return {
-                exerciseName: ex.exerciseName,
-                setNumber: s.setNumber,
-                weightKg: s.weightKg,
-                reps: s.reps,
-                isNextExercise: false,
-              };
-            }
-          }
-        } else if (foundCurrentEx) {
-          for (const s of ex.sets) {
-            if (!s.completed) {
-              return {
-                exerciseName: ex.exerciseName,
-                setNumber: s.setNumber,
-                weightKg: s.weightKg,
-                reps: s.reps,
-                isNextExercise: true,
-              };
-            }
-          }
+    }
+
+    // CAS 2 : Exercice standard (ou toutes les séries du superset sont finies)
+    // 2.a : Prochaine série non complétée dans le même exercice
+    for (let i = currentSetIndex + 1; i < currentEx.sets.length; i++) {
+      const s = currentEx.sets[i];
+      if (!s.completed) {
+        return {
+          exerciseName: currentEx.exerciseName,
+          setNumber: s.setNumber,
+          weightKg: s.weightKg,
+          reps: s.reps,
+          isNextExercise: false,
+        };
+      }
+    }
+
+    // 2.b : Premier exercice suivant avec une série non complétée
+    const currGlobalIndex = exercises.findIndex((e) => e.id === currentExerciseId);
+    for (let i = currGlobalIndex + 1; i < exercises.length; i++) {
+      const nextEx = exercises[i];
+      for (const s of nextEx.sets) {
+        if (!s.completed) {
+          return {
+            exerciseName: nextEx.exerciseName,
+            setNumber: s.setNumber,
+            weightKg: s.weightKg,
+            reps: s.reps,
+            isNextExercise: true,
+          };
         }
       }
     }
@@ -733,7 +756,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (isMarkingCompleted) {
         const nextSetInfo = findNextSetPreview(updatedSession, exerciseId, setId);
-        startRestTimer(exerciseName, targetRestSeconds, nextSetInfo);
+        let restTime = targetRestSeconds;
+        let timerKind: 'rest' | 'transition' = 'rest';
+
+        if (nextSetInfo?.isTransition) {
+          // Transition courte intra-superset (10s)
+          restTime = 10;
+          timerKind = 'transition';
+        }
+
+        startRestTimer(exerciseName, restTime, nextSetInfo, timerKind);
       }
 
       return updatedSession;
@@ -1435,6 +1467,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const updatePastWorkout = async (updatedSession: WorkoutSession) => {
+    const updated = await StorageService.updateWorkoutSession(updatedSession);
+    setData(updated);
+  };
+
   const deleteWorkoutSession = async (sessionId: string) => {
     const updated = await StorageService.deleteWorkoutSession(sessionId);
     setData(updated);
@@ -1525,6 +1562,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       toggleFolderCollapse,
       moveTemplateToFolder,
       logPastWorkout,
+      updatePastWorkout,
       deleteWorkoutSession,
       deleteExerciseFromSession,
       deleteSetFromSession,
