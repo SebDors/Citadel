@@ -2,9 +2,11 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 import { Check, Trash2, X, Plus, CornerDownRight } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 import { parseFloatFrench } from '../../utils/numberUtils';
+import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 
 interface SetTableRowProps {
   set: WorkoutSet;
@@ -17,7 +19,7 @@ interface SetTableRowProps {
 
 type KeypadTarget =
   | { type: 'main'; field: NumericFieldType }
-  | { type: 'drop'; stepId: string; field: 'weightKg' | 'reps' }
+  | { type: 'drop'; stepId: string; field: 'weightKg' | 'reps'; ghostWeight?: string; ghostReps?: string }
   | null;
 
 const SetTableRowComponent: React.FC<SetTableRowProps> = ({
@@ -29,11 +31,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   onDelete,
 }) => {
   const { theme } = useTheme();
+  const { data } = useWorkout();
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<KeypadTarget>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
+  const dropReductionPercent = data?.profile?.dropSetReductionPercent ?? 20;
 
   // Ouverture du clavier numérique sur un champ principal ou décharge
   const handleOpenMainKeypad = useCallback((field: NumericFieldType) => {
@@ -50,11 +54,38 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   }, [set.weightKg, set.reps, set.rir]);
 
   const handleOpenDropKeypad = useCallback((stepId: string, field: 'weightKg' | 'reps') => {
-    setKeypadTarget({ type: 'drop', stepId, field });
-    const step = (set.dropSteps || []).find((s) => s.id === stepId);
+    const steps = set.dropSteps || [];
+    const stepIdx = steps.findIndex((s) => s.id === stepId);
+    const step = steps[stepIdx];
     const val = step ? step[field] : undefined;
+
+    // Calcul de la ghost value pour le drop step
+    let ghostWeight: string | undefined;
+    let ghostReps: string | undefined;
+
+    // Poids de référence = étape précédente (ou série principale si étape 1)
+    let refWeight: number | undefined;
+    let refReps: number | undefined;
+    if (stepIdx === 0) {
+      refWeight = set.weightKg;
+      refReps = set.reps;
+    } else if (stepIdx > 0) {
+      refWeight = steps[stepIdx - 1]?.weightKg ?? set.weightKg;
+      refReps = steps[stepIdx - 1]?.reps ?? set.reps;
+    }
+
+    if (refWeight !== undefined && refWeight > 0) {
+      const reduced = refWeight * (1 - dropReductionPercent / 100);
+      const rounded = Math.round(reduced * 2) / 2; // arrondi au 0.5 kg le plus proche
+      ghostWeight = String(rounded);
+    }
+    if (refReps !== undefined && refReps > 0) {
+      ghostReps = String(refReps);
+    }
+
+    setKeypadTarget({ type: 'drop', stepId, field, ghostWeight, ghostReps });
     setTempValue(val !== undefined && val !== null ? String(val) : '');
-  }, [set.dropSteps]);
+  }, [set.dropSteps, set.weightKg, set.reps, dropReductionPercent]);
 
   // Validation et mise à jour de la valeur saisie
   const commitValue = useCallback((target: KeypadTarget, valStr: string) => {
@@ -373,6 +404,19 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
             const isWeightActive = keypadTarget?.type === 'drop' && keypadTarget.stepId === step.id && keypadTarget.field === 'weightKg';
             const isRepsActive = keypadTarget?.type === 'drop' && keypadTarget.stepId === step.id && keypadTarget.field === 'reps';
 
+            // Calcul du ghost weight pour l'affichage passif dans la case
+            let dropGhostWeight: string | undefined;
+            let refW: number | undefined;
+            if (idx === 0) {
+              refW = set.weightKg;
+            } else {
+              refW = (set.dropSteps || [])[idx - 1]?.weightKg ?? set.weightKg;
+            }
+            if (refW !== undefined && refW > 0) {
+              const reduced = refW * (1 - dropReductionPercent / 100);
+              dropGhostWeight = String(Math.round(reduced * 2) / 2);
+            }
+
             return (
               <View key={step.id || idx} style={styles.dropStepRow}>
                 <Text style={[styles.dropStepLabel, { color: theme.textMuted }]}>
@@ -392,8 +436,24 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                   ]}
                   onPress={() => handleOpenDropKeypad(step.id, 'weightKg')}
                 >
-                  <Text style={[styles.dropCellText, { color: isWeightActive ? theme.accent : (step.weightKg !== undefined ? theme.text : theme.textMuted) }]}>
-                    {step.weightKg !== undefined ? `${step.weightKg} kg` : '- kg'}
+                  <Text
+                    style={[
+                      styles.dropCellText,
+                      {
+                        color: isWeightActive
+                          ? theme.accent
+                          : step.weightKg !== undefined
+                          ? theme.text
+                          : `${theme.textMuted}80`,
+                        fontStyle: step.weightKg === undefined && dropGhostWeight ? 'italic' : 'normal',
+                      },
+                    ]}
+                  >
+                    {step.weightKg !== undefined
+                      ? `${step.weightKg} kg`
+                      : dropGhostWeight
+                      ? `${dropGhostWeight} kg`
+                      : '- kg'}
                   </Text>
                 </TouchableOpacity>
 
@@ -412,8 +472,24 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                   ]}
                   onPress={() => handleOpenDropKeypad(step.id, 'reps')}
                 >
-                  <Text style={[styles.dropCellText, { color: isRepsActive ? theme.accent : (step.reps !== undefined ? theme.text : theme.textMuted) }]}>
-                    {step.reps !== undefined ? `${step.reps} reps` : '- reps'}
+                  <Text
+                    style={[
+                      styles.dropCellText,
+                      {
+                        color: isRepsActive
+                          ? theme.accent
+                          : step.reps !== undefined
+                          ? theme.text
+                          : `${theme.textMuted}80`,
+                        fontStyle: step.reps === undefined && set.reps !== undefined ? 'italic' : 'normal',
+                      },
+                    ]}
+                  >
+                    {step.reps !== undefined
+                      ? `${step.reps} reps`
+                      : set.reps !== undefined
+                      ? `${set.reps} reps`
+                      : '- reps'}
                   </Text>
                 </TouchableOpacity>
 
@@ -449,12 +525,18 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           value={tempValue}
           previousValue={set.previous}
           ghostValue={
-            keypadTarget.type === 'main' && previousMatch
-              ? keypadTarget.field === 'weightKg'
-                ? previousMatch.weight
-                : keypadTarget.field === 'reps'
-                ? previousMatch.reps
+            keypadTarget.type === 'main'
+              ? previousMatch
+                ? keypadTarget.field === 'weightKg'
+                  ? previousMatch.weight
+                  : keypadTarget.field === 'reps'
+                  ? previousMatch.reps
+                  : undefined
                 : undefined
+              : keypadTarget.type === 'drop'
+              ? keypadTarget.field === 'weightKg'
+                ? keypadTarget.ghostWeight
+                : keypadTarget.ghostReps
               : undefined
           }
           onNextField={handleKeypadNext}
@@ -503,7 +585,12 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                   <Text style={styles.typeBadgeText}>{cfg.code}</Text>
                 </View>
                 <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text style={[styles.typeOptionLabel, { color: theme.text }]}>{cfg.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.typeOptionLabel, { color: theme.text, marginRight: 6 }]}>{cfg.label}</Text>
+                    {cfg.type === 'amrap' && <TermInfoTooltip termKey="AMRAP" size={13} />}
+                    {cfg.type === 'drop' && <TermInfoTooltip termKey="DROP_SET" size={13} />}
+                    {cfg.type === 'failure' && <TermInfoTooltip termKey="ECHEC" size={13} />}
+                  </View>
                   <Text style={[styles.typeOptionDesc, { color: theme.textMuted }]}>{cfg.description}</Text>
                 </View>
                 {set.type === cfg.type && <Check size={18} color={theme.accent} />}

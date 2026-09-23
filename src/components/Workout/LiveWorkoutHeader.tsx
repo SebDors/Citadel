@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from "react-native";
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
-import { CheckCircle, RotateCw, Timer, Pause } from "lucide-react-native";
+import { CheckCircle, RotateCw, Timer, Pause, FileText } from "lucide-react-native";
+import { WorkoutNoteModal } from "./WorkoutNoteModal";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -19,13 +20,16 @@ interface LiveWorkoutHeaderProps {
   onCancel?: () => void;
   onTogglePause?: () => void;
   circuitInfo?: CircuitInfo;
+  onUpdateNotes?: (notes: string) => void;
 }
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
   circuitInfo,
+  onUpdateNotes,
 }) => {
   const { theme } = useTheme();
+  const [showNoteModal, setShowNoteModal] = React.useState(false);
 
   const pauseAnim = useRef(new Animated.Value(1)).current;
   const [pauseElapsed, setPauseElapsed] = React.useState<number>(() => {
@@ -145,11 +149,58 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           </View>
         )}
 
-        {/* Badge pilule des séries avec mention 'séries' à Droite */}
+        {/* Badge pilule des séries avec mention 'séries' & bouton Note à Droite */}
         <View style={styles.rightGroup}>
           {renderSetsBadge()}
+
+          {onUpdateNotes && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowNoteModal(true)}
+              style={[
+                styles.noteBtn,
+                {
+                  backgroundColor: session.notes ? `${theme.accent}20` : theme.cardBg,
+                  borderColor: session.notes ? theme.accent : theme.border,
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            >
+              <FileText size={14} color={session.notes ? theme.accent : theme.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
+
+      {/* Note Callout (si des remarques globales sur la séance existent) */}
+      {session.notes ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => onUpdateNotes && setShowNoteModal(true)}
+          style={[
+            styles.sessionNoteBanner,
+            { backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}40` },
+          ]}
+        >
+          <FileText size={12} color={theme.accent} style={{ marginRight: 6, marginTop: 1 }} />
+          <Text style={[styles.sessionNoteBannerText, { color: theme.text }]} numberOfLines={2}>
+            {session.notes}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* Modal Remarques Séance */}
+      {onUpdateNotes && (
+        <WorkoutNoteModal
+          visible={showNoteModal}
+          onClose={() => setShowNoteModal(false)}
+          title="Notes de la séance"
+          subtitle={session.title}
+          initialNote={session.notes || ''}
+          onSave={onUpdateNotes}
+          placeholder="Remarques générales, forme du jour, points d'attention pour la séance..."
+        />
+      )}
     </View>
   );
 };
@@ -215,5 +266,28 @@ const styles = StyleSheet.create({
   pauseText: {
     fontSize: 11,
     fontWeight: "900",
+  },
+  noteBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sessionNoteBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  sessionNoteBannerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "500",
   },
 });

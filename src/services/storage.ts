@@ -10,7 +10,7 @@ const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
 const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
 
 let saveCurrentWorkoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-let lastPendingSession: WorkoutSession | null = null;
+let lastPendingSession: WorkoutSession | null | undefined = undefined;
 
 export const StorageService = {
   /**
@@ -36,6 +36,7 @@ export const StorageService = {
           const activeSessionJson = await AsyncStorage.getItem(CURRENT_WORKOUT_KEY);
           if (activeSessionJson !== null) {
             parsed.currentWorkout = JSON.parse(activeSessionJson) as WorkoutSession;
+            lastPendingSession = parsed.currentWorkout;
           }
         } catch {
           // Ignorer si échec de lecture de la clé isolée
@@ -56,6 +57,25 @@ export const StorageService = {
    * Importe et écrase toutes les données avec une nouvelle sauvegarde.
    */
   async importFullData(newData: FitTrackerData): Promise<FitTrackerData> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    if (newData.currentWorkout) {
+      lastPendingSession = newData.currentWorkout;
+      try {
+        await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(newData.currentWorkout));
+      } catch (e) {
+        console.error('Erreur import CURRENT_WORKOUT_KEY:', e);
+      }
+    } else {
+      lastPendingSession = null;
+      try {
+        await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+      } catch (e) {
+        console.error('Erreur suppression import CURRENT_WORKOUT_KEY:', e);
+      }
+    }
     await this.saveData(newData);
     return newData;
   },

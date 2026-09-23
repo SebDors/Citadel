@@ -55,9 +55,12 @@ import {
   ArrowUpDown,
   AlertTriangle,
   Calculator,
+  FileText,
 } from "lucide-react-native";
 import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
 import { WorkoutToolsModal } from "../src/components/Workout/WorkoutToolsModal";
+import { WorkoutNoteModal } from "../src/components/Workout/WorkoutNoteModal";
+import { TermInfoTooltip } from "../src/components/UI/TermInfoTooltip";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -224,8 +227,11 @@ export default function LiveWorkoutScreen() {
     addBatchExercisesToCircuit,
     removeExercise,
     duplicateExercise,
+    replaceExerciseInActiveWorkout,
     updateExerciseRestTime,
     setExerciseSupersetGroup,
+    updateSessionNotes,
+    updateExerciseNotes,
     startRestTimer,
     restTimer,
     startSessionTimer,
@@ -260,6 +266,9 @@ export default function LiveWorkoutScreen() {
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
+    string | null
+  >(null);
+  const [replaceTargetExerciseId, setReplaceTargetExerciseId] = useState<
     string | null
   >(null);
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(
@@ -721,6 +730,7 @@ export default function LiveWorkoutScreen() {
     setShowAddExModal(false);
     setSearchQuery("");
     setTargetCircuitBlockId(null);
+    setReplaceTargetExerciseId(null);
     setSelectedExerciseIds(new Set());
   };
 
@@ -730,6 +740,20 @@ export default function LiveWorkoutScreen() {
     const selectedExercises = allExercises.filter((ex) =>
       selectedExerciseIds.has(ex.id),
     );
+
+    if (replaceTargetExerciseId) {
+      const newEx = selectedExercises[0];
+      if (newEx) {
+        replaceExerciseInActiveWorkout(replaceTargetExerciseId, {
+          id: newEx.id,
+          name: newEx.name,
+          primaryMuscle: newEx.primaryMuscle,
+          targetMuscles: newEx.targetMuscles,
+        });
+      }
+      handleCloseModal();
+      return;
+    }
 
     if (targetCircuitBlockId) {
       addBatchExercisesToCircuit(
@@ -932,6 +956,7 @@ export default function LiveWorkoutScreen() {
             onCancel={handleCancel}
             onTogglePause={togglePauseWorkoutSession}
             circuitInfo={circuitInfo}
+            onUpdateNotes={updateSessionNotes}
           />
 
           {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
@@ -1020,12 +1045,19 @@ export default function LiveWorkoutScreen() {
                   onRemoveSet={(setId) => removeSet(ex.id, setId)}
                   onDuplicateExercise={() => duplicateExercise(ex.id)}
                   onRemoveExercise={() => removeExercise(ex.id)}
+                  onReplaceExercise={() => {
+                    setTargetCircuitBlockId(null);
+                    setReplaceTargetExerciseId(ex.id);
+                    setSelectedExerciseIds(new Set());
+                    setShowAddExModal(true);
+                  }}
                   onUpdateRestTime={(newRest) =>
                     updateExerciseRestTime(ex.id, newRest)
                   }
                   onSetSupersetGroup={(grp) =>
                     setExerciseSupersetGroup(ex.id, grp)
                   }
+                  onUpdateNotes={(notes) => updateExerciseNotes(ex.id, notes)}
                 />
               </View>
             );
@@ -1061,22 +1093,26 @@ export default function LiveWorkoutScreen() {
                   >
                     <Text style={styles.circuitBadgeText}>C</Text>
                   </View>
-                  <View style={{ marginLeft: 8 }}>
-                    <Text style={[styles.circuitTag, { color: theme.accent }]}>
+                  <View style={{ marginLeft: 8, flexDirection: "row", alignItems: "center" }}>
+                    <Text style={[styles.circuitTag, { color: theme.accent, marginRight: 6 }]}>
                       CIRCUIT
                     </Text>
+                    <TermInfoTooltip termKey={isAmrap ? "AMRAP" : "CIRCUIT"} size={13} iconColor={theme.accent} />
                   </View>
                 </View>
 
                 <Text style={[styles.circuitTitle, { color: theme.text }]}>
                   {block.title}
                 </Text>
-                <Text style={[styles.circuitSub, { color: theme.textMuted }]}>
-                  {block.exercises.length} EXOS ·{" "}
-                  {isAmrap
-                    ? `AMRAP ${block.amrapDurationMinutes || 12} MIN`
-                    : `${totalRounds} TOURS`}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={[styles.circuitSub, { color: theme.textMuted, marginRight: 4 }]}>
+                    {block.exercises.length} EXOS ·{" "}
+                    {isAmrap
+                      ? `AMRAP ${block.amrapDurationMinutes || 12} MIN`
+                      : `${totalRounds} TOURS`}
+                  </Text>
+                  {isAmrap && <TermInfoTooltip termKey="AMRAP" size={12} />}
+                </View>
 
                 {/* Bouton [Commencer le circuit] ou Progression & Chrono AMRAP */}
                 {!started ? (
@@ -1719,9 +1755,11 @@ export default function LiveWorkoutScreen() {
                     { color: theme.text, flex: 1, marginBottom: 0 },
                   ]}
                 >
-                  {targetCircuitBlockId
-                    ? "Ajouter au circuit"
-                    : "Sélectionner un exercice"}
+                  {replaceTargetExerciseId
+                    ? "Modifier l'exercice"
+                    : targetCircuitBlockId
+                      ? "Ajouter au circuit"
+                      : "Sélectionner un exercice"}
                 </Text>
                 <TouchableOpacity
                   onPress={handleCloseModal}
@@ -1831,9 +1869,11 @@ export default function LiveWorkoutScreen() {
               <View style={styles.pickerActionBar}>
                 <Button
                   title={
-                    selectedExerciseIds.size > 0
-                      ? `Ajouter (${selectedExerciseIds.size})`
-                      : "Ajouter (0)"
+                    replaceTargetExerciseId
+                      ? "Remplacer l'exercice"
+                      : selectedExerciseIds.size > 0
+                        ? `Ajouter (${selectedExerciseIds.size})`
+                        : "Ajouter (0)"
                   }
                   variant="primary"
                   disabled={selectedExerciseIds.size === 0}

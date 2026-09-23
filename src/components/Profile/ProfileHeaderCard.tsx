@@ -53,6 +53,9 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
   const [availablePlates, setAvailablePlates] = useState<number[]>(
     profile.availablePlates || [25, 20, 15, 10, 5, 2.5, 1.25, 0.5],
   );
+  const [dropReductionPercent, setDropReductionPercent] = useState<number>(
+    profile.dropSetReductionPercent ?? 20,
+  );
 
   useEffect(() => {
     // Vérification silencieuse au chargement du profil
@@ -100,10 +103,19 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
     );
   };
 
+  useEffect(() => {
+    setName(profile.name);
+    setAvailablePlates(
+      profile.availablePlates || [25, 20, 15, 10, 5, 2.5, 1.25, 0.5],
+    );
+    setDropReductionPercent(profile.dropSetReductionPercent ?? 20);
+  }, [profile]);
+
   const handleSave = () => {
     onUpdateProfile({
       name,
       availablePlates,
+      dropSetReductionPercent: dropReductionPercent,
     });
     setShowEditModal(false);
   };
@@ -276,7 +288,53 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
               })}
             </View>
 
-            <View style={{ flexDirection: "row", marginTop: 16 }}>
+            {/* Réglage du pourcentage de décharge Drop Set */}
+            <Text
+              style={[styles.inputLabel, { color: theme.text, marginTop: 14 }]}
+            >
+              Décharge Drop Set automatique (% indicatif)
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                marginTop: 6,
+              }}
+            >
+              {[15, 20, 25, 30].map((pct) => {
+                const isSelected = dropReductionPercent === pct;
+                return (
+                  <TouchableOpacity
+                    key={pct}
+                    activeOpacity={0.7}
+                    onPress={() => setDropReductionPercent(pct)}
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isSelected ? theme.accent : theme.border,
+                      backgroundColor: isSelected
+                        ? theme.accent
+                        : theme.surface,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: isSelected ? "#FFFFFF" : theme.textMuted,
+                      }}
+                    >
+                      -{pct}%
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={{ flexDirection: "row", marginTop: 20 }}>
               <Button
                 title="Annuler"
                 variant="outline"

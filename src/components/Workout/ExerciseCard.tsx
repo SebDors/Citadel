@@ -6,7 +6,9 @@ import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { SetTableRow } from './SetTableRow';
-import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw } from 'lucide-react-native';
+import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw } from 'lucide-react-native';
+import { TermInfoTooltip } from '../UI/TermInfoTooltip';
+import { WorkoutNoteModal } from './WorkoutNoteModal';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -16,8 +18,10 @@ interface ExerciseCardProps {
   onRemoveSet: (setId: string) => void;
   onDuplicateExercise: () => void;
   onRemoveExercise: () => void;
+  onReplaceExercise?: () => void;
   onUpdateRestTime: (newRestSeconds: number) => void;
   onSetSupersetGroup: (supersetGroup?: string) => void;
+  onUpdateNotes?: (notes: string) => void;
   supersetOrder?: { index: number; total: number };
   nextTargetSet?: { exerciseName: string; setNumber: number } | null;
 }
@@ -30,8 +34,10 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   onRemoveSet,
   onDuplicateExercise,
   onRemoveExercise,
+  onReplaceExercise,
   onUpdateRestTime,
   onSetSupersetGroup,
+  onUpdateNotes,
   supersetOrder,
   nextTargetSet,
 }) => {
@@ -39,6 +45,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   const [showMenu, setShowMenu] = useState(false);
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
   const [tempRestSeconds, setTempRestSeconds] = useState(String(exercise.restSeconds || 75));
 
   const primaryMusclesList = useMemo(() => {
@@ -80,6 +87,9 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
               {exercise.supersetGroup.toUpperCase()}
               {supersetOrder ? ` · POSTE ${supersetOrder.index}/${supersetOrder.total}` : ''}
             </Text>
+            <View style={{ marginLeft: 6 }}>
+              <TermInfoTooltip termKey="SUPERSET" size={13} iconColor="#FFFFFF" />
+            </View>
           </View>
           <Text style={styles.supersetSub}>Alternance automatique</Text>
         </View>
@@ -126,7 +136,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           </View>
         </View>
 
-        {/* Rest Timer (Cliquable pour modifier!) & Options */}
+        {/* Rest Timer (Cliquable pour modifier!), Bouton Note & Options */}
         <View style={styles.headerRight}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -137,11 +147,45 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
             <Text style={[styles.restText, { color: theme.accent }]}>{exercise.restSeconds}s</Text>
           </TouchableOpacity>
 
+          {onUpdateNotes && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowNoteModal(true)}
+              style={[
+                styles.noteIconButton,
+                {
+                  backgroundColor: exercise.notes ? `${theme.accent}20` : theme.surface,
+                  borderColor: exercise.notes ? theme.accent : theme.border,
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            >
+              <FileText size={15} color={exercise.notes ? theme.accent : theme.textMuted} />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity activeOpacity={0.7} onPress={() => setShowMenu(true)} style={styles.menuButton}>
             <MoreVertical size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Note Callout (si une remarque/consigne existe sur l'exercice) */}
+      {exercise.notes ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => onUpdateNotes && setShowNoteModal(true)}
+          style={[
+            styles.noteCallout,
+            { backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}40` },
+          ]}
+        >
+          <FileText size={13} color={theme.accent} style={{ marginRight: 6, marginTop: 1 }} />
+          <Text style={[styles.noteCalloutText, { color: theme.text }]} numberOfLines={2}>
+            {exercise.notes}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       {/* Table Header */}
       <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
@@ -183,7 +227,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
             set={set}
             exerciseId={exercise.id}
             isNextSet={isNext}
-            onUpdate={(field, val) => onUpdateSet(set.id, field, val)}
+            onUpdate={(field: keyof WorkoutSet, val: any) => onUpdateSet(set.id, field, val)}
             onToggleComplete={() => onToggleSetComplete(set.id)}
             onDelete={() => onRemoveSet(set.id)}
           />
@@ -265,6 +309,34 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
               </Text>
             </TouchableOpacity>
 
+            {onUpdateNotes && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  setShowNoteModal(true);
+                }}
+              >
+                <FileText size={16} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>
+                  {exercise.notes ? 'Modifier la remarque/note' : 'Ajouter une remarque/note'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {onReplaceExercise && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  onReplaceExercise();
+                }}
+              >
+                <RefreshCw size={16} color={theme.accent} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Modifier l'exercice</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -294,7 +366,10 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       <Modal visible={showSupersetModal} transparent animationType="fade" onRequestClose={() => setShowSupersetModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSupersetModal(false)}>
           <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Groupe Superset</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={[styles.menuTitle, { color: theme.text, marginBottom: 0 }]}>Groupe Superset</Text>
+              <TermInfoTooltip termKey="SUPERSET" size={16} />
+            </View>
             {['Superset A', 'Superset B', 'Superset C'].map((group) => (
               <TouchableOpacity
                 key={group}
@@ -323,6 +398,19 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modal Remarque/Note Exercice */}
+      {onUpdateNotes && (
+        <WorkoutNoteModal
+          visible={showNoteModal}
+          onClose={() => setShowNoteModal(false)}
+          title="Remarque sur l'exercice"
+          subtitle={exercise.exerciseName}
+          initialNote={exercise.notes || ''}
+          onSave={onUpdateNotes}
+          placeholder="Consignes techniques, réglage machine, charges à viser..."
+        />
+      )}
     </Card>
   );
 };
@@ -516,12 +604,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  noteIconButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noteCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  noteCalloutText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
 });
 
 export const ExerciseCard = React.memo(
   ExerciseCardComponent,
   (prev, next) =>
     prev.exercise === next.exercise &&
+    prev.exercise.notes === next.exercise.notes &&
     prev.nextTargetSet?.exerciseName === next.nextTargetSet?.exerciseName &&
     prev.nextTargetSet?.setNumber === next.nextTargetSet?.setNumber &&
     prev.supersetOrder?.index === next.supersetOrder?.index &&

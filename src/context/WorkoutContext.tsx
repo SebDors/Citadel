@@ -53,8 +53,11 @@ export interface WorkoutContextType {
   addCircuitToActiveWorkout: () => void;
   removeExercise: (exerciseId: string) => void;
   duplicateExercise: (exerciseId: string) => void;
+  replaceExerciseInActiveWorkout: (oldExerciseId: string, newExercise: { id: string; name: string; primaryMuscle: string; targetMuscles: string[] }) => void;
   updateExerciseRestTime: (exerciseId: string, newRestSeconds: number) => void;
   setExerciseSupersetGroup: (exerciseId: string, supersetGroup?: string) => void;
+  updateSessionNotes: (notes: string) => void;
+  updateExerciseNotes: (exerciseId: string, notes: string) => void;
   updateActiveSessionCircuitStates: (states: Record<string, any>) => void;
   addExerciseToCircuit: (blockId: string, exerciseName: string, primaryMuscle: string, targetMuscles?: string[]) => void;
   addBatchExercisesToCircuit: (blockId: string, items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles?: string[] }>) => void;
@@ -503,6 +506,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       circuitRounds: template?.circuitRounds || 3,
       currentCircuitRound: 1,
       restBetweenRoundsSeconds: template?.restBetweenRoundsSeconds || 105,
+      notes: template?.notes,
       blocks: sessionBlocks,
       exercises: legacyExercises,
     };
@@ -1115,6 +1119,77 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveCurrentWorkout(updatedSession);
   };
 
+  const replaceExerciseInActiveWorkout = (
+    oldExerciseId: string,
+    newExercise: { id: string; name: string; primaryMuscle: string; targetMuscles: string[] }
+  ) => {
+    if (!activeSession) return;
+
+    const updatedExercises = (activeSession.exercises || []).map((ex) => {
+      if (ex.id !== oldExerciseId) return ex;
+      return {
+        ...ex,
+        exerciseId: newExercise.id,
+        exerciseName: newExercise.name,
+        primaryMuscle: newExercise.primaryMuscle,
+        targetMuscles: newExercise.targetMuscles,
+      };
+    });
+
+    const updatedBlocks = activeSession.blocks
+      ? activeSession.blocks.map((block) => {
+          if (block.type === 'single' && block.exercise.id === oldExerciseId) {
+            return {
+              ...block,
+              exercise: {
+                ...block.exercise,
+                exerciseId: newExercise.id,
+                exerciseName: newExercise.name,
+                primaryMuscle: newExercise.primaryMuscle,
+                targetMuscles: newExercise.targetMuscles,
+              },
+            };
+          }
+          if (block.type === 'circuit') {
+            const hasEx = block.exercises.some((item) => item.id === oldExerciseId);
+            if (hasEx) {
+              return {
+                ...block,
+                exercises: block.exercises.map((item) =>
+                  item.id === oldExerciseId
+                    ? {
+                        ...item,
+                        exerciseName: newExercise.name,
+                        primaryMuscle: newExercise.primaryMuscle,
+                        targetMuscles: newExercise.targetMuscles,
+                      }
+                    : item
+                ),
+              };
+            }
+          }
+          return block;
+        })
+      : undefined;
+
+    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+      updatedExercises,
+      updatedBlocks
+    );
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+      exercises: updatedExercises,
+      totalVolumeKg: volume,
+      completedSetsCount: completedCount,
+      totalSetsCount: totalCount,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
   const updateExerciseRestTime = (exerciseId: string, newRestSeconds: number) => {
     if (!activeSession) return;
 
@@ -1160,6 +1235,62 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...block,
               exercise: { ...block.exercise, supersetGroup },
             };
+          }
+          return block;
+        })
+      : undefined;
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+      exercises: updatedExercises,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const updateSessionNotes = (notes: string) => {
+    if (!activeSession) return;
+
+    const trimmedNotes = notes.trim() || undefined;
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      notes: trimmedNotes,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const updateExerciseNotes = (exerciseId: string, notes: string) => {
+    if (!activeSession) return;
+
+    const trimmedNotes = notes.trim() || undefined;
+
+    const updatedExercises = (activeSession.exercises || []).map((ex) => {
+      if (ex.id !== exerciseId) return ex;
+      return { ...ex, notes: trimmedNotes };
+    });
+
+    const updatedBlocks = activeSession.blocks
+      ? activeSession.blocks.map((block) => {
+          if (block.type === 'single' && block.exercise.id === exerciseId) {
+            return {
+              ...block,
+              exercise: { ...block.exercise, notes: trimmedNotes },
+            };
+          }
+          if (block.type === 'circuit') {
+            const hasEx = block.exercises.some((item) => item.id === exerciseId);
+            if (hasEx) {
+              return {
+                ...block,
+                exercises: block.exercises.map((item) =>
+                  item.id === exerciseId ? { ...item, notes: trimmedNotes } : item
+                ),
+              };
+            }
           }
           return block;
         })
@@ -1296,7 +1427,80 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       status: 'completed',
     };
 
-    const updatedData = await StorageService.saveWorkoutSession(completedSession);
+    let updatedData = await StorageService.saveWorkoutSession(completedSession);
+
+    // Synchronisation des notes de la séance et des exercices vers le template source (s'il existe)
+    if (activeSession.templateId && updatedData.templates) {
+      const tplIndex = updatedData.templates.findIndex((t) => t.id === activeSession.templateId);
+      if (tplIndex >= 0) {
+        const targetTemplate = updatedData.templates[tplIndex];
+
+        // Map des notes d'exercices depuis la séance
+        const sessionExerciseNotesMap: Record<string, string | undefined> = {};
+        (activeSession.exercises || []).forEach((ex) => {
+          if (ex.exerciseName) {
+            sessionExerciseNotesMap[ex.exerciseName.trim().toLowerCase()] = ex.notes;
+          }
+        });
+        (activeSession.blocks || []).forEach((b) => {
+          if (b.type === 'single' && b.exercise.exerciseName) {
+            sessionExerciseNotesMap[b.exercise.exerciseName.trim().toLowerCase()] = b.exercise.notes;
+          } else if (b.type === 'circuit') {
+            b.exercises.forEach((item) => {
+              if (item.exerciseName) {
+                sessionExerciseNotesMap[item.exerciseName.trim().toLowerCase()] = item.notes;
+              }
+            });
+          }
+        });
+
+        // Mise à jour des notes dans le template
+        const updatedTemplate: WorkoutTemplate = {
+          ...targetTemplate,
+          notes: activeSession.notes !== undefined ? activeSession.notes : targetTemplate.notes,
+          exercises: targetTemplate.exercises
+            ? targetTemplate.exercises.map((ex) => {
+                const key = ex.exerciseName.trim().toLowerCase();
+                if (key in sessionExerciseNotesMap) {
+                  return { ...ex, notes: sessionExerciseNotesMap[key] };
+                }
+                return ex;
+              })
+            : targetTemplate.exercises,
+          blocks: targetTemplate.blocks
+            ? targetTemplate.blocks.map((b) => {
+                if (b.type === 'single') {
+                  const key = b.exercise.exerciseName.trim().toLowerCase();
+                  if (key in sessionExerciseNotesMap) {
+                    return {
+                      ...b,
+                      exercise: { ...b.exercise, notes: sessionExerciseNotesMap[key] },
+                    };
+                  }
+                } else if (b.type === 'circuit') {
+                  return {
+                    ...b,
+                    exercises: b.exercises.map((item) => {
+                      const key = item.exerciseName.trim().toLowerCase();
+                      if (key in sessionExerciseNotesMap) {
+                        return { ...item, notes: sessionExerciseNotesMap[key] };
+                      }
+                      return item;
+                    }),
+                  };
+                }
+                return b;
+              })
+            : targetTemplate.blocks,
+        };
+
+        const updatedTemplates = [...updatedData.templates];
+        updatedTemplates[tplIndex] = updatedTemplate;
+        updatedData = { ...updatedData, templates: updatedTemplates };
+        await StorageService.saveData(updatedData);
+      }
+    }
+
     setData(updatedData);
     setActiveSession(null);
     dismissRestTimer();
@@ -1543,8 +1747,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addCircuitToActiveWorkout,
       removeExercise,
       duplicateExercise,
+      replaceExerciseInActiveWorkout,
       updateExerciseRestTime,
       setExerciseSupersetGroup,
+      updateSessionNotes,
+      updateExerciseNotes,
       updateActiveSessionCircuitStates,
       addExerciseToCircuit,
       addBatchExercisesToCircuit,

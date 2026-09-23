@@ -61,8 +61,11 @@ import {
   ChevronsUp,
   ChevronsDown,
   RefreshCw,
+  FileText,
 } from "lucide-react-native";
 import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
+import { TermInfoTooltip } from "../src/components/UI/TermInfoTooltip";
+import { WorkoutNoteModal } from "../src/components/Workout/WorkoutNoteModal";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -82,7 +85,18 @@ export default function TemplateEditorScreen() {
   const fromSessionIdParam = params.fromSessionId as string | undefined;
 
   const [title, setTitle] = useState("");
+  const [templateNotes, setTemplateNotes] = useState<string>("");
   const [defaultRestSeconds, setDefaultRestSeconds] = useState<number>(75);
+
+  // Note Modal state: session notes vs exercise notes
+  const [activeNoteTarget, setActiveNoteTarget] = useState<{
+    type: "session" | "single" | "circuit_exercise";
+    blockId?: string;
+    itemId?: string;
+    title: string;
+    subtitle?: string;
+    note: string;
+  } | null>(null);
 
   // État unifié par blocs (SingleExerciseBlock & CircuitBlock)
   const [selectedBlocks, setSelectedBlocks] = useState<WorkoutBlock[]>([]);
@@ -178,6 +192,7 @@ export default function TemplateEditorScreen() {
       const existing = data.templates.find((t) => t.id === templateIdParam);
       if (existing) {
         setTitle(existing.title);
+        setTemplateNotes(existing.notes || "");
         setDefaultRestSeconds(existing.defaultRestSeconds || 75);
         const blocks = getTemplateBlocks(existing);
         setSelectedBlocks(JSON.parse(JSON.stringify(blocks)));
@@ -190,6 +205,7 @@ export default function TemplateEditorScreen() {
             ? "Mon Programme Libre"
             : pastSession.title,
         );
+        setTemplateNotes(pastSession.notes || "");
         // On récupère `getSessionBlocks` depuis types. On l'a déjà importé indirectement via getTemplateBlocks ? Wait.
         // Wait, getSessionBlocks is imported but maybe not in this file. Ah, getTemplateBlocks is imported. I will need to import getSessionBlocks if it isn't. Let's check imports.
         // I will add the getSessionBlocks import in a separate replace_file_content if needed.
@@ -985,6 +1001,7 @@ export default function TemplateEditorScreen() {
     const newTemplate: WorkoutTemplate = {
       id: templateIdParam || `tpl_${Date.now()}`,
       title: title.trim(),
+      notes: templateNotes.trim() || undefined,
       createdAt: existingTpl?.createdAt || new Date().toISOString(),
       defaultRestSeconds,
       blocks: selectedBlocks,
@@ -1141,6 +1158,48 @@ export default function TemplateEditorScreen() {
           value={title}
           onChangeText={setTitle}
         />
+
+        {/* Remarques / Notes du programme */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() =>
+            setActiveNoteTarget({
+              type: "session",
+              title: "Notes de la séance",
+              subtitle: title.trim() || "Séance",
+              note: templateNotes,
+            })
+          }
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: templateNotes ? `${theme.accent}50` : theme.border,
+            backgroundColor: templateNotes ? `${theme.accent}12` : theme.surface,
+            marginTop: 10,
+            marginBottom: 4,
+          }}
+        >
+          <FileText
+            size={16}
+            color={templateNotes ? theme.accent : theme.textMuted}
+            style={{ marginRight: 8 }}
+          />
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              fontSize: 13,
+              color: templateNotes ? theme.text : theme.textMuted,
+              fontWeight: templateNotes ? "600" : "400",
+            }}
+          >
+            {templateNotes || "Ajouter des notes / consignes générales..."}
+          </Text>
+        </TouchableOpacity>
 
         {/* Temps de repos par défaut de la séance */}
         <View
@@ -1359,17 +1418,22 @@ export default function TemplateEditorScreen() {
                           color={theme.textMuted}
                           style={{ marginRight: 6 }}
                         />
-                        <Text
-                          style={[
-                            styles.circuitRestLabel,
-                            { color: theme.textMuted },
-                          ]}
-                        >
-                          Durée AMRAP ·{" "}
-                          <Text style={{ fontWeight: "900" }}>
-                            {block.amrapDurationMinutes || 12} min
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <Text
+                            style={[
+                              styles.circuitRestLabel,
+                              { color: theme.textMuted },
+                            ]}
+                          >
+                            Durée AMRAP ·{" "}
+                            <Text style={{ fontWeight: "900" }}>
+                              {block.amrapDurationMinutes || 12} min
+                            </Text>
                           </Text>
-                        </Text>
+                          <View style={{ marginLeft: 6 }}>
+                            <TermInfoTooltip termKey="AMRAP" size={13} />
+                          </View>
+                        </View>
                       </View>
                       <View style={styles.rowAlign}>
                         <TouchableOpacity
@@ -1732,8 +1796,13 @@ export default function TemplateEditorScreen() {
                     { backgroundColor: theme.supersetTag },
                   ]}
                 >
-                  <Layers size={14} color="#FFFFFF" />
-                  <Text style={styles.supersetText}>{ex.supersetGroup}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Layers size={14} color="#FFFFFF" />
+                    <Text style={styles.supersetText}>{ex.supersetGroup}</Text>
+                    <View style={{ marginLeft: 6 }}>
+                      <TermInfoTooltip termKey="SUPERSET" size={13} iconColor="#FFFFFF" />
+                    </View>
+                  </View>
                 </View>
               )}
 
@@ -1791,6 +1860,26 @@ export default function TemplateEditorScreen() {
                     />
                   </TouchableOpacity>
 
+                  {/* Bouton Note Exercice */}
+                  <TouchableOpacity
+                    style={styles.headerActionBtn}
+                    onPress={() =>
+                      setActiveNoteTarget({
+                        type: "single",
+                        blockId: block.id,
+                        title: "Notes de l'exercice",
+                        subtitle: ex.exerciseName,
+                        note: ex.notes || "",
+                      })
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <FileText
+                      size={18}
+                      color={ex.notes ? theme.accent : theme.textMuted}
+                    />
+                  </TouchableOpacity>
+
                   {/* Bouton Options ... pour exercice individuel */}
                   <TouchableOpacity
                     style={styles.headerActionBtn}
@@ -1806,6 +1895,46 @@ export default function TemplateEditorScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Bannière de Note Exercice (si présente) */}
+              {!!ex.notes && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setActiveNoteTarget({
+                      type: "single",
+                      blockId: block.id,
+                      title: "Notes de l'exercice",
+                      subtitle: ex.exerciseName,
+                      note: ex.notes || "",
+                    })
+                  }
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: `${theme.accent}40`,
+                    backgroundColor: `${theme.accent}12`,
+                    marginBottom: 10,
+                  }}
+                >
+                  <FileText size={14} color={theme.accent} style={{ marginRight: 6 }} />
+                  <Text
+                    numberOfLines={2}
+                    style={{
+                      flex: 1,
+                      fontSize: 12,
+                      color: theme.text,
+                      lineHeight: 16,
+                    }}
+                  >
+                    {ex.notes}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {/* Réglage du temps de repos spécifique */}
               <View
@@ -2143,6 +2272,46 @@ export default function TemplateEditorScreen() {
                       styles.menuItem,
                       { borderBottomColor: theme.border },
                     ]}
+                    onPress={() => {
+                      const block = selectedBlocks.find(
+                        (b) => b.id === activeBlockOptions.blockId && b.type === "circuit"
+                      );
+                      const targetEx =
+                        block && block.type === "circuit"
+                          ? block.exercises[activeBlockOptions.exIdx!]
+                          : undefined;
+                      const noteVal = targetEx?.notes || "";
+                      const exName = targetEx?.exerciseName || "Exercice";
+                      const bId = activeBlockOptions.blockId;
+                      const itId = targetEx?.id;
+                      setActiveBlockOptions(null);
+                      if (itId) {
+                        setActiveNoteTarget({
+                          type: "circuit_exercise",
+                          blockId: bId,
+                          itemId: itId,
+                          title: "Notes de l'exercice",
+                          subtitle: exName,
+                          note: noteVal,
+                        });
+                      }
+                    }}
+                  >
+                    <FileText
+                      size={16}
+                      color={theme.accent}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>
+                      Notes / Remarques
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.menuItem,
+                      { borderBottomColor: theme.border },
+                    ]}
                     onPress={() =>
                       handleConvertCircuitExToSingle(
                         activeBlockOptions.blockId,
@@ -2208,6 +2377,36 @@ export default function TemplateEditorScreen() {
                   />
                   <Text style={[styles.menuItemText, { color: theme.text }]}>
                     Modifier l'exercice
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => {
+                    const block = selectedBlocks.find(
+                      (b) => b.id === activeBlockOptions.blockId && b.type === "single"
+                    );
+                    const singleEx = block && block.type === "single" ? block.exercise : undefined;
+                    const noteVal = singleEx?.notes || "";
+                    const exName = singleEx?.exerciseName || "Exercice";
+                    const bId = activeBlockOptions.blockId;
+                    setActiveBlockOptions(null);
+                    setActiveNoteTarget({
+                      type: "single",
+                      blockId: bId,
+                      title: "Notes de l'exercice",
+                      subtitle: exName,
+                      note: noteVal,
+                    });
+                  }}
+                >
+                  <FileText
+                    size={16}
+                    color={theme.accent}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>
+                    Notes / Remarques
                   </Text>
                 </TouchableOpacity>
 
@@ -2456,11 +2655,16 @@ export default function TemplateEditorScreen() {
                       <Text style={styles.typeBadgeText}>{cfg.code}</Text>
                     </View>
                     <View style={{ marginLeft: 12, flex: 1 }}>
-                      <Text
-                        style={[styles.typeOptionLabel, { color: theme.text }]}
-                      >
-                        {cfg.label}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Text
+                          style={[styles.typeOptionLabel, { color: theme.text, marginRight: 6 }]}
+                        >
+                          {cfg.label}
+                        </Text>
+                        {cfg.type === "amrap" && <TermInfoTooltip termKey="AMRAP" size={13} />}
+                        {cfg.type === "drop" && <TermInfoTooltip termKey="DROP_SET" size={13} />}
+                        {cfg.type === "failure" && <TermInfoTooltip termKey="ECHEC" size={13} />}
+                      </View>
                       <Text
                         style={[
                           styles.typeOptionDesc,
@@ -2666,14 +2870,24 @@ export default function TemplateEditorScreen() {
               { backgroundColor: theme.cardBg, borderColor: theme.border },
             ]}
           >
-            <Text
-              style={[
-                styles.modalTitle,
-                { color: theme.text, textAlign: "center", marginBottom: 12 },
-              ]}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
             >
-              Groupe Superset
-            </Text>
+              <Text
+                style={[
+                  styles.modalTitle,
+                  { color: theme.text, marginBottom: 0 },
+                ]}
+              >
+                Groupe Superset
+              </Text>
+              <TermInfoTooltip termKey="SUPERSET" size={16} />
+            </View>
             {["Superset A", "Superset B", "Superset C"].map((group) => {
               const currentBlock = selectedBlocks.find(
                 (b) => b.id === supersetModalBlockId,
@@ -2940,6 +3154,57 @@ export default function TemplateEditorScreen() {
         onClose={() => setShowReorderModal(false)}
         blocks={selectedBlocks}
         onReorder={setSelectedBlocks}
+      />
+
+      {/* Modale de Notes */}
+      <WorkoutNoteModal
+        visible={activeNoteTarget !== null}
+        onClose={() => setActiveNoteTarget(null)}
+        title={activeNoteTarget?.title || "Notes"}
+        subtitle={activeNoteTarget?.subtitle}
+        initialNote={activeNoteTarget?.note || ""}
+        onSave={(savedNote) => {
+          if (!activeNoteTarget) return;
+
+          if (activeNoteTarget.type === "session") {
+            setTemplateNotes(savedNote);
+          } else if (activeNoteTarget.type === "single" && activeNoteTarget.blockId) {
+            setSelectedBlocks((prev) =>
+              prev.map((b) => {
+                if (b.id === activeNoteTarget.blockId && b.type === "single") {
+                  return {
+                    ...b,
+                    exercise: {
+                      ...b.exercise,
+                      notes: savedNote || undefined,
+                    },
+                  };
+                }
+                return b;
+              })
+            );
+          } else if (
+            activeNoteTarget.type === "circuit_exercise" &&
+            activeNoteTarget.blockId &&
+            activeNoteTarget.itemId
+          ) {
+            setSelectedBlocks((prev) =>
+              prev.map((b) => {
+                if (b.id === activeNoteTarget.blockId && b.type === "circuit") {
+                  return {
+                    ...b,
+                    exercises: b.exercises.map((item) =>
+                      item.id === activeNoteTarget.itemId
+                        ? { ...item, notes: savedNote || undefined }
+                        : item
+                    ),
+                  };
+                }
+                return b;
+              })
+            );
+          }
+        }}
       />
     </View>
   );

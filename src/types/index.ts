@@ -58,6 +58,7 @@ export interface CircuitExerciseItem {
   targetValue: number;
   targetType: 'reps' | 'time';
   setType?: SetType;
+  notes?: string;
 }
 
 export interface CircuitBlock {
@@ -69,6 +70,7 @@ export interface CircuitBlock {
   exercises: CircuitExerciseItem[];
   circuitType?: 'rounds' | 'amrap';
   amrapDurationMinutes?: number;
+  notes?: string;
 }
 
 export interface SingleExerciseBlock {
@@ -101,6 +103,7 @@ export interface WorkoutSession {
   completedRoundsCount?: number;
   restBetweenRoundsSeconds?: number;
   circuitStates?: Record<string, any>;
+  notes?: string;
 }
 
 export interface WorkoutTemplate {
@@ -115,6 +118,7 @@ export interface WorkoutTemplate {
   restBetweenRoundsSeconds?: number;
   defaultRestSeconds?: number;
   createdAt?: string;
+  notes?: string;
 }
 
 export interface BodyMeasurement {
@@ -142,6 +146,7 @@ export interface UserProfile {
   currentWeightKg: number;
   totalWorkouts: number;
   availablePlates?: number[];
+  dropSetReductionPercent?: number; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
 }
 
 import { SharedExercise } from '../constants/exerciseDatabase';
