@@ -1,9 +1,20 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  TouchableOpacity,
+} from "react-native";
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
-import { CheckCircle, RotateCw, Timer, Pause, FileText } from "lucide-react-native";
-import { WorkoutNoteModal } from "./WorkoutNoteModal";
+import {
+  CheckCircle,
+  RotateCw,
+  Timer,
+  Pause,
+  FileText,
+} from "lucide-react-native";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -21,20 +32,24 @@ interface LiveWorkoutHeaderProps {
   onTogglePause?: () => void;
   circuitInfo?: CircuitInfo;
   onUpdateNotes?: (notes: string) => void;
+  onOpenNotes?: () => void;
 }
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
   circuitInfo,
   onUpdateNotes,
+  onOpenNotes,
 }) => {
   const { theme } = useTheme();
-  const [showNoteModal, setShowNoteModal] = React.useState(false);
 
   const pauseAnim = useRef(new Animated.Value(1)).current;
   const [pauseElapsed, setPauseElapsed] = React.useState<number>(() => {
     if (session.isPaused && session.pausedAt) {
-      return Math.max(0, Math.floor((Date.now() - new Date(session.pausedAt).getTime()) / 1000));
+      return Math.max(
+        0,
+        Math.floor((Date.now() - new Date(session.pausedAt).getTime()) / 1000),
+      );
     }
     return 0;
   });
@@ -43,9 +58,17 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
     if (session.isPaused) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pauseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-          Animated.timing(pauseAnim, { toValue: 1, duration: 800, useNativeDriver: true })
-        ])
+          Animated.timing(pauseAnim, {
+            toValue: 0.4,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pauseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]),
       ).start();
     } else {
       pauseAnim.setValue(1);
@@ -58,7 +81,14 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       return;
     }
     const tick = () => {
-      setPauseElapsed(Math.max(0, Math.floor((Date.now() - new Date(session.pausedAt!).getTime()) / 1000)));
+      setPauseElapsed(
+        Math.max(
+          0,
+          Math.floor(
+            (Date.now() - new Date(session.pausedAt!).getTime()) / 1000,
+          ),
+        ),
+      );
     };
     tick();
     const interval = setInterval(tick, 1000);
@@ -126,7 +156,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       ]}
     >
       <View style={styles.singleRow}>
-        {/* Titre de la séance à Gauche */}
+        {/* Titre de la séance à Gauche suivi du bouton Note */}
         <View style={styles.titleBox}>
           <Text
             style={[styles.title, { color: theme.text }]}
@@ -135,72 +165,96 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           >
             {session.title}
           </Text>
+          {(onOpenNotes || onUpdateNotes) && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPressIn={() => {
+                if (onOpenNotes) {
+                  onOpenNotes();
+                }
+              }}
+              style={[
+                styles.inlineNoteBtn,
+                {
+                  backgroundColor: session.notes
+                    ? `${theme.accent}20`
+                    : theme.cardBg,
+                  borderColor: session.notes ? theme.accent : theme.border,
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <FileText
+                size={14}
+                color={session.notes ? theme.accent : theme.textMuted}
+              />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Badge "EN PAUSE" au centre si la séance est en pause */}
         {session.isPaused && session.hasStarted !== false && (
           <View style={styles.centerBadgeContainer}>
-            <Animated.View style={[styles.pauseBadge, { backgroundColor: `${theme.danger}20`, borderColor: theme.danger, opacity: pauseAnim }]}>
-              <Pause size={11} color={theme.danger} fill={theme.danger} style={{ marginRight: 4 }} />
+            <Animated.View
+              style={[
+                styles.pauseBadge,
+                {
+                  backgroundColor: `${theme.danger}20`,
+                  borderColor: theme.danger,
+                  opacity: pauseAnim,
+                },
+              ]}
+            >
+              <Pause
+                size={11}
+                color={theme.danger}
+                fill={theme.danger}
+                style={{ marginRight: 4 }}
+              />
               <Text style={[styles.pauseText, { color: theme.danger }]}>
-                EN PAUSE{pauseElapsed > 0 ? ` (${formatMinutesSeconds(pauseElapsed)})` : ""}
+                EN PAUSE
+                {pauseElapsed > 0
+                  ? ` (${formatMinutesSeconds(pauseElapsed)})`
+                  : ""}
               </Text>
             </Animated.View>
           </View>
         )}
 
-        {/* Badge pilule des séries avec mention 'séries' & bouton Note à Droite */}
-        <View style={styles.rightGroup}>
-          {renderSetsBadge()}
-
-          {onUpdateNotes && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowNoteModal(true)}
-              style={[
-                styles.noteBtn,
-                {
-                  backgroundColor: session.notes ? `${theme.accent}20` : theme.cardBg,
-                  borderColor: session.notes ? theme.accent : theme.border,
-                },
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <FileText size={14} color={session.notes ? theme.accent : theme.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Badge pilule des séries avec mention 'séries' à Droite */}
+        <View style={styles.rightGroup}>{renderSetsBadge()}</View>
       </View>
 
       {/* Note Callout (si des remarques globales sur la séance existent) */}
       {session.notes ? (
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => onUpdateNotes && setShowNoteModal(true)}
+          onPressIn={() => {
+            if (onOpenNotes) {
+              onOpenNotes();
+            }
+          }}
           style={[
             styles.sessionNoteBanner,
-            { backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}40` },
+            {
+              backgroundColor: `${theme.accent}12`,
+              borderColor: `${theme.accent}40`,
+            },
           ]}
         >
-          <FileText size={12} color={theme.accent} style={{ marginRight: 6, marginTop: 1 }} />
-          <Text style={[styles.sessionNoteBannerText, { color: theme.text }]} numberOfLines={2}>
+          <FileText
+            size={12}
+            color={theme.accent}
+            style={{ marginRight: 6, marginTop: 1 }}
+          />
+          <Text
+            style={[styles.sessionNoteBannerText, { color: theme.text }]}
+            numberOfLines={2}
+          >
             {session.notes}
           </Text>
         </TouchableOpacity>
       ) : null}
-
-      {/* Modal Remarques Séance */}
-      {onUpdateNotes && (
-        <WorkoutNoteModal
-          visible={showNoteModal}
-          onClose={() => setShowNoteModal(false)}
-          title="Notes de la séance"
-          subtitle={session.title}
-          initialNote={session.notes || ''}
-          onSave={onUpdateNotes}
-          placeholder="Remarques générales, forme du jour, points d'attention pour la séance..."
-        />
-      )}
     </View>
   );
 };
@@ -226,12 +280,24 @@ const styles = StyleSheet.create({
   titleBox: {
     flex: 1,
     flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginRight: 6,
   },
   title: {
     fontSize: 17,
     fontWeight: "900",
     textAlign: "left",
+    flexShrink: 1,
+  },
+  inlineNoteBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   centerBadgeContainer: {
     alignItems: "center",
