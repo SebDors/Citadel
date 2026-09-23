@@ -41,9 +41,12 @@ import {
   Dumbbell,
   Sparkles,
   Share2,
+  ArrowUpCircle,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
+import { UpdateModal } from "../../src/components/Profile/UpdateModal";
+import { UpdateService, UpdateInfo } from "../../src/services/updateService";
 import {
   WorkoutSession,
   WorkoutTemplate,
@@ -154,6 +157,23 @@ export default function WorkoutTab() {
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>(
     {},
   );
+
+  // Mise à jour de l'application
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  useEffect(() => {
+    // Vérification silencieuse au chargement de l'onglet Entraînement
+    UpdateService.checkForUpdate()
+      .then((info) => {
+        if (info.hasUpdate) {
+          setUpdateInfo(info);
+        }
+      })
+      .catch(() => {
+        // Mode silencieux : ignorer les erreurs au chargement
+      });
+  }, []);
 
   // Restauration de l'état de réduction des cartes depuis AsyncStorage au lancement
   useEffect(() => {
@@ -499,6 +519,54 @@ export default function WorkoutTab() {
               Entraînement
             </Text>
           </View>
+
+          {/* Bannière de Mise à Jour Disponible */}
+          {updateInfo && updateInfo.hasUpdate && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setShowUpdateModal(true)}
+              style={[
+                styles.updateAvailableBanner,
+                { backgroundColor: `${theme.accent}15`, borderColor: theme.accent },
+              ]}
+            >
+              <View style={styles.updateBannerLeft}>
+                <View
+                  style={[
+                    styles.updateIconCircle,
+                    { backgroundColor: theme.accent },
+                  ]}
+                >
+                  <ArrowUpCircle size={16} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <View style={styles.updateTitleRow}>
+                    <Text
+                      style={[styles.updateBannerTitle, { color: theme.text }]}
+                    >
+                      Mise à jour v{updateInfo.latestVersion} disponible
+                    </Text>
+                    <View
+                      style={[
+                        styles.updateNewBadge,
+                        { backgroundColor: theme.accent },
+                      ]}
+                    >
+                      <Text style={styles.updateNewBadgeText}>NEW</Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[styles.updateBannerSub, { color: theme.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {updateInfo.releaseName ||
+                      "Appuyez pour voir les nouveautés et mettre à jour"}
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight size={18} color={theme.accent} />
+            </TouchableOpacity>
+          )}
 
           {/* Active Workout Banner */}
           {activeSession && (
@@ -1367,6 +1435,13 @@ export default function WorkoutTab() {
             await completeOnboarding({ name: 'Athlète' });
           }}
         />
+
+        {/* ---------------- MODALE DE MISE À JOUR DISPONIBLE ---------------- */}
+        <UpdateModal
+          visible={showUpdateModal}
+          onClose={() => setShowUpdateModal(false)}
+          updateInfo={updateInfo}
+        />
       </SafeAreaView>
     </TabSwipeWrapper>
   );
@@ -1388,6 +1463,54 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 26,
     fontWeight: "900",
+  },
+  updateAvailableBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+  },
+  updateBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 8,
+  },
+  updateIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  updateTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  updateBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+  updateNewBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  updateNewBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  updateBannerSub: {
+    fontSize: 11.5,
+    fontWeight: "500",
+    marginTop: 1,
   },
   activeBanner: {
     padding: 10,
