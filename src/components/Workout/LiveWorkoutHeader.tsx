@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Animated, TouchableOpacity } from "react-native
 import { WorkoutSession } from "../../types";
 import { useTheme } from "../../context/ThemeContext";
 import { CheckCircle, RotateCw, Timer, Pause, FileText } from "lucide-react-native";
-import { WorkoutNoteModal } from "./WorkoutNoteModal";
 
 export interface CircuitInfo {
   isCircuit: boolean;
@@ -21,15 +20,16 @@ interface LiveWorkoutHeaderProps {
   onTogglePause?: () => void;
   circuitInfo?: CircuitInfo;
   onUpdateNotes?: (notes: string) => void;
+  onOpenNotes?: () => void;
 }
 
 export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
   session,
   circuitInfo,
   onUpdateNotes,
+  onOpenNotes,
 }) => {
   const { theme } = useTheme();
-  const [showNoteModal, setShowNoteModal] = React.useState(false);
 
   const pauseAnim = useRef(new Animated.Value(1)).current;
   const [pauseElapsed, setPauseElapsed] = React.useState<number>(() => {
@@ -126,7 +126,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       ]}
     >
       <View style={styles.singleRow}>
-        {/* Titre de la séance à Gauche */}
+        {/* Titre de la séance à Gauche suivi du bouton Note */}
         <View style={styles.titleBox}>
           <Text
             style={[styles.title, { color: theme.text }]}
@@ -135,6 +135,26 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           >
             {session.title}
           </Text>
+          {(onOpenNotes || onUpdateNotes) && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                if (onOpenNotes) {
+                  onOpenNotes();
+                }
+              }}
+              style={[
+                styles.inlineNoteBtn,
+                {
+                  backgroundColor: session.notes ? `${theme.accent}20` : theme.cardBg,
+                  borderColor: session.notes ? theme.accent : theme.border,
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <FileText size={14} color={session.notes ? theme.accent : theme.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Badge "EN PAUSE" au centre si la séance est en pause */}
@@ -149,26 +169,9 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           </View>
         )}
 
-        {/* Badge pilule des séries avec mention 'séries' & bouton Note à Droite */}
+        {/* Badge pilule des séries avec mention 'séries' à Droite */}
         <View style={styles.rightGroup}>
           {renderSetsBadge()}
-
-          {onUpdateNotes && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowNoteModal(true)}
-              style={[
-                styles.noteBtn,
-                {
-                  backgroundColor: session.notes ? `${theme.accent}20` : theme.cardBg,
-                  borderColor: session.notes ? theme.accent : theme.border,
-                },
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <FileText size={14} color={session.notes ? theme.accent : theme.textMuted} />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
@@ -176,7 +179,11 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       {session.notes ? (
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => onUpdateNotes && setShowNoteModal(true)}
+          onPress={() => {
+            if (onOpenNotes) {
+              onOpenNotes();
+            }
+          }}
           style={[
             styles.sessionNoteBanner,
             { backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}40` },
@@ -188,19 +195,6 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           </Text>
         </TouchableOpacity>
       ) : null}
-
-      {/* Modal Remarques Séance */}
-      {onUpdateNotes && (
-        <WorkoutNoteModal
-          visible={showNoteModal}
-          onClose={() => setShowNoteModal(false)}
-          title="Notes de la séance"
-          subtitle={session.title}
-          initialNote={session.notes || ''}
-          onSave={onUpdateNotes}
-          placeholder="Remarques générales, forme du jour, points d'attention pour la séance..."
-        />
-      )}
     </View>
   );
 };
@@ -226,12 +220,24 @@ const styles = StyleSheet.create({
   titleBox: {
     flex: 1,
     flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginRight: 6,
   },
   title: {
     fontSize: 17,
     fontWeight: "900",
     textAlign: "left",
+    flexShrink: 1,
+  },
+  inlineNoteBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   centerBadgeContainer: {
     alignItems: "center",

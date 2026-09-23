@@ -264,6 +264,7 @@ export default function LiveWorkoutScreen() {
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showToolsModal, setShowToolsModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
+  const [showSessionNotesModal, setShowSessionNotesModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
     string | null
@@ -957,6 +958,7 @@ export default function LiveWorkoutScreen() {
             onTogglePause={togglePauseWorkoutSession}
             circuitInfo={circuitInfo}
             onUpdateNotes={updateSessionNotes}
+            onOpenNotes={() => setShowSessionNotesModal(true)}
           />
 
           {/* Card de Guidage Pas-à-Pas pendant la 1ère Séance en Direct */}
@@ -2107,6 +2109,17 @@ export default function LiveWorkoutScreen() {
       <WorkoutToolsModal
         visible={showToolsModal}
         onClose={() => setShowToolsModal(false)}
+      />
+
+      {/* Modal Notes de Séance globale au niveau racine (évite tout bug tactile de sticky header au scroll) */}
+      <WorkoutNoteModal
+        visible={showSessionNotesModal}
+        onClose={() => setShowSessionNotesModal(false)}
+        title="Notes de la séance"
+        subtitle={activeSession.title}
+        initialNote={activeSession.notes || ''}
+        onSave={updateSessionNotes}
+        placeholder="Remarques générales, forme du jour, points d'attention pour la séance..."
       />
     </SafeAreaView>
   );

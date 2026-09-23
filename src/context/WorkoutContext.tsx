@@ -1191,119 +1191,168 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateExerciseRestTime = (exerciseId: string, newRestSeconds: number) => {
-    if (!activeSession) return;
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    const updatedExercises = (activeSession.exercises || []).map((ex) => {
-      if (ex.id !== exerciseId) return ex;
-      return { ...ex, restSeconds: newRestSeconds };
+      const updatedExercises = (prevSession.exercises || []).map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        return { ...ex, restSeconds: newRestSeconds };
+      });
+
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              return {
+                ...block,
+                exercise: { ...block.exercise, restSeconds: newRestSeconds },
+              };
+            }
+            return block;
+          })
+        : undefined;
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
     });
-
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            return {
-              ...block,
-              exercise: { ...block.exercise, restSeconds: newRestSeconds },
-            };
-          }
-          return block;
-        })
-      : undefined;
-
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const setExerciseSupersetGroup = (exerciseId: string, supersetGroup?: string) => {
-    if (!activeSession) return;
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    const updatedExercises = (activeSession.exercises || []).map((ex) => {
-      if (ex.id !== exerciseId) return ex;
-      return { ...ex, supersetGroup };
+      const updatedExercises = (prevSession.exercises || []).map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        return { ...ex, supersetGroup };
+      });
+
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single' && block.exercise.id === exerciseId) {
+              return {
+                ...block,
+                exercise: { ...block.exercise, supersetGroup },
+              };
+            }
+            return block;
+          })
+        : undefined;
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
     });
-
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            return {
-              ...block,
-              exercise: { ...block.exercise, supersetGroup },
-            };
-          }
-          return block;
-        })
-      : undefined;
-
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const updateSessionNotes = (notes: string) => {
-    if (!activeSession) return;
-
     const trimmedNotes = notes.trim() || undefined;
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      notes: trimmedNotes,
-    };
-
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        notes: trimmedNotes,
+      };
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
   };
 
   const updateExerciseNotes = (exerciseId: string, notes: string) => {
-    if (!activeSession) return;
-
     const trimmedNotes = notes.trim() || undefined;
 
-    const updatedExercises = (activeSession.exercises || []).map((ex) => {
-      if (ex.id !== exerciseId) return ex;
-      return { ...ex, notes: trimmedNotes };
-    });
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
 
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            return {
-              ...block,
-              exercise: { ...block.exercise, notes: trimmedNotes },
-            };
-          }
-          if (block.type === 'circuit') {
-            const hasEx = block.exercises.some((item) => item.id === exerciseId);
-            if (hasEx) {
-              return {
-                ...block,
-                exercises: block.exercises.map((item) =>
-                  item.id === exerciseId ? { ...item, notes: trimmedNotes } : item
-                ),
-              };
+      // Chercher le nom de l'exercice pour match robuste ID et nom
+      let matchedExName: string | undefined;
+      const singleBlock = (prevSession.blocks || []).find(
+        (b): b is SingleExerciseBlock => b.type === 'single' && b.exercise.id === exerciseId
+      );
+      if (singleBlock) {
+        matchedExName = singleBlock.exercise.exerciseName;
+      } else {
+        const foundInEx = (prevSession.exercises || []).find((ex) => ex.id === exerciseId);
+        if (foundInEx) {
+          matchedExName = foundInEx.exerciseName;
+        } else {
+          // Chercher dans circuit
+          (prevSession.blocks || []).forEach((b) => {
+            if (b.type === 'circuit') {
+              const cEx = b.exercises.find((item) => item.id === exerciseId);
+              if (cEx) matchedExName = cEx.exerciseName;
             }
-          }
-          return block;
-        })
-      : undefined;
+          });
+        }
+      }
 
-    const updatedSession: WorkoutSession = {
-      ...activeSession,
-      blocks: updatedBlocks,
-      exercises: updatedExercises,
-    };
+      const updatedExercises = (prevSession.exercises || []).map((ex) => {
+        const isMatch =
+          ex.id === exerciseId ||
+          (matchedExName && ex.exerciseName && ex.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
+        if (!isMatch) return ex;
+        return { ...ex, notes: trimmedNotes };
+      });
 
-    setActiveSession(updatedSession);
-    StorageService.saveCurrentWorkout(updatedSession);
+      const updatedBlocks = prevSession.blocks
+        ? prevSession.blocks.map((block) => {
+            if (block.type === 'single') {
+              const isMatch =
+                block.exercise.id === exerciseId ||
+                (matchedExName &&
+                  block.exercise.exerciseName &&
+                  block.exercise.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
+              if (isMatch) {
+                return {
+                  ...block,
+                  exercise: { ...block.exercise, notes: trimmedNotes },
+                };
+              }
+            }
+            if (block.type === 'circuit') {
+              const hasEx = block.exercises.some(
+                (item) =>
+                  item.id === exerciseId ||
+                  (matchedExName &&
+                    item.exerciseName &&
+                    item.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase())
+              );
+              if (hasEx) {
+                return {
+                  ...block,
+                  exercises: block.exercises.map((item) => {
+                    const isMatch =
+                      item.id === exerciseId ||
+                      (matchedExName &&
+                        item.exerciseName &&
+                        item.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
+                    return isMatch ? { ...item, notes: trimmedNotes } : item;
+                  }),
+                };
+              }
+            }
+            return block;
+          })
+        : undefined;
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
   };
 
   const updateActiveSessionCircuitStates = (states: Record<string, any>) => {

@@ -20,6 +20,7 @@ export interface CustomNumericKeypadProps {
   value: string;
   previousValue?: string;
   ghostValue?: string;
+  ghostLabel?: string;
   onChangeValue?: (val: string) => void;
   onNextField?: (currentVal: string) => void;
   onPreviousField?: (currentVal: string) => void;
@@ -223,6 +224,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   value,
   previousValue,
   ghostValue,
+  ghostLabel,
   onChangeValue,
   onNextField,
   onPreviousField,
@@ -382,7 +384,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                   </Text>
                   {Boolean(!localValue && ghostValue) && (
                     <View style={[styles.ghostPill, { backgroundColor: `${theme.accent}18`, borderColor: theme.accent }]}>
-                      <Text style={[styles.ghostPillText, { color: theme.accent }]}>Précédent</Text>
+                      <Text style={[styles.ghostPillText, { color: theme.accent }]}>{ghostLabel || 'Précédent'}</Text>
                     </View>
                   )}
                 </TouchableOpacity>

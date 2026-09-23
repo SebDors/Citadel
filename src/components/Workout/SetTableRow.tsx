@@ -539,6 +539,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 : keypadTarget.ghostReps
               : undefined
           }
+          ghostLabel={keypadTarget.type === 'drop' ? 'Estimé' : 'Précédent'}
           onNextField={handleKeypadNext}
           onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}
