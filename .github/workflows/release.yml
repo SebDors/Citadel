@@ -45,7 +45,7 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: 📝 Prepare APK Artifact
+      - name: 📝 Prepare APK File
         run: |
           TAG_NAME="${{ github.ref_name }}"
           if [[ -z "$TAG_NAME" || "$TAG_NAME" == "main" ]]; then
