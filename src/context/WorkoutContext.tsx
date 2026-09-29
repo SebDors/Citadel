@@ -42,7 +42,7 @@ export interface WorkoutContextType {
   startSessionTimer: () => void;
   togglePauseWorkoutSession: () => void;
   finishWorkout: () => Promise<void>;
-  cancelWorkout: () => void;
+  cancelWorkout: () => Promise<void>;
   updateSet: (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => void;
   toggleSetComplete: (exerciseId: string, setId: string) => void;
   addSet: (exerciseId: string) => void;
@@ -302,6 +302,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (loaded.currentWorkout) {
       const enriched = enrichSessionWithPreviousPerformances(loaded.currentWorkout, loaded.history || []);
       setActiveSession(enriched);
+    } else {
+      setActiveSession(null);
     }
     setLoading(false);
   };
@@ -1555,10 +1557,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     dismissRestTimer();
   };
 
-  const cancelWorkout = () => {
-    setActiveSession(null);
-    StorageService.saveCurrentWorkout(null);
+  const cancelWorkout = async () => {
     dismissRestTimer();
+    setActiveSession(null);
+    setData((prev) => (prev ? { ...prev, currentWorkout: null } : prev));
+    await StorageService.discardCurrentWorkout();
   };
 
   const addMeasurement = async (measurement: BodyMeasurement) => {

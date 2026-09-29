@@ -37,6 +37,9 @@ export const StorageService = {
           if (activeSessionJson !== null) {
             parsed.currentWorkout = JSON.parse(activeSessionJson) as WorkoutSession;
             lastPendingSession = parsed.currentWorkout;
+          } else {
+            parsed.currentWorkout = null;
+            lastPendingSession = null;
           }
         } catch {
           // Ignorer si échec de lecture de la clé isolée
@@ -152,6 +155,14 @@ export const StorageService = {
 
     if (saveCurrentWorkoutDebounceTimer) {
       clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+
+    if (session === null) {
+      AsyncStorage.removeItem(CURRENT_WORKOUT_KEY).catch((e) => {
+        console.error('Erreur suppression immédiate CURRENT_WORKOUT_KEY:', e);
+      });
+      return;
     }
 
     saveCurrentWorkoutDebounceTimer = setTimeout(async () => {
@@ -166,6 +177,40 @@ export const StorageService = {
         console.error('Erreur debounce saveCurrentWorkout:', e);
       }
     }, 2000);
+  },
+
+  /**
+   * Abandonne et supprime définitivement la séance en cours :
+   * - Annule tout timer de debounce actif
+   * - Définit lastPendingSession = null
+   * - Supprime immédiatement la clé isolée CURRENT_WORKOUT_KEY
+   * - Met à jour currentWorkout: null dans la base globale STORAGE_KEY si nécessaire
+   */
+  async discardCurrentWorkout(): Promise<void> {
+    if (saveCurrentWorkoutDebounceTimer) {
+      clearTimeout(saveCurrentWorkoutDebounceTimer);
+      saveCurrentWorkoutDebounceTimer = null;
+    }
+    lastPendingSession = null;
+
+    try {
+      await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
+    } catch (e) {
+      console.error('Erreur suppression CURRENT_WORKOUT_KEY dans discardCurrentWorkout:', e);
+    }
+
+    try {
+      const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+      if (jsonValue !== null) {
+        const parsed = JSON.parse(jsonValue) as FitTrackerData;
+        if (parsed.currentWorkout) {
+          parsed.currentWorkout = null;
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
+      }
+    } catch (e) {
+      console.error('Erreur nettoyage global currentWorkout dans discardCurrentWorkout:', e);
+    }
   },
 
   /**

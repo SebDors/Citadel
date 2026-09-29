@@ -709,9 +709,9 @@ export default function LiveWorkoutScreen() {
     setShowAbandonModal(true);
   };
 
-  const handleConfirmAbandon = () => {
+  const handleConfirmAbandon = async () => {
     setShowAbandonModal(false);
-    cancelWorkout();
+    await cancelWorkout();
     router.replace("/(tabs)");
   };
 
