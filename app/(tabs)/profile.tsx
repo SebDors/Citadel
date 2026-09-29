@@ -8,13 +8,15 @@ import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { ModularMeasurementChartCard } from '../../src/components/Profile/ModularMeasurementChartCard';
 import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
 import { ThemeSelectorModal } from '../../src/components/UI/ThemeSelectorModal';
-import { Palette } from 'lucide-react-native';
+import { AppSettingsModal } from '../../src/components/Profile/AppSettingsModal';
+import { Palette, Settings } from 'lucide-react-native';
 import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 
 export default function ProfileTab() {
   const { data, addMeasurement, deleteMeasurement, updateUserProfile } = useWorkout();
   const { theme } = useTheme();
   const [themeModalVisible, setThemeModalVisible] = useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   if (!data) return null;
 
@@ -22,7 +24,7 @@ export default function ProfileTab() {
     <TabSwipeWrapper tabIndex={2}>
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Page Header avec bouton de sélection Thème dans l'angle supérieur droit */}
+        {/* Page Header avec boutons Thème et Paramètres dans l'angle supérieur droit */}
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
             <View style={{ flex: 1 }}>
@@ -32,18 +34,29 @@ export default function ProfileTab() {
               </Text>
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setThemeModalVisible(true)}
-              style={[styles.themeToggleBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              accessibilityLabel="Choisir un thème"
-            >
-              <Palette size={20} color={theme.accent} />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setThemeModalVisible(true)}
+                style={[styles.headerBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                accessibilityLabel="Choisir un thème"
+              >
+                <Palette size={20} color={theme.accent} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setSettingsModalVisible(true)}
+                style={[styles.headerBtn, { backgroundColor: theme.surface, borderColor: theme.border, marginLeft: 8 }]}
+                accessibilityLabel="Paramètres de l'application"
+              >
+                <Settings size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        {/* 1. Carte En-tête Profil avec Réglages */}
+        {/* 1. Carte En-tête Profil */}
         <ProfileHeaderCard profile={data.profile} onUpdateProfile={updateUserProfile} />
 
         {/* 2. Graphique Modulable de Mensurations (Poids, Poitrine, Cuisse, Bras) */}
@@ -64,6 +77,14 @@ export default function ProfileTab() {
       <ThemeSelectorModal
         visible={themeModalVisible}
         onClose={() => setThemeModalVisible(false)}
+      />
+
+      {/* Modale des Paramètres */}
+      <AppSettingsModal
+        visible={settingsModalVisible}
+        onClose={() => setSettingsModalVisible(false)}
+        profile={data.profile}
+        onUpdateProfile={updateUserProfile}
       />
     </SafeAreaView>
     </TabSwipeWrapper>
@@ -96,13 +117,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  themeToggleBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
 });
