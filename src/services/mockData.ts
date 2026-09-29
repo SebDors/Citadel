@@ -9,6 +9,7 @@ export const INITIAL_MOCK_DATA: FitTrackerData = {
   },
   templates: [],
   history: [],
+  cardioSessions: [],
   measurements: [],
   folders: [],
   customExercises: [],

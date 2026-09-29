@@ -15,6 +15,7 @@ import {
   SingleExerciseBlock,
   CircuitBlock,
   CircuitExerciseItem,
+  CardioSession,
   getTemplateBlocks,
   getSessionBlocks,
 } from '../types';
@@ -79,6 +80,8 @@ export interface WorkoutContextType {
   deleteWorkoutSession: (sessionId: string) => Promise<void>;
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
+  logCardioSession: (session: CardioSession) => Promise<void>;
+  deleteCardioSession: (id: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
   resetAllData: () => Promise<void>;
   importFullData: (newData: FitTrackerData) => Promise<void>;
@@ -1921,6 +1924,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const logCardioSession = async (session: CardioSession) => {
+    const updated = await StorageService.logCardioSession(session);
+    setData(updated);
+  };
+
+  const deleteCardioSession = async (id: string) => {
+    const updated = await StorageService.deleteCardioSession(id);
+    setData(updated);
+  };
+
 
   const customExercises = data?.customExercises || [];
   const deletedExerciseIds = useMemo(() => new Set(data?.deletedExerciseIds || []), [data?.deletedExerciseIds]);
@@ -2003,6 +2016,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteWorkoutSession,
       deleteExerciseFromSession,
       deleteSetFromSession,
+      logCardioSession,
+      deleteCardioSession,
       reloadAllData,
       resetAllData,
       importFullData,

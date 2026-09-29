@@ -161,12 +161,22 @@ export interface UserProfile {
   dropSetReductionPercent?: number; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
 }
 
+export interface CardioSession {
+  id: string;
+  date: string; // ISO
+  activity: string; // "Boxe", "Course à pied", etc.
+  durationMinutes: number;
+  perceivedExertion: number; // 1-10 (RPE de séance)
+  notes?: string;
+}
+
 import { SharedExercise } from '../constants/exerciseDatabase';
 
 export interface FitTrackerData {
   profile: UserProfile;
   templates: WorkoutTemplate[];
   history: WorkoutSession[];
+  cardioSessions?: CardioSession[];
   measurements: BodyMeasurement[];
   folders?: WorkoutFolder[];
   customExercises?: SharedExercise[];

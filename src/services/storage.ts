@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder, getSessionBlocks } from '../types';
+import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder, CardioSession, getSessionBlocks } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
 import { SharedExercise } from '../constants/exerciseDatabase';
 import { normalizeMuscle, MuscleTarget } from '../constants/muscles';
@@ -304,6 +304,9 @@ export const StorageService = {
         if (!parsed.folders) {
           parsed.folders = INITIAL_MOCK_DATA.folders || [];
         }
+        if (!parsed.cardioSessions) {
+          parsed.cardioSessions = INITIAL_MOCK_DATA.cardioSessions || [];
+        }
 
         // Vérifier si une session active isolée et plus récente existe
         try {
@@ -425,6 +428,35 @@ export const StorageService = {
         ...currentData.profile,
         totalWorkouts: (currentData.profile.totalWorkouts || 0) + 1,
       },
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Enregistre une séance de cardio / boxe hors musculation.
+   */
+  async logCardioSession(session: CardioSession): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedSessions = [session, ...(currentData.cardioSessions || [])];
+    updatedSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      cardioSessions: updatedSessions,
+    };
+    await this.saveData(updatedData);
+    return updatedData;
+  },
+
+  /**
+   * Supprime une séance de cardio par son ID.
+   */
+  async deleteCardioSession(id: string): Promise<FitTrackerData> {
+    const currentData = await this.loadData();
+    const updatedSessions = (currentData.cardioSessions || []).filter((s) => s.id !== id);
+    const updatedData: FitTrackerData = {
+      ...currentData,
+      cardioSessions: updatedSessions,
     };
     await this.saveData(updatedData);
     return updatedData;
