@@ -549,23 +549,41 @@ export const WorkoutToolsModal: React.FC<WorkoutToolsModalProps> = ({
                   style={[
                     styles.oneRmResultCard,
                     {
-                      backgroundColor: `${theme.accent}15`,
-                      borderColor: theme.accent,
+                      backgroundColor: rmReps > 12 ? (isDark ? '#2D2312' : '#FEF3C7') : `${theme.accent}15`,
+                      borderColor: rmReps > 12 ? (isDark ? '#D97706' : '#F59E0B') : theme.accent,
                     },
                   ]}
                 >
-                  <Text style={[styles.oneRmResultTitle, { color: theme.accent }]}>
+                  <Text
+                    style={[
+                      styles.oneRmResultTitle,
+                      { color: rmReps > 12 ? (isDark ? '#FBBF24' : '#B45309') : theme.accent },
+                    ]}
+                  >
                     1RM ESTIMÉ
                   </Text>
                   <View style={styles.oneRmNumberRow}>
                     <Text style={[styles.oneRmBigNumber, { color: theme.text }]}>
-                      {oneRMCalculations.e1RM}
+                      {rmReps > 12 ? '—' : oneRMCalculations.e1RM}
                     </Text>
-                    <Text style={[styles.oneRmUnit, { color: theme.accent }]}>kg</Text>
+                    {rmReps <= 12 && (
+                      <Text style={[styles.oneRmUnit, { color: theme.accent }]}>kg</Text>
+                    )}
                   </View>
-                  <Text style={[styles.oneRmFormulaDesc, { color: theme.textMuted }]}>
-                    Moyenne Epley & Brzycki pour {rmWeight} kg × {rmReps} reps
-                  </Text>
+                  {rmReps > 12 ? (
+                    <Text
+                      style={[
+                        styles.oneRmFormulaDesc,
+                        { color: isDark ? '#FBBF24' : '#B45309', fontWeight: '600' },
+                      ]}
+                    >
+                      Non fiable (&gt; 12 reps) — Les estimations 1RM ne sont plus précises au-delà de 12 répétitions.
+                    </Text>
+                  ) : (
+                    <Text style={[styles.oneRmFormulaDesc, { color: theme.textMuted }]}>
+                      Moyenne Epley & Brzycki pour {rmWeight} kg × {rmReps} reps
+                    </Text>
+                  )}
                 </View>
 
                 {/* Tableau des pourcentages d'entraînement */}
@@ -615,7 +633,7 @@ export const WorkoutToolsModal: React.FC<WorkoutToolsModalProps> = ({
                           },
                         ]}
                       >
-                        {item.weight} kg
+                        {rmReps > 12 ? '—' : `${item.weight} kg`}
                       </Text>
                     </View>
                   ))}

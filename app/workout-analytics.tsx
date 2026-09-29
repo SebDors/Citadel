@@ -34,6 +34,7 @@ import {
 } from "../src/types";
 import ExerciseDetailModal from "../src/components/Analytics/ExerciseDetailModal";
 import { PastSessionDetailModal } from "../src/components/History/PastSessionDetailModal";
+import { calculateE1RM } from "../src/services/analyticsService";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -298,11 +299,21 @@ export default function WorkoutAnalyticsScreen() {
       }
 
       if (bestWeight > 0 || bestReps > 0) {
-        const e1RM = Math.round(bestWeight * (1 + bestReps / 30));
+        const e1RM = calculateE1RM(bestWeight, bestReps);
+        let valueText = "";
+        if (bestWeight > 0) {
+          if (bestReps > 12 || e1RM === null) {
+            valueText = "Non fiable (>12 reps)";
+          } else {
+            valueText = `${e1RM} kg e1RM`;
+          }
+        } else {
+          valueText = `${bestReps} reps`;
+        }
         return {
           name: exItem.exerciseName,
           dateText: lastDateFormatted || "RÉCENT",
-          valueText: bestWeight > 0 ? `${e1RM} kg e1RM` : `${bestReps} reps`,
+          valueText,
           subText: bestWeight > 0 ? `${bestWeight} kg × ${bestReps}` : "Poids de corps",
         };
       }
@@ -312,8 +323,9 @@ export default function WorkoutAnalyticsScreen() {
         const w = firstSet.weightKg || 0;
         const r = firstSet.reps || 10;
         if (w > 0) {
-          const e1RM = Math.round(w * (1 + r / 30));
-          return { name: exItem.exerciseName, dateText: "OBJECTIF", valueText: `${e1RM} kg e1RM`, subText: `${w} kg × ${r}` };
+          const e1RM = calculateE1RM(w, r);
+          const valueText = (r > 12 || e1RM === null) ? "Non fiable (>12 reps)" : `${e1RM} kg e1RM`;
+          return { name: exItem.exerciseName, dateText: "OBJECTIF", valueText, subText: `${w} kg × ${r}` };
         }
         return { name: exItem.exerciseName, dateText: "OBJECTIF", valueText: `${r} reps`, subText: "Poids de corps" };
       }

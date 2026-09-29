@@ -56,7 +56,7 @@ export const OneRMChartCard: React.FC = () => {
               const currentE1RM = calculateE1RM(set.weightKg, set.reps);
               const existing = prMap.get(block.exercise.exerciseName);
 
-              if (!existing || currentE1RM > existing.e1RM) {
+              if (currentE1RM !== null && (!existing || currentE1RM > existing.e1RM)) {
                 prMap.set(block.exercise.exerciseName, {
                   name: block.exercise.exerciseName,
                   weightKg: set.weightKg,

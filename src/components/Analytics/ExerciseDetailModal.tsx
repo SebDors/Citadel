@@ -97,7 +97,7 @@ export default function ExerciseDetailModal({
     });
 
     const maxPrRecord = calculateMaxE1RM(history, exerciseName);
-    const e1RM = maxPrRecord ? maxPrRecord.e1RM : (bestWeight > 0 ? calculateE1RM(bestWeight, bestReps) : 0);
+    const e1RM = maxPrRecord ? maxPrRecord.e1RM : (bestWeight > 0 ? calculateE1RM(bestWeight, bestReps) : null);
 
     return {
       exerciseHistory: historyItems,
@@ -145,7 +145,7 @@ export default function ExerciseDetailModal({
                 <View style={[styles.prItem, { backgroundColor: theme.surface }]}>
                   <Text style={[styles.prLabel, { color: theme.textMuted }]}>Est. 1RM</Text>
                   <Text style={[styles.prValue, { color: theme.text }]}>
-                    {prs.e1RM > 0 ? `${prs.e1RM} kg` : '-'}
+                    {prs.e1RM ? `${prs.e1RM} kg` : (prs.bestReps > 12 ? 'Non fiable (>12 reps)' : '—')}
                   </Text>
                 </View>
                 <View style={[styles.prItem, { backgroundColor: theme.surface }]}>

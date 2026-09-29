@@ -2,10 +2,12 @@ import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBl
 
 /**
  * Calcul du 1RM estimé selon la formule d'Epley (standard international de référence).
+ * Si reps > 12, renvoie null (formule non fiable au-delà de 12 répétitions).
  * Si reps === 1, renvoie directement le poids.
  */
-export function calculateE1RM(weightKg: number, reps: number): number {
-  if (!weightKg || weightKg <= 0 || !reps || reps <= 0) return 0;
+export function calculateE1RM(weightKg: number, reps: number): number | null {
+  if (!weightKg || weightKg <= 0 || !reps || reps <= 0) return null;
+  if (reps > 12) return null;
   if (reps === 1) return Math.round(weightKg * 10) / 10;
   // Formule d'Epley : 1RM = Poids * (1 + Reps / 30)
   return Math.round((weightKg * (1 + reps / 30)) * 10) / 10;
@@ -113,7 +115,7 @@ export function calculateMaxE1RM(
           (block.exercise.sets || []).forEach((set) => {
             if (set.completed && set.weightKg && set.weightKg > 0 && set.reps && set.reps > 0) {
               const currentE1RM = calculateE1RM(set.weightKg, set.reps);
-              if (!bestRecord || currentE1RM > bestRecord.e1RM) {
+              if (currentE1RM !== null && (!bestRecord || currentE1RM > bestRecord.e1RM)) {
                 bestRecord = {
                   exerciseName: block.exercise.exerciseName,
                   weightKg: set.weightKg,
@@ -157,7 +159,7 @@ export function getAvailableExercisesFromHistory(
           (block.exercise.sets || []).forEach((s) => {
             if (s.completed && s.weightKg && s.reps) {
               const e = calculateE1RM(s.weightKg, s.reps);
-              if (e > sessionMaxE1RM) sessionMaxE1RM = e;
+              if (e !== null && e > sessionMaxE1RM) sessionMaxE1RM = e;
             }
           });
           map.set(name, {
