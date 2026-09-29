@@ -15,6 +15,7 @@ import { CalendarView } from "../../src/components/History/CalendarView";
 import { ActivitySummaryCard } from "../../src/components/History/ActivitySummaryCard";
 import { CardioSessionCard } from "../../src/components/History/CardioSessionCard";
 import { WeeklyMuscleVolumeCard } from "../../src/components/Analytics/WeeklyMuscleVolumeCard";
+import { FatigueMarkersCard } from "../../src/components/Analytics/FatigueMarkersCard";
 import { Calendar, Plus, ChevronDown, ChevronUp, Flame } from "lucide-react-native";
 import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import { LogPastWorkoutModal } from "../../src/components/History/LogPastWorkoutModal";
@@ -128,6 +129,9 @@ export default function HistoryTab() {
 
           {/* 3. Répartition Scientifique du Volume Musculaire (MEV / MAV) */}
           <WeeklyMuscleVolumeCard />
+
+          {/* 4. Marqueurs de fatigue simples et récupération (Feature 5) */}
+          <FatigueMarkersCard />
 
           {/* 4. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
           <TouchableOpacity

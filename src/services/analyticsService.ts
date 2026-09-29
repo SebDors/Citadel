@@ -1,4 +1,4 @@
-import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks } from '../types';
+import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks, BodyMeasurement } from '../types';
 import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
 
 /**
@@ -372,4 +372,197 @@ export function calculateExponentialMovingAverage(
       trend: Math.round(currentEMA * 100) / 100,
     };
   });
+}
+
+export interface WeeklyFatigueSnapshot {
+  weekLabel: string;
+  avgRir: number;
+  avgRir4wRollingAvg: number;
+  bodyweightKg: number | null;
+  avgSessionDurationMin: number;
+  totalSessions: number;
+  isUnderRecovering: boolean;
+  weekOffset?: number;
+}
+
+/**
+ * Règle scientifique de détection de sous-récupération / fatigue accumulée (Feature 5 de retour.md).
+ * Déclenche une alerte si :
+ * 1. Le RIR moyen de la semaine dépasse de plus d'1 point la moyenne mobile sur 4 semaines (effort perçu en baisse / incapacité à pousser).
+ * 2. Le poids corporel est stagnant ou en baisse par rapport à la semaine précédente (ou absent de l'historique de pesées).
+ */
+export function flagPossibleUnderRecovery(
+  snapshot: Pick<WeeklyFatigueSnapshot, 'avgRir' | 'avgRir4wRollingAvg' | 'bodyweightKg'>,
+  previousWeekBodyweight?: number | null
+): boolean {
+  if (!snapshot || snapshot.avgRir <= 0 || snapshot.avgRir4wRollingAvg <= 0) {
+    return false;
+  }
+  const rirElevated = snapshot.avgRir > snapshot.avgRir4wRollingAvg + 1;
+  const weightStagnantOrDropping =
+    snapshot.bodyweightKg === null ||
+    previousWeekBodyweight === undefined ||
+    previousWeekBodyweight === null ||
+    snapshot.bodyweightKg <= previousWeekBodyweight;
+
+  return rirElevated && weightStagnantOrDropping;
+}
+
+/**
+ * Calcule les snapshots hebdomadaires de fatigue pour les dernières semaines.
+ * Agrège le RIR moyen, la moyenne mobile sur 4 semaines, le poids corporel le plus proche et la durée moyenne des séances.
+ */
+export function calculateWeeklyFatigueSnapshots(
+  history: WorkoutSession[],
+  measurements: BodyMeasurement[] = [],
+  weeksCount: number = 8
+): WeeklyFatigueSnapshot[] {
+  if (!history || history.length === 0) return [];
+
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+
+  // Déterminer le nombre de semaines à calculer en fonction de l'ancienneté des séances
+  let resolvedWeeks = Math.max(weeksCount, 4);
+  const validTimes = history
+    .filter((s) => s.status === 'completed' && s.startTime)
+    .map((s) => new Date(s.startTime).getTime())
+    .filter((t) => !isNaN(t));
+
+  if (validTimes.length > 0) {
+    const earliestTime = Math.min(...validTimes);
+    const weeksDiff = Math.ceil((now.getTime() - earliestTime) / (7 * 24 * 60 * 60 * 1000));
+    if (weeksDiff > resolvedWeeks) {
+      resolvedWeeks = Math.min(weeksDiff + 1, 24);
+    }
+  }
+
+  const intermediate: Array<{
+    weekOffset: number;
+    weekLabel: string;
+    avgRir: number;
+    hasRirData: boolean;
+    bodyweightKg: number | null;
+    avgSessionDurationMin: number;
+    totalSessions: number;
+  }> = [];
+
+  for (let offset = -(resolvedWeeks - 1); offset <= 0; offset++) {
+    const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) + offset * 7;
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    endOfWeek.setMilliseconds(-1);
+
+    const weekSessions = history.filter((s) => {
+      if (s.status !== 'completed' || !s.startTime) return false;
+      const sDate = new Date(s.startTime);
+      return sDate >= startOfWeek && sDate <= endOfWeek;
+    });
+
+    const totalSessions = weekSessions.length;
+
+    // Calcul du RIR moyen sur les séries effectives (non warmup)
+    let rirSum = 0;
+    let rirCount = 0;
+    weekSessions.forEach((s) => {
+      const blocks = getSessionBlocks(s);
+      blocks.forEach((block) => {
+        if (block.type === 'single') {
+          (block.exercise.sets || []).forEach((set) => {
+            if (set.completed && set.type !== 'warmup' && typeof set.rir === 'number' && !isNaN(set.rir)) {
+              rirSum += set.rir;
+              rirCount++;
+            }
+          });
+        }
+      });
+    });
+
+    const hasRirData = rirCount > 0;
+    const avgRir = hasRirData ? Math.round((rirSum / rirCount) * 10) / 10 : 0;
+
+    // Calcul de la durée moyenne des séances (en minutes)
+    let totalDurationSec = 0;
+    weekSessions.forEach((s) => {
+      totalDurationSec += s.durationSeconds || 0;
+    });
+    const avgSessionDurationMin = totalSessions > 0
+      ? Math.round(totalDurationSec / totalSessions / 60)
+      : 0;
+
+    // Poids corporel le plus proche du centre de la semaine
+    let bodyweightKg: number | null = null;
+    if (measurements && measurements.length > 0) {
+      const weekMidpoint = (startOfWeek.getTime() + endOfWeek.getTime()) / 2;
+      let closestDiff = Infinity;
+      let closestWeight: number | null = null;
+      measurements.forEach((m) => {
+        if (typeof m.weightKg === 'number' && m.weightKg > 0 && m.date) {
+          const mTime = new Date(m.date).getTime();
+          if (!isNaN(mTime)) {
+            const diff = Math.abs(mTime - weekMidpoint);
+            if (diff < closestDiff && diff <= 30 * 24 * 60 * 60 * 1000) {
+              closestDiff = diff;
+              closestWeight = m.weightKg;
+            }
+          }
+        }
+      });
+      bodyweightKg = closestWeight !== null ? Math.round(closestWeight * 10) / 10 : null;
+    }
+
+    const startStr = `${startOfWeek.getDate()} ${startOfWeek.toLocaleDateString('fr-FR', { month: 'short' })}`;
+    const endStr = `${endOfWeek.getDate()} ${endOfWeek.toLocaleDateString('fr-FR', { month: 'short' })}`;
+    const weekLabel = offset === 0
+      ? `Cette semaine (${startStr} - ${endStr})`
+      : offset === -1
+      ? `Semaine passée (${startStr} - ${endStr})`
+      : `Sem. du ${startStr} au ${endStr}`;
+
+    intermediate.push({
+      weekOffset: offset,
+      weekLabel,
+      avgRir,
+      hasRirData,
+      bodyweightKg,
+      avgSessionDurationMin,
+      totalSessions,
+    });
+  }
+
+  // Calcul de la moyenne mobile sur 4 semaines et du statut de sous-récupération
+  const snapshots: WeeklyFatigueSnapshot[] = [];
+
+  for (let i = 0; i < intermediate.length; i++) {
+    const cur = intermediate[i];
+
+    // Semaines précédentes (jusqu'à 4) ayant des données de RIR
+    const priorWeeks = intermediate.slice(Math.max(0, i - 4), i).filter((w) => w.hasRirData);
+
+    const avgRir4wRollingAvg = priorWeeks.length > 0
+      ? Math.round((priorWeeks.reduce((acc, w) => acc + w.avgRir, 0) / priorWeeks.length) * 10) / 10
+      : cur.avgRir;
+
+    const prevWeek = i > 0 ? intermediate[i - 1] : undefined;
+    const isUnderRecovering = flagPossibleUnderRecovery(
+      { avgRir: cur.avgRir, avgRir4wRollingAvg, bodyweightKg: cur.bodyweightKg },
+      prevWeek?.bodyweightKg
+    );
+
+    snapshots.push({
+      weekLabel: cur.weekLabel,
+      avgRir: cur.avgRir,
+      avgRir4wRollingAvg,
+      bodyweightKg: cur.bodyweightKg,
+      avgSessionDurationMin: cur.avgSessionDurationMin,
+      totalSessions: cur.totalSessions,
+      isUnderRecovering,
+      weekOffset: cur.weekOffset,
+    });
+  }
+
+  return snapshots;
 }

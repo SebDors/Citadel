@@ -40,6 +40,7 @@ export interface WorkoutSet {
 }
 
 export type { MuscleGroup, MuscleTarget } from '../constants/muscles';
+export type { WeeklyFatigueSnapshot } from '../services/analyticsService';
 
 export interface WorkoutExercise {
   id: string;
