@@ -847,6 +847,7 @@ export default function LiveWorkoutScreen() {
     } else {
       addBatchExercisesToActiveWorkout(
         selectedExercises.map((ex) => ({
+          exerciseId: ex.id,
           exerciseName: ex.name,
           primaryMuscle: ex.primaryMuscle,
           targetMuscles: ex.targetMuscles,

@@ -47,8 +47,8 @@ export interface WorkoutContextType {
   toggleSetComplete: (exerciseId: string, setId: string) => void;
   addSet: (exerciseId: string) => void;
   removeSet: (exerciseId: string, setId: string) => void;
-  addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number) => void;
-  addBatchExercisesToActiveWorkout: (items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
+  addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number, exerciseId?: string) => void;
+  addBatchExercisesToActiveWorkout: (items: Array<{ exerciseId?: string; exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
   reorderActiveSessionBlocks: (newBlocks: WorkoutBlock[]) => void;
   addCircuitToActiveWorkout: () => void;
   removeExercise: (exerciseId: string) => void;
@@ -126,27 +126,103 @@ function formatSetPerf(set: WorkoutSet): string {
   return '-';
 }
 
-function getPreviousSetPerformance(
+export function getPreviousSetPerformance(
   history: WorkoutSession[],
-  exerciseName: string,
-  setIndex: number
+  exerciseId?: string,
+  exerciseName?: string,
+  setIndex: number = 1,
+  currentSessionId?: string
 ): string | undefined {
-  if (!history || history.length === 0 || !exerciseName) return undefined;
+  if (!history || history.length === 0 || (!exerciseId && !exerciseName)) return undefined;
 
-  const targetName = normalizeString(exerciseName);
+  const targetExerciseId = exerciseId?.trim();
+  const targetName = exerciseName ? normalizeString(exerciseName) : '';
 
-  for (const session of history) {
-    // 1. Blocks (SingleExerciseBlock)
+  if (!targetExerciseId && !targetName) return undefined;
+
+  // Filtre et trie 'history' par ordre chronologique décroissant
+  // Ignore la séance en cours (currentSessionId) et ne prend que les séances ayant un statut 'completed' (ou endTime)
+  const validSessions = history
+    .filter((session) => {
+      if (!session) return false;
+      if (currentSessionId && session.id === currentSessionId) return false;
+      return session.status === 'completed' || !!session.endTime;
+    })
+    .sort((a, b) => {
+      const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
+      const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
+      return timeB - timeA;
+    });
+
+  for (const session of validSessions) {
+    // 1. Parcours des blocs ('single' et 'circuit')
     const blocks = session.blocks || [];
     for (const block of blocks) {
       if (block.type === 'single') {
         const ex = block.exercise;
-        if (normalizeString(ex.exerciseName) === targetName) {
+        if (!ex) continue;
+
+        // Priorité absolue sur exerciseId, fallback secondaire sur exerciseName pour les anciens logs
+        const isMatch = (targetExerciseId && ex.exerciseId)
+          ? ex.exerciseId === targetExerciseId
+          : (targetName && ex.exerciseName ? normalizeString(ex.exerciseName) === targetName : false);
+
+        if (isMatch) {
           const completedSets = (ex.sets || []).filter(
             (s) => s.completed && (s.weightKg !== undefined || s.reps !== undefined)
           );
-          if (completedSets.length === 0) continue;
+          if (completedSets.length > 0) {
+            const targetSet =
+              completedSets.find((s) => s.setNumber === setIndex) ||
+              completedSets[setIndex - 1] ||
+              completedSets[completedSets.length - 1];
 
+            if (targetSet) {
+              return formatSetPerf(targetSet);
+            }
+          }
+        }
+      } else if (block.type === 'circuit') {
+        const circuitExercises = block.exercises || [];
+        for (const item of circuitExercises) {
+          const exItem = item as any;
+          const isMatch = (targetExerciseId && exItem.exerciseId)
+            ? exItem.exerciseId === targetExerciseId
+            : (targetName && exItem.exerciseName ? normalizeString(exItem.exerciseName) === targetName : false);
+
+          if (isMatch && Array.isArray(exItem.sets)) {
+            const completedSets = exItem.sets.filter(
+              (s: WorkoutSet) => s.completed && (s.weightKg !== undefined || s.reps !== undefined)
+            );
+            if (completedSets.length > 0) {
+              const targetSet =
+                completedSets.find((s: WorkoutSet) => s.setNumber === setIndex) ||
+                completedSets[setIndex - 1] ||
+                completedSets[completedSets.length - 1];
+
+              if (targetSet) {
+                return formatSetPerf(targetSet);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Parcours de session.exercises (anciens logs)
+    const exercises = session.exercises || [];
+    for (const ex of exercises) {
+      if (!ex) continue;
+
+      const isMatch = (targetExerciseId && ex.exerciseId)
+        ? ex.exerciseId === targetExerciseId
+        : (targetName && ex.exerciseName ? normalizeString(ex.exerciseName) === targetName : false);
+
+      if (isMatch) {
+        const completedSets = (ex.sets || []).filter(
+          (s) => s.completed && (s.weightKg !== undefined || s.reps !== undefined)
+        );
+        if (completedSets.length > 0) {
           const targetSet =
             completedSets.find((s) => s.setNumber === setIndex) ||
             completedSets[setIndex - 1] ||
@@ -155,26 +231,6 @@ function getPreviousSetPerformance(
           if (targetSet) {
             return formatSetPerf(targetSet);
           }
-        }
-      }
-    }
-
-    // 2. Legacy exercises list
-    const exercises = session.exercises || [];
-    for (const ex of exercises) {
-      if (normalizeString(ex.exerciseName) === targetName) {
-        const completedSets = (ex.sets || []).filter(
-          (s) => s.completed && (s.weightKg !== undefined || s.reps !== undefined)
-        );
-        if (completedSets.length === 0) continue;
-
-        const targetSet =
-          completedSets.find((s) => s.setNumber === setIndex) ||
-          completedSets[setIndex - 1] ||
-          completedSets[completedSets.length - 1];
-
-        if (targetSet) {
-          return formatSetPerf(targetSet);
         }
       }
     }
@@ -189,13 +245,22 @@ export function enrichSessionWithPreviousPerformances(
 ): WorkoutSession {
   if (!session) return session;
 
+  const currentSessionId = session.id;
+
   const updatedBlocks = session.blocks
     ? session.blocks.map((block) => {
         if (block.type === 'single') {
           const ex = block.exercise;
           const updatedSets = ex.sets.map((s) => ({
             ...s,
-            previous: getPreviousSetPerformance(history, ex.exerciseName, s.setNumber) || s.previous,
+            previous:
+              getPreviousSetPerformance(
+                history,
+                ex.exerciseId,
+                ex.exerciseName,
+                s.setNumber,
+                currentSessionId
+              ) || s.previous,
           }));
           return { ...block, exercise: { ...ex, sets: updatedSets } };
         }
@@ -207,7 +272,14 @@ export function enrichSessionWithPreviousPerformances(
     ? session.exercises.map((ex) => {
         const updatedSets = ex.sets.map((s) => ({
           ...s,
-          previous: getPreviousSetPerformance(history, ex.exerciseName, s.setNumber) || s.previous,
+          previous:
+            getPreviousSetPerformance(
+              history,
+              ex.exerciseId,
+              ex.exerciseName,
+              s.setNumber,
+              currentSessionId
+            ) || s.previous,
         }));
         return { ...ex, sets: updatedSets };
       })
@@ -787,7 +859,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       const lastSet = ex.sets[ex.sets.length - 1];
       const nextSetNum = ex.sets.length + 1;
-      const prevPerf = getPreviousSetPerformance(data?.history || [], ex.exerciseName, nextSetNum);
+      const prevPerf = getPreviousSetPerformance(
+        data?.history || [],
+        ex.exerciseId,
+        ex.exerciseName,
+        nextSetNum,
+        activeSession.id
+      );
       const newSet: WorkoutSet = {
         id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         setNumber: nextSetNum,
@@ -807,7 +885,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (block.type === 'single' && block.exercise.id === exerciseId) {
             const lastSet = block.exercise.sets[block.exercise.sets.length - 1];
             const nextSetNum = block.exercise.sets.length + 1;
-            const prevPerf = getPreviousSetPerformance(data?.history || [], block.exercise.exerciseName, nextSetNum);
+            const prevPerf = getPreviousSetPerformance(
+              data?.history || [],
+              block.exercise.exerciseId,
+              block.exercise.exerciseName,
+              nextSetNum,
+              activeSession.id
+            );
             const newSet: WorkoutSet = {
               id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
               setNumber: nextSetNum,
@@ -896,6 +980,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addBatchExercisesToActiveWorkout = (
     items: Array<{
+      exerciseId?: string;
       exerciseName: string;
       primaryMuscle: string;
       targetMuscles: string[];
@@ -910,9 +995,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     items.forEach((item, index) => {
       const uniqueId = `ex_${now}_${index}_${Math.random().toString(36).substr(2, 4)}`;
+      const exCatalogId = item.exerciseId || item.exerciseName.toLowerCase().replace(/\s+/g, '_');
       const newEx: WorkoutExercise = {
         id: uniqueId,
-        exerciseId: item.exerciseName.toLowerCase().replace(/\s+/g, '_'),
+        exerciseId: exCatalogId,
         exerciseName: item.exerciseName,
         primaryMuscle: item.primaryMuscle,
         targetMuscles: item.targetMuscles,
@@ -926,7 +1012,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             reps: undefined,
             rir: undefined,
             completed: false,
-            previous: getPreviousSetPerformance(data?.history || [], item.exerciseName, 1),
+            previous: getPreviousSetPerformance(
+              data?.history || [],
+              exCatalogId,
+              item.exerciseName,
+              1,
+              activeSession.id
+            ),
           },
         ],
       };
@@ -968,10 +1060,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     exerciseName: string,
     primaryMuscle: string,
     targetMuscles: string[],
-    restSeconds: number = 75
+    restSeconds: number = 75,
+    exerciseId?: string
   ) => {
     addBatchExercisesToActiveWorkout([
-      { exerciseName, primaryMuscle, targetMuscles, restSeconds },
+      { exerciseId, exerciseName, primaryMuscle, targetMuscles, restSeconds },
     ]);
   };
 
@@ -1135,6 +1228,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         exerciseName: newExercise.name,
         primaryMuscle: newExercise.primaryMuscle,
         targetMuscles: newExercise.targetMuscles,
+        sets: ex.sets.map((s) => ({
+          ...s,
+          previous:
+            getPreviousSetPerformance(
+              data?.history || [],
+              newExercise.id,
+              newExercise.name,
+              s.setNumber,
+              activeSession.id
+            ) || s.previous,
+        })),
       };
     });
 
@@ -1149,6 +1253,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 exerciseName: newExercise.name,
                 primaryMuscle: newExercise.primaryMuscle,
                 targetMuscles: newExercise.targetMuscles,
+                sets: block.exercise.sets.map((s) => ({
+                  ...s,
+                  previous:
+                    getPreviousSetPerformance(
+                      data?.history || [],
+                      newExercise.id,
+                      newExercise.name,
+                      s.setNumber,
+                      activeSession.id
+                    ) || s.previous,
+                })),
               },
             };
           }
