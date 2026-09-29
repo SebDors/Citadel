@@ -1,4 +1,5 @@
 import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks } from '../types';
+import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
 
 /**
  * Calcul du 1RM estimé selon la formule d'Epley (standard international de référence).
@@ -189,53 +190,58 @@ export interface MuscleVolumeBreakdown {
 }
 
 // Repères scientifiques basés sur la littérature d'hypertrophie (Renaissance Periodization / Dr. Mike Israetel)
-const MUSCLE_VOLUME_LANDMARKS: Record<string, { mev: number; mav: number }> = {
+export const MUSCLE_VOLUME_LANDMARKS: Record<MuscleGroup, { mev: number; mav: number }> & Record<string, { mev: number; mav: number }> = {
+  // Les 20 MUSCLE_GROUPS normalisés
   'Pectoraux': { mev: 8, mav: 16 },
+  'Grand Dorsal': { mev: 8, mav: 16 },
+  'Trapèzes': { mev: 6, mav: 14 },
+  'Rhomboïdes': { mev: 4, mav: 12 },
+  'Grand Rond': { mev: 4, mav: 10 },
+  'Deltoïde Antérieur': { mev: 4, mav: 12 },
+  'Deltoïde Latéral': { mev: 8, mav: 20 },
+  'Deltoïde Postérieur': { mev: 6, mav: 16 },
+  'Biceps': { mev: 6, mav: 14 },
+  'Triceps': { mev: 6, mav: 14 },
+  'Avant-bras': { mev: 4, mav: 12 },
+  'Quadriceps': { mev: 8, mav: 16 },
+  'Ischio-Jambiers': { mev: 6, mav: 14 },
+  'Grand Fessier': { mev: 6, mav: 14 },
+  'Adducteurs': { mev: 4, mav: 12 },
+  'Mollets (Gastrocnémiens)': { mev: 6, mav: 14 },
+  'Mollets (Soléaire)': { mev: 6, mav: 14 },
+  'Lombaires': { mev: 4, mav: 10 },
+  'Abdominaux': { mev: 4, mav: 12 },
+  'Obliques': { mev: 4, mav: 12 },
+
+  // Variantes additionnelles pour rétro-compatibilité
   'Pectoraux (Chef claviculaire - Haut)': { mev: 6, mav: 14 },
   'Pectoraux (Chef sterno-costal - Médian)': { mev: 6, mav: 14 },
   'Pectoraux (Chef abdominal - Bas)': { mev: 6, mav: 12 },
   'Pectoraux (Global)': { mev: 8, mav: 16 },
   'Dos': { mev: 10, mav: 18 },
-  'Grand Dorsal': { mev: 8, mav: 16 },
   'Trapèzes (Moyens)': { mev: 6, mav: 14 },
   'Trapèzes (Inférieurs)': { mev: 4, mav: 10 },
   'Trapèzes (Supérieurs)': { mev: 6, mav: 14 },
   'Trapèzes Supérieurs': { mev: 6, mav: 14 },
-  'Trapèzes': { mev: 6, mav: 14 },
-  'Rhomboïdes': { mev: 4, mav: 12 },
-  'Grand Rond': { mev: 4, mav: 10 },
   'Lombaires (Érecteurs du rachis)': { mev: 4, mav: 10 },
-  'Lombaires': { mev: 4, mav: 10 },
-  'Quadriceps': { mev: 8, mav: 16 },
   'Ischio-jambiers': { mev: 6, mav: 14 },
-  'Grand Fessier': { mev: 6, mav: 14 },
   'Moyen Fessier': { mev: 4, mav: 12 },
   'Fessiers': { mev: 6, mav: 14 },
-  'Adducteurs': { mev: 4, mav: 12 },
   'Épaules': { mev: 8, mav: 18 },
-  'Deltoïde Antérieur': { mev: 4, mav: 12 },
-  'Deltoïde Latéral': { mev: 8, mav: 20 },
-  'Deltoïde Postérieur': { mev: 6, mav: 16 },
   'Coiffe des rotateurs': { mev: 4, mav: 10 },
   'Biceps (Chef court)': { mev: 6, mav: 14 },
   'Biceps (Chef long)': { mev: 6, mav: 14 },
-  'Biceps': { mev: 6, mav: 14 },
   'Brachial': { mev: 4, mav: 10 },
   'Brachioradial': { mev: 4, mav: 10 },
   'Triceps (Chef long)': { mev: 6, mav: 14 },
   'Triceps (Chef latéral)': { mev: 6, mav: 14 },
   'Triceps (Chef médial)': { mev: 4, mav: 12 },
   'Triceps (Global)': { mev: 6, mav: 14 },
-  'Triceps': { mev: 6, mav: 14 },
   'Mollets': { mev: 6, mav: 14 },
-  'Mollets (Gastrocnémiens)': { mev: 6, mav: 14 },
-  'Mollets (Soléaire)': { mev: 6, mav: 14 },
   'Tibial antérieur': { mev: 4, mav: 10 },
-  'Abdominaux': { mev: 4, mav: 12 },
   'Grand Droit (Partie haute)': { mev: 4, mav: 12 },
   'Grand Droit (Partie basse)': { mev: 4, mav: 12 },
   'Grand Droit': { mev: 4, mav: 12 },
-  'Obliques': { mev: 4, mav: 12 },
   'Transverse': { mev: 4, mav: 10 },
 };
 
@@ -271,25 +277,30 @@ export function calculateWeeklyMuscleVolume(
     const blocks = getSessionBlocks(session);
     blocks.forEach((block) => {
       if (block.type === 'single') {
-        const muscles = (block.exercise.primaryMuscles && block.exercise.primaryMuscles.length > 0)
+        const rawMuscles = (block.exercise.primaryMuscles && block.exercise.primaryMuscles.length > 0)
           ? block.exercise.primaryMuscles
-          : (block.exercise.primaryMuscle || 'Autre').split(',').map((m) => m.trim()).filter(Boolean);
+          : (block.exercise.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
 
         const workingSets = (block.exercise.sets || []).filter(
           (s) => s.completed && s.type !== 'warmup'
         ).length;
 
-        muscles.forEach((muscle) => {
+        // Déduplication par groupe musculaire normalisé pour éviter de compter 2 fois la même série
+        const normalizedGroups = Array.from(new Set(rawMuscles.map((m) => normalizeMuscle(m).muscle)));
+
+        normalizedGroups.forEach((muscle) => {
           muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + workingSets);
         });
       } else if (block.type === 'circuit') {
         block.exercises.forEach((item) => {
-          const muscles = (item.primaryMuscles && item.primaryMuscles.length > 0)
+          const rawMuscles = (item.primaryMuscles && item.primaryMuscles.length > 0)
             ? item.primaryMuscles
-            : (item.primaryMuscle || 'Autre').split(',').map((m) => m.trim()).filter(Boolean);
+            : (item.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
 
           const rounds = block.rounds || 1;
-          muscles.forEach((muscle) => {
+          const normalizedGroups = Array.from(new Set(rawMuscles.map((m) => normalizeMuscle(m).muscle)));
+
+          normalizedGroups.forEach((muscle) => {
             muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + rounds);
           });
         });

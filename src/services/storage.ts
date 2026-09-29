@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder, getSessionBlocks } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
 import { SharedExercise } from '../constants/exerciseDatabase';
+import { normalizeMuscle, MuscleTarget } from '../constants/muscles';
 
 const STORAGE_KEY = '@citadel_app_data_v1';
 const LEGACY_STORAGE_KEY = '@warriorfit_app_data_v1';
@@ -11,6 +12,279 @@ const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
 
 let saveCurrentWorkoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastPendingSession: WorkoutSession | null | undefined = undefined;
+
+/**
+ * Migration transparente d'un exercice individuel :
+ * - Sauvegarde l'ancien format sous *_legacy pour rollback/traçabilité
+ * - Normalise primaryMuscle et primaryMuscles selon MUSCLE_GROUPS
+ * - Normalise targetMuscles selon MUSCLE_GROUPS
+ * - Construit la structure normalisée muscleTargets
+ */
+function migrateExercise(ex: any): boolean {
+  if (!ex) return false;
+  let changed = false;
+
+  // 1. Sauvegarde legacy si pas encore fait
+  if (ex.primaryMuscle && !ex.primaryMuscle_legacy) {
+    ex.primaryMuscle_legacy = ex.primaryMuscle;
+  }
+  if (Array.isArray(ex.targetMuscles) && !ex.targetMuscles_legacy) {
+    ex.targetMuscles_legacy = [...ex.targetMuscles];
+  }
+
+  // 2. Normalisation du primaryMuscle
+  if (ex.primaryMuscle) {
+    const norm = normalizeMuscle(ex.primaryMuscle);
+    if (ex.primaryMuscle !== norm.muscle) {
+      ex.primaryMuscle = norm.muscle;
+      changed = true;
+    }
+  }
+
+  // 3. Normalisation de primaryMuscles
+  if (Array.isArray(ex.primaryMuscles) && ex.primaryMuscles.length > 0) {
+    const normalizedPrimaries = Array.from(new Set(ex.primaryMuscles.map((m: string) => normalizeMuscle(m).muscle)));
+    if (JSON.stringify(normalizedPrimaries) !== JSON.stringify(ex.primaryMuscles)) {
+      ex.primaryMuscles = normalizedPrimaries;
+      changed = true;
+    }
+  } else if (ex.primaryMuscle) {
+    ex.primaryMuscles = [ex.primaryMuscle];
+  }
+
+  // 4. Normalisation de targetMuscles et génération de muscleTargets
+  if (Array.isArray(ex.targetMuscles)) {
+    const rawTargets = ex.targetMuscles_legacy || ex.targetMuscles;
+    const normalizedTargets: string[] = [];
+    const muscleTargets: MuscleTarget[] = [];
+
+    // Ajouter le muscle principal dans muscleTargets
+    if (ex.primaryMuscle) {
+      const primaryNorm = normalizeMuscle(ex.primaryMuscle_legacy || ex.primaryMuscle);
+      muscleTargets.push({
+        muscle: primaryNorm.muscle,
+        subRegion: primaryNorm.subRegion,
+        role: 'primary',
+        fraction: 1.0,
+      });
+    }
+
+    rawTargets.forEach((item: any) => {
+      if (typeof item === 'string') {
+        const norm = normalizeMuscle(item);
+        if (!normalizedTargets.includes(norm.muscle)) {
+          normalizedTargets.push(norm.muscle);
+        }
+        if (!muscleTargets.some((t) => t.muscle === norm.muscle)) {
+          muscleTargets.push({
+            muscle: norm.muscle,
+            subRegion: norm.subRegion,
+            role: 'secondary',
+            fraction: 0.5,
+          });
+        }
+      } else if (item && typeof item === 'object' && item.muscle) {
+        const norm = normalizeMuscle(item.muscle);
+        if (!normalizedTargets.includes(norm.muscle)) {
+          normalizedTargets.push(norm.muscle);
+        }
+        muscleTargets.push({
+          muscle: norm.muscle,
+          subRegion: item.subRegion || norm.subRegion,
+          role: item.role || 'secondary',
+          fraction: item.fraction ?? 0.5,
+        });
+      }
+    });
+
+    if (JSON.stringify(normalizedTargets) !== JSON.stringify(ex.targetMuscles)) {
+      ex.targetMuscles = normalizedTargets;
+      changed = true;
+    }
+    if (!ex.muscleTargets || ex.muscleTargets.length === 0) {
+      ex.muscleTargets = muscleTargets;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+/**
+ * Migration transparente d'un item de circuit
+ */
+function migrateCircuitExercise(item: any): boolean {
+  if (!item) return false;
+  let changed = false;
+
+  if (item.primaryMuscle && !item.primaryMuscle_legacy) {
+    item.primaryMuscle_legacy = item.primaryMuscle;
+  }
+  if (Array.isArray(item.targetMuscles) && !item.targetMuscles_legacy) {
+    item.targetMuscles_legacy = [...item.targetMuscles];
+  }
+
+  if (item.primaryMuscle) {
+    const norm = normalizeMuscle(item.primaryMuscle);
+    if (item.primaryMuscle !== norm.muscle) {
+      item.primaryMuscle = norm.muscle;
+      changed = true;
+    }
+  }
+
+  if (Array.isArray(item.primaryMuscles) && item.primaryMuscles.length > 0) {
+    const normalizedPrimaries = Array.from(new Set(item.primaryMuscles.map((m: string) => normalizeMuscle(m).muscle)));
+    if (JSON.stringify(normalizedPrimaries) !== JSON.stringify(item.primaryMuscles)) {
+      item.primaryMuscles = normalizedPrimaries;
+      changed = true;
+    }
+  } else if (item.primaryMuscle) {
+    item.primaryMuscles = [item.primaryMuscle];
+  }
+
+  if (Array.isArray(item.targetMuscles)) {
+    const rawTargets = item.targetMuscles_legacy || item.targetMuscles;
+    const normalizedTargets: string[] = [];
+    const muscleTargets: MuscleTarget[] = [];
+
+    if (item.primaryMuscle) {
+      const primaryNorm = normalizeMuscle(item.primaryMuscle_legacy || item.primaryMuscle);
+      muscleTargets.push({
+        muscle: primaryNorm.muscle,
+        subRegion: primaryNorm.subRegion,
+        role: 'primary',
+        fraction: 1.0,
+      });
+    }
+
+    rawTargets.forEach((raw: any) => {
+      if (typeof raw === 'string') {
+        const norm = normalizeMuscle(raw);
+        if (!normalizedTargets.includes(norm.muscle)) {
+          normalizedTargets.push(norm.muscle);
+        }
+        if (!muscleTargets.some((t) => t.muscle === norm.muscle)) {
+          muscleTargets.push({
+            muscle: norm.muscle,
+            subRegion: norm.subRegion,
+            role: 'secondary',
+            fraction: 0.5,
+          });
+        }
+      } else if (raw && typeof raw === 'object' && raw.muscle) {
+        const norm = normalizeMuscle(raw.muscle);
+        if (!normalizedTargets.includes(norm.muscle)) {
+          normalizedTargets.push(norm.muscle);
+        }
+        muscleTargets.push({
+          muscle: norm.muscle,
+          subRegion: raw.subRegion || norm.subRegion,
+          role: raw.role || 'secondary',
+          fraction: raw.fraction ?? 0.5,
+        });
+      }
+    });
+
+    if (JSON.stringify(normalizedTargets) !== JSON.stringify(item.targetMuscles)) {
+      item.targetMuscles = normalizedTargets;
+      changed = true;
+    }
+    if (!item.muscleTargets || item.muscleTargets.length === 0) {
+      item.muscleTargets = muscleTargets;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+/**
+ * Normalise l'intégralité du dataset applicatif (templates, historique, séance en cours, exercices personnalisés)
+ */
+function migrateData(data: FitTrackerData): boolean {
+  if (!data) return false;
+  let anyChange = false;
+
+  // 1. Templates
+  if (Array.isArray(data.templates)) {
+    data.templates.forEach((tmpl) => {
+      if (Array.isArray(tmpl.targetMuscles)) {
+        const normalized = Array.from(new Set(tmpl.targetMuscles.map((m) => normalizeMuscle(m).muscle)));
+        if (JSON.stringify(normalized) !== JSON.stringify(tmpl.targetMuscles)) {
+          tmpl.targetMuscles = normalized;
+          anyChange = true;
+        }
+      }
+      if (Array.isArray(tmpl.exercises)) {
+        tmpl.exercises.forEach((ex) => {
+          if (migrateExercise(ex)) anyChange = true;
+        });
+      }
+      if (Array.isArray(tmpl.blocks)) {
+        tmpl.blocks.forEach((block) => {
+          if (block.type === 'single' && block.exercise) {
+            if (migrateExercise(block.exercise)) anyChange = true;
+          } else if (block.type === 'circuit' && Array.isArray(block.exercises)) {
+            block.exercises.forEach((item) => {
+              if (migrateCircuitExercise(item)) anyChange = true;
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 2. Historique
+  if (Array.isArray(data.history)) {
+    data.history.forEach((session) => {
+      if (Array.isArray(session.exercises)) {
+        session.exercises.forEach((ex) => {
+          if (migrateExercise(ex)) anyChange = true;
+        });
+      }
+      if (Array.isArray(session.blocks)) {
+        session.blocks.forEach((block) => {
+          if (block.type === 'single' && block.exercise) {
+            if (migrateExercise(block.exercise)) anyChange = true;
+          } else if (block.type === 'circuit' && Array.isArray(block.exercises)) {
+            block.exercises.forEach((item) => {
+              if (migrateCircuitExercise(item)) anyChange = true;
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 3. Séance active en cours
+  if (data.currentWorkout) {
+    if (Array.isArray(data.currentWorkout.exercises)) {
+      data.currentWorkout.exercises.forEach((ex) => {
+        if (migrateExercise(ex)) anyChange = true;
+      });
+    }
+    if (Array.isArray(data.currentWorkout.blocks)) {
+      data.currentWorkout.blocks.forEach((block) => {
+        if (block.type === 'single' && block.exercise) {
+          if (migrateExercise(block.exercise)) anyChange = true;
+        } else if (block.type === 'circuit' && Array.isArray(block.exercises)) {
+          block.exercises.forEach((item) => {
+            if (migrateCircuitExercise(item)) anyChange = true;
+          });
+        }
+      });
+    }
+  }
+
+  // 4. Exercices personnalisés
+  if (Array.isArray(data.customExercises)) {
+    data.customExercises.forEach((ex) => {
+      if (migrateExercise(ex)) anyChange = true;
+    });
+  }
+
+  return anyChange;
+}
 
 export const StorageService = {
   /**
@@ -45,9 +319,19 @@ export const StorageService = {
           // Ignorer si échec de lecture de la clé isolée
         }
 
+        // Migration transparente des référentiels musculaires
+        const hasChanges = migrateData(parsed);
+        if (hasChanges) {
+          // Persistance silencieuse en tâche de fond pour pérenniser les modifications
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed)).catch((err) => {
+            console.error('[StorageService] Erreur lors de la persistance de la migration:', err);
+          });
+        }
+
         return parsed;
       }
-      // Première utilisation : Sauvegarder les données mock initiales
+      // Première utilisation : Sauvegarder les données mock initiales migrées
+      migrateData(INITIAL_MOCK_DATA);
       await this.saveData(INITIAL_MOCK_DATA);
       return INITIAL_MOCK_DATA;
     } catch (e) {
@@ -79,6 +363,7 @@ export const StorageService = {
         console.error('Erreur suppression import CURRENT_WORKOUT_KEY:', e);
       }
     }
+    migrateData(newData);
     await this.saveData(newData);
     return newData;
   },

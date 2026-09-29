@@ -39,13 +39,18 @@ export interface WorkoutSet {
   bodyweightUsedKg?: number; // Snapshot du poids de corps pour calcul de tonnage réel
 }
 
+export type { MuscleGroup, MuscleTarget } from '../constants/muscles';
+
 export interface WorkoutExercise {
   id: string;
   exerciseId: string;
   exerciseName: string;
   targetMuscles: string[];
+  targetMuscles_legacy?: string[];
+  muscleTargets?: import('../constants/muscles').MuscleTarget[];
   primaryMuscle: string;
   primaryMuscles?: string[];
+  primaryMuscle_legacy?: string;
   notes?: string;
   restSeconds: number;
   supersetGroup?: string;
@@ -58,7 +63,10 @@ export interface CircuitExerciseItem {
   exerciseName: string;
   primaryMuscle: string;
   primaryMuscles?: string[];
+  primaryMuscle_legacy?: string;
   targetMuscles?: string[];
+  targetMuscles_legacy?: string[];
+  muscleTargets?: import('../constants/muscles').MuscleTarget[];
   targetValue: number;
   targetType: 'reps' | 'time';
   setType?: SetType;

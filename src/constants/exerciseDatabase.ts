@@ -1,3 +1,5 @@
+import { MuscleTarget } from './muscles';
+
 export interface SharedExercise {
   id: string;
   name: string;
@@ -8,6 +10,8 @@ export interface SharedExercise {
   category: 'Pectoraux' | 'Dos' | 'Épaules' | 'Bras' | 'Jambes' | 'Abdos';
   isCustom?: boolean;
   isBodyweight?: boolean;
+  subRegion?: string;
+  muscleTargets?: MuscleTarget[];
 }
 
 export const EXERCISE_DATABASE: SharedExercise[] = [
