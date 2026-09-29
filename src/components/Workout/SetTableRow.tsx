@@ -43,21 +43,25 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const handleOpenMainKeypad = useCallback((field: NumericFieldType) => {
     let ghostValue: string | undefined;
     let ghostLabel: string | undefined;
-    if (field === 'rir') {
+    if (field === 'weightKg') {
+      if (set.isBodyweight) {
+        ghostLabel = 'Lest (+kg)';
+      }
+    } else if (field === 'rir') {
       ghostLabel = 'Cible RIR';
       ghostValue = set.targetRir !== undefined ? String(set.targetRir) : undefined;
     }
     setKeypadTarget({ type: 'main', field, ghostValue, ghostLabel });
     let valStr = '';
     if (field === 'weightKg') {
-      valStr = set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '';
+      valStr = set.weightKg !== undefined && set.weightKg !== null && set.weightKg !== 0 ? String(set.weightKg) : '';
     } else if (field === 'reps') {
       valStr = set.reps !== undefined && set.reps !== null ? String(set.reps) : '';
     } else if (field === 'rir') {
       valStr = set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '';
     }
     setTempValue(valStr);
-  }, [set.weightKg, set.reps, set.rir, set.targetRir]);
+  }, [set.isBodyweight, set.weightKg, set.reps, set.rir, set.targetRir]);
 
   const handleOpenDropKeypad = useCallback((stepId: string, field: 'weightKg' | 'reps') => {
     const steps = set.dropSteps || [];
@@ -218,20 +222,40 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   // Extraction des valeurs fantômes de la performance précédente (Ghost values)
   const previousMatch = useMemo(() => {
     if (!set.previous) return null;
+    if (set.isBodyweight) {
+      const mBw = set.previous.match(/(?:PDC|\+([0-9.]+)\s*kg)\s*[×x*]\s*([0-9]+)/i);
+      if (mBw) {
+        return { weight: mBw[1] || '0', reps: mBw[2] };
+      }
+      const mReps = set.previous.match(/([0-9]+)\s*reps/i);
+      if (mReps) {
+        return { weight: '0', reps: mReps[1] };
+      }
+    }
     const m = set.previous.match(/([0-9.]+)\s*(?:kg)?\s*[×x*]\s*([0-9]+)/i);
     if (m) {
       return { weight: m[1], reps: m[2] };
     }
     return null;
-  }, [set.previous]);
+  }, [set.previous, set.isBodyweight]);
 
   const isNextToFill = Boolean(isNextSet && !set.completed);
   const isWeightActive = keypadTarget?.type === 'main' && keypadTarget.field === 'weightKg';
   const isRepsActive = keypadTarget?.type === 'main' && keypadTarget.field === 'reps';
   const isRirActive = keypadTarget?.type === 'main' && keypadTarget.field === 'rir';
 
-  const isWeightEmpty = set.weightKg === undefined || set.weightKg === null;
+  const isWeightEmpty = !set.isBodyweight && (set.weightKg === undefined || set.weightKg === null);
   const isRepsEmpty = set.reps === undefined || set.reps === null;
+
+  const displayWeight = useMemo(() => {
+    if (set.isBodyweight) {
+      if (set.weightKg === undefined || set.weightKg === null || set.weightKg === 0) {
+        return 'PDC';
+      }
+      return `+${set.weightKg}`;
+    }
+    return set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '-';
+  }, [set.isBodyweight, set.weightKg]);
 
   return (
     <View style={styles.containerCol}>
@@ -295,12 +319,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 {
                   color: isWeightActive
                     ? theme.accent
+                    : set.isBodyweight
+                    ? theme.text
                     : (set.weightKg !== undefined && set.weightKg !== null ? theme.text : theme.textMuted),
                   fontWeight: isWeightActive || (isNextToFill && isWeightEmpty) ? '900' : '700',
                 },
               ]}
             >
-              {set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '-'}
+              {displayWeight}
             </Text>
           </TouchableOpacity>
         </View>

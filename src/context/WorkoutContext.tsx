@@ -47,8 +47,8 @@ export interface WorkoutContextType {
   toggleSetComplete: (exerciseId: string, setId: string) => void;
   addSet: (exerciseId: string) => void;
   removeSet: (exerciseId: string, setId: string) => void;
-  addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number, exerciseId?: string) => void;
-  addBatchExercisesToActiveWorkout: (items: Array<{ exerciseId?: string; exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number }>) => void;
+  addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number, exerciseId?: string, isBodyweight?: boolean) => void;
+  addBatchExercisesToActiveWorkout: (items: Array<{ exerciseId?: string; exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number; isBodyweight?: boolean }>) => void;
   reorderActiveSessionBlocks: (newBlocks: WorkoutBlock[]) => void;
   addCircuitToActiveWorkout: () => void;
   removeExercise: (exerciseId: string) => void;
@@ -114,6 +114,13 @@ export interface WorkoutContextType {
 const WorkoutContext = createContext<WorkoutContextType>({} as WorkoutContextType);
 
 function formatSetPerf(set: WorkoutSet): string {
+  if (set.isBodyweight) {
+    const weightPrefix = set.weightKg && set.weightKg > 0 ? `+${set.weightKg}kg` : 'PDC';
+    if (set.reps !== undefined && set.reps > 0) {
+      return `${weightPrefix} × ${set.reps}`;
+    }
+    return weightPrefix;
+  }
   if (set.weightKg !== undefined && set.weightKg > 0 && set.reps !== undefined && set.reps > 0) {
     return `${set.weightKg}kg × ${set.reps}`;
   }
@@ -516,15 +523,28 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const startWorkout = (template?: WorkoutTemplate) => {
+    const isExerciseBodyweight = (ex: WorkoutExercise) => {
+      if (ex.isBodyweight !== undefined) return ex.isBodyweight;
+      const match = EXERCISE_DATABASE.find(
+        (e) => (ex.exerciseId && e.id === ex.exerciseId) || (ex.exerciseName && e.name.toLowerCase() === ex.exerciseName.toLowerCase())
+      ) || (data?.customExercises || []).find(
+        (e) => (ex.exerciseId && e.id === ex.exerciseId) || (ex.exerciseName && e.name.toLowerCase() === ex.exerciseName.toLowerCase())
+      );
+      return match?.isBodyweight ?? false;
+    };
+
     const blocks = template ? getTemplateBlocks(template) : [];
     const sessionBlocks: WorkoutBlock[] = JSON.parse(JSON.stringify(blocks)).map((block: WorkoutBlock) => {
       if (block.type === 'single') {
+        const isBw = isExerciseBodyweight(block.exercise);
         return {
           ...block,
           exercise: {
             ...block.exercise,
+            isBodyweight: isBw,
             sets: block.exercise.sets.map((s) => ({
               ...s,
+              isBodyweight: isBw || s.isBodyweight,
               weightKg: undefined,
               reps: undefined,
               rir: undefined,
@@ -541,16 +561,21 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .map((b) => b.exercise);
 
     const legacyExercises: WorkoutExercise[] = template?.exercises
-      ? JSON.parse(JSON.stringify(template.exercises)).map((ex: WorkoutExercise) => ({
-          ...ex,
-          sets: ex.sets.map((s) => ({
-            ...s,
-            weightKg: undefined,
-            reps: undefined,
-            rir: undefined,
-            completed: false,
-          })),
-        }))
+      ? JSON.parse(JSON.stringify(template.exercises)).map((ex: WorkoutExercise) => {
+          const isBw = isExerciseBodyweight(ex);
+          return {
+            ...ex,
+            isBodyweight: isBw,
+            sets: ex.sets.map((s) => ({
+              ...s,
+              isBodyweight: isBw || s.isBodyweight,
+              weightKg: undefined,
+              reps: undefined,
+              rir: undefined,
+              completed: false,
+            })),
+          };
+        })
       : singleExercises;
 
     let totalSets = 0;
@@ -768,10 +793,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const newCompleted = !s.completed;
           if (newCompleted) isMarkingCompleted = true;
 
+          const isBw = Boolean(ex.isBodyweight || s.isBodyweight);
+          const bodyweightUsedKg = isBw && newCompleted
+            ? (data?.profile?.currentWeightKg || s.bodyweightUsedKg)
+            : s.bodyweightUsedKg;
+
           return {
             ...s,
             completed: newCompleted,
             completedAt: newCompleted ? new Date().toISOString() : undefined,
+            ...(isBw ? { isBodyweight: true, bodyweightUsedKg } : {}),
           };
         });
 
@@ -789,10 +820,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const newCompleted = !s.completed;
                 if (newCompleted) isMarkingCompleted = true;
 
+                const isBw = Boolean(block.exercise.isBodyweight || s.isBodyweight);
+                const bodyweightUsedKg = isBw && newCompleted
+                  ? (data?.profile?.currentWeightKg || s.bodyweightUsedKg)
+                  : s.bodyweightUsedKg;
+
                 return {
                   ...s,
                   completed: newCompleted,
                   completedAt: newCompleted ? new Date().toISOString() : undefined,
+                  ...(isBw ? { isBodyweight: true, bodyweightUsedKg } : {}),
                 };
               });
 
@@ -866,6 +903,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         nextSetNum,
         activeSession.id
       );
+      const isBw = Boolean(ex.isBodyweight || lastSet?.isBodyweight);
       const newSet: WorkoutSet = {
         id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         setNumber: nextSetNum,
@@ -875,6 +913,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         rir: undefined,
         completed: false,
         previous: prevPerf || lastSet?.previous || undefined,
+        isBodyweight: isBw,
       };
 
       return { ...ex, sets: [...ex.sets, newSet] };
@@ -892,6 +931,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               nextSetNum,
               activeSession.id
             );
+            const isBw = Boolean(block.exercise.isBodyweight || lastSet?.isBodyweight);
             const newSet: WorkoutSet = {
               id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
               setNumber: nextSetNum,
@@ -901,6 +941,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               rir: undefined,
               completed: false,
               previous: prevPerf || lastSet?.previous || undefined,
+              isBodyweight: isBw,
             };
 
             return {
@@ -985,6 +1026,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       primaryMuscle: string;
       targetMuscles: string[];
       restSeconds?: number;
+      isBodyweight?: boolean;
     }>
   ) => {
     if (!activeSession || items.length === 0) return;
@@ -996,6 +1038,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     items.forEach((item, index) => {
       const uniqueId = `ex_${now}_${index}_${Math.random().toString(36).substr(2, 4)}`;
       const exCatalogId = item.exerciseId || item.exerciseName.toLowerCase().replace(/\s+/g, '_');
+      const catalogEx = EXERCISE_DATABASE.find(
+        (e) => (item.exerciseId && e.id === item.exerciseId) || e.name.toLowerCase() === item.exerciseName.toLowerCase()
+      ) || (data?.customExercises || []).find(
+        (e) => (item.exerciseId && e.id === item.exerciseId) || e.name.toLowerCase() === item.exerciseName.toLowerCase()
+      );
+      const isBodyweight = item.isBodyweight !== undefined ? item.isBodyweight : (catalogEx?.isBodyweight ?? false);
+
       const newEx: WorkoutExercise = {
         id: uniqueId,
         exerciseId: exCatalogId,
@@ -1003,6 +1052,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         primaryMuscle: item.primaryMuscle,
         targetMuscles: item.targetMuscles,
         restSeconds: item.restSeconds || 75,
+        isBodyweight,
         sets: [
           {
             id: `s_${now}_${index}_1`,
@@ -1012,6 +1062,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             reps: undefined,
             rir: undefined,
             completed: false,
+            isBodyweight,
             previous: getPreviousSetPerformance(
               data?.history || [],
               exCatalogId,
@@ -1061,10 +1112,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     primaryMuscle: string,
     targetMuscles: string[],
     restSeconds: number = 75,
-    exerciseId?: string
+    exerciseId?: string,
+    isBodyweight?: boolean
   ) => {
     addBatchExercisesToActiveWorkout([
-      { exerciseId, exerciseName, primaryMuscle, targetMuscles, restSeconds },
+      { exerciseId, exerciseName, primaryMuscle, targetMuscles, restSeconds, isBodyweight },
     ]);
   };
 
@@ -1220,6 +1272,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ) => {
     if (!activeSession) return;
 
+    const catalogEx = EXERCISE_DATABASE.find(
+      (e) => e.id === newExercise.id || e.name.toLowerCase() === newExercise.name.toLowerCase()
+    ) || (data?.customExercises || []).find(
+      (e) => e.id === newExercise.id || e.name.toLowerCase() === newExercise.name.toLowerCase()
+    );
+    const isBw = catalogEx?.isBodyweight ?? false;
+
     const updatedExercises = (activeSession.exercises || []).map((ex) => {
       if (ex.id !== oldExerciseId) return ex;
       return {
@@ -1228,8 +1287,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         exerciseName: newExercise.name,
         primaryMuscle: newExercise.primaryMuscle,
         targetMuscles: newExercise.targetMuscles,
+        isBodyweight: isBw,
         sets: ex.sets.map((s) => ({
           ...s,
+          isBodyweight: isBw,
           previous:
             getPreviousSetPerformance(
               data?.history || [],
@@ -1253,8 +1314,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 exerciseName: newExercise.name,
                 primaryMuscle: newExercise.primaryMuscle,
                 targetMuscles: newExercise.targetMuscles,
+                isBodyweight: isBw,
                 sets: block.exercise.sets.map((s) => ({
                   ...s,
+                  isBodyweight: isBw,
                   previous:
                     getPreviousSetPerformance(
                       data?.history || [],

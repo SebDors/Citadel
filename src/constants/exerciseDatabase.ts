@@ -7,6 +7,7 @@ export interface SharedExercise {
   defaultRestSeconds: number;
   category: 'Pectoraux' | 'Dos' | 'Épaules' | 'Bras' | 'Jambes' | 'Abdos';
   isCustom?: boolean;
+  isBodyweight?: boolean;
 }
 
 export const EXERCISE_DATABASE: SharedExercise[] = [
@@ -73,6 +74,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Deltoïde antérieur'],
     defaultRestSeconds: 90,
     category: 'Pectoraux',
+    isBodyweight: true,
   },
   {
     id: 'low_cable_fly',
@@ -109,6 +111,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Deltoïde antérieur', 'Transverse'],
     defaultRestSeconds: 60,
     category: 'Pectoraux',
+    isBodyweight: true,
   },
   {
     id: 'landmine_press',
@@ -138,6 +141,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Grand Rond', 'Biceps (Chef court)', 'Trapèzes (Inférieurs)'],
     defaultRestSeconds: 90,
     category: 'Dos',
+    isBodyweight: true,
   },
   {
     id: 'chinups',
@@ -147,6 +151,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Brachial', 'Grand Rond'],
     defaultRestSeconds: 90,
     category: 'Dos',
+    isBodyweight: true,
   },
   {
     id: 'lat_pulldown',
@@ -264,6 +269,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Ischio-jambiers'],
     defaultRestSeconds: 60,
     category: 'Dos',
+    isBodyweight: true,
   },
 
   // ---------------- ÉPAULES (12) ----------------
@@ -502,6 +508,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Deltoïde antérieur'],
     defaultRestSeconds: 60,
     category: 'Bras',
+    isBodyweight: true,
   },
   {
     id: 'triceps_kickback',
@@ -704,6 +711,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Fléchisseurs de la hanche'],
     defaultRestSeconds: 0,
     category: 'Abdos',
+    isBodyweight: true,
   },
   {
     id: 'releve_genoux_suspendu',
@@ -713,6 +721,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     targetMuscles: ['Fléchisseurs de la hanche'],
     defaultRestSeconds: 0,
     category: 'Abdos',
+    isBodyweight: true,
   },
   {
     id: 'planche_statique',

@@ -26,7 +26,7 @@ export interface WorkoutSet {
   id: string;
   setNumber: number;
   type: SetType;
-  weightKg?: number; // Optionnel (champ vide si non renseigné)
+  weightKg?: number; // Optionnel (champ vide si non renseigné, charge externe ajoutée/lest si isBodyweight)
   reps?: number;     // Optionnel (champ vide si non renseigné)
   rir?: number;      // Reps In Reserve (0 à 5+)
   targetRir?: number;// Reps In Reserve Cible
@@ -35,6 +35,8 @@ export interface WorkoutSet {
   previous?: string; // Ex: "100kg x 8" ou "45s"
   completed: boolean;
   completedAt?: string;
+  isBodyweight?: boolean;
+  bodyweightUsedKg?: number; // Snapshot du poids de corps pour calcul de tonnage réel
 }
 
 export interface WorkoutExercise {
@@ -48,6 +50,7 @@ export interface WorkoutExercise {
   restSeconds: number;
   supersetGroup?: string;
   sets: WorkoutSet[];
+  isBodyweight?: boolean;
 }
 
 export interface CircuitExerciseItem {

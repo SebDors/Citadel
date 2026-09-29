@@ -326,8 +326,9 @@ export const StorageService = {
           totalSetsCount++;
           if (s.completed) {
             completedSetsCount++;
-            if (s.type !== 'warmup' && s.weightKg && s.reps) {
-              totalVolume += s.weightKg * s.reps;
+            const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+            if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
+              totalVolume += effectiveWeight * s.reps;
             }
           }
         });
@@ -402,8 +403,9 @@ export const StorageService = {
               totalCount++;
               if (s.completed) {
                 completedCount++;
-                if (s.type !== 'warmup' && s.weightKg && s.reps) {
-                  volume += s.weightKg * s.reps;
+                const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+                if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
+                  volume += effectiveWeight * s.reps;
                 }
               }
             });
@@ -415,8 +417,9 @@ export const StorageService = {
             totalCount++;
             if (s.completed) {
               completedCount++;
-              if (s.type !== 'warmup' && s.weightKg && s.reps) {
-                volume += s.weightKg * s.reps;
+              const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+              if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
+                volume += effectiveWeight * s.reps;
               }
             }
           });
@@ -482,8 +485,9 @@ export const StorageService = {
               totalCount++;
               if (s.completed) {
                 completedCount++;
-                if (s.type !== 'warmup' && s.weightKg && s.reps) {
-                  volume += s.weightKg * s.reps;
+                const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+                if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
+                  volume += effectiveWeight * s.reps;
                 }
               }
             });
@@ -495,8 +499,9 @@ export const StorageService = {
             totalCount++;
             if (s.completed) {
               completedCount++;
-              if (s.type !== 'warmup' && s.weightKg && s.reps) {
-                volume += s.weightKg * s.reps;
+              const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+              if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
+                volume += effectiveWeight * s.reps;
               }
             }
           });

@@ -34,14 +34,16 @@ export function calculateWorkoutTotalVolume(
     totalCount++;
     if (s.completed) {
       completedCount++;
-      if (s.type !== 'warmup' && s.weightKg && s.reps) {
-        volume += s.weightKg * s.reps;
+      const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+      if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
+        volume += effectiveWeight * s.reps;
       }
       // Prise en compte scientifique des Drop Sets (chaque décharge compte dans le tonnage)
       if (s.dropSteps && s.dropSteps.length > 0) {
         s.dropSteps.forEach((step) => {
-          if (step.weightKg && step.reps) {
-            volume += step.weightKg * step.reps;
+          const stepEffectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (step.weightKg || 0);
+          if (stepEffectiveWeight > 0 && step.reps) {
+            volume += stepEffectiveWeight * step.reps;
           }
         });
       }
@@ -113,12 +115,13 @@ export function calculateMaxE1RM(
       if (block.type === 'single') {
         if (block.exercise.exerciseName.trim().toLowerCase() === targetName) {
           (block.exercise.sets || []).forEach((set) => {
-            if (set.completed && set.weightKg && set.weightKg > 0 && set.reps && set.reps > 0) {
-              const currentE1RM = calculateE1RM(set.weightKg, set.reps);
+            const effectiveWeight = (set.isBodyweight ? (set.bodyweightUsedKg || 0) : 0) + (set.weightKg || 0);
+            if (set.completed && effectiveWeight > 0 && set.reps && set.reps > 0) {
+              const currentE1RM = calculateE1RM(effectiveWeight, set.reps);
               if (currentE1RM !== null && (!bestRecord || currentE1RM > bestRecord.e1RM)) {
                 bestRecord = {
                   exerciseName: block.exercise.exerciseName,
-                  weightKg: set.weightKg,
+                  weightKg: effectiveWeight,
                   reps: set.reps,
                   e1RM: currentE1RM,
                   date: session.startTime,
@@ -157,8 +160,9 @@ export function getAvailableExercisesFromHistory(
           const existing = map.get(name) || { count: 0, max1RM: 0 };
           let sessionMaxE1RM = 0;
           (block.exercise.sets || []).forEach((s) => {
-            if (s.completed && s.weightKg && s.reps) {
-              const e = calculateE1RM(s.weightKg, s.reps);
+            const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+            if (s.completed && effectiveWeight > 0 && s.reps) {
+              const e = calculateE1RM(effectiveWeight, s.reps);
               if (e !== null && e > sessionMaxE1RM) sessionMaxE1RM = e;
             }
           });
