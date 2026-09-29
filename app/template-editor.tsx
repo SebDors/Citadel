@@ -125,6 +125,12 @@ export default function TemplateEditorScreen() {
     setIdx: number;
   } | null>(null);
 
+  // Target set pour modal de RIR cible: { blockId, setIdx }
+  const [activeTargetRirTarget, setActiveTargetRirTarget] = useState<{
+    blockId: string;
+    setIdx: number;
+  } | null>(null);
+
   // Target circuit item pour modal de type de série: { blockId, itemId }
   const [activeCircuitSetTarget, setActiveCircuitSetTarget] = useState<{
     blockId: string;
@@ -921,6 +927,7 @@ export default function TemplateEditorScreen() {
             setNumber: newSetNumber,
             type: "normal" as SetType,
             rir: undefined,
+            targetRir: b.exercise.sets[b.exercise.sets.length - 1]?.targetRir,
             completed: false,
           };
           return {
@@ -973,6 +980,27 @@ export default function TemplateEditorScreen() {
       }),
     );
     setActiveSetTarget(null);
+  };
+
+  const handleUpdateSetTargetRir = (
+    blockId: string,
+    setIdx: number,
+    targetRir: number | undefined,
+  ) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === "single") {
+          const updatedSets = [...b.exercise.sets];
+          updatedSets[setIdx] = { ...updatedSets[setIdx], targetRir };
+          return {
+            ...b,
+            exercise: { ...b.exercise, sets: updatedSets },
+          };
+        }
+        return b;
+      }),
+    );
+    setActiveTargetRirTarget(null);
   };
 
   // Enregistrement du programme
@@ -2023,24 +2051,69 @@ export default function TemplateEditorScreen() {
                         Série {set.setNumber}
                       </Text>
 
-                      {/* Badge / Sélecteur de Type de Série */}
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        style={[
-                          styles.typeBadge,
-                          { backgroundColor: setTypeInfo.color },
-                        ]}
-                        onPress={() =>
-                          setActiveSetTarget({ blockId: block.id, setIdx })
-                        }
-                      >
-                        <Text style={styles.typeBadgeCode}>
-                          {setTypeInfo.code}
-                        </Text>
-                        <Text style={styles.typeBadgeLabel}>
-                          {setTypeInfo.label}
-                        </Text>
-                      </TouchableOpacity>
+                      {/* Actions de Série : Type & RIR Cible */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {/* Badge / Sélecteur de Type de Série */}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          style={[
+                            styles.typeBadge,
+                            { backgroundColor: setTypeInfo.color },
+                          ]}
+                          onPress={() =>
+                            setActiveSetTarget({ blockId: block.id, setIdx })
+                          }
+                        >
+                          <Text style={styles.typeBadgeCode}>
+                            {setTypeInfo.code}
+                          </Text>
+                          <Text style={styles.typeBadgeLabel}>
+                            {setTypeInfo.label}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Sélecteur tactile discret de RIR Cible */}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          style={[
+                            styles.targetRirBadge,
+                            {
+                              borderColor:
+                                set.targetRir !== undefined
+                                  ? theme.accent
+                                  : theme.border,
+                              backgroundColor:
+                                set.targetRir !== undefined
+                                  ? `${theme.accent}18`
+                                  : theme.surface,
+                            },
+                          ]}
+                          onPress={() =>
+                            setActiveTargetRirTarget({
+                              blockId: block.id,
+                              setIdx,
+                            })
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.targetRirBadgeText,
+                              {
+                                color:
+                                  set.targetRir !== undefined
+                                    ? theme.accent
+                                    : theme.textMuted,
+                                fontWeight:
+                                  set.targetRir !== undefined ? "700" : "500",
+                              },
+                            ]}
+                          >
+                            {set.targetRir !== undefined
+                              ? `RIR ${set.targetRir}`
+                              : "RIR: Libre"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
 
                       {/* Supprimer une série */}
                       {ex.sets.length > 1 ? (
@@ -2585,6 +2658,126 @@ export default function TemplateEditorScreen() {
                   </TouchableOpacity>
                 );
               })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- MODAL DE SÉLECTION DU RIR CIBLE --- */}
+      <Modal
+        visible={activeTargetRirTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActiveTargetRirTarget(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActiveTargetRirTarget(null)}
+        >
+          <View
+            style={[
+              styles.modalSheet,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  RIR Cible de la série
+                </Text>
+                <Text style={[styles.modalSubHeader, { color: theme.textMuted }]}>
+                  Répétitions en Réserve planifiées avant l'échec
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setActiveTargetRirTarget(null)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {activeTargetRirTarget && (() => {
+              const block = selectedBlocks.find(
+                (b) => b.id === activeTargetRirTarget.blockId,
+              );
+              const currentSet =
+                block && block.type === "single"
+                  ? block.exercise.sets[activeTargetRirTarget.setIdx]
+                  : undefined;
+              const currentTargetRir = currentSet?.targetRir;
+
+              const rirOptions: Array<{ value: number | undefined; label: string; desc: string }> = [
+                { value: undefined, label: "Libre / Aucun", desc: "Pas de consigne stricte de réserve" },
+                { value: 0, label: "RIR 0 — Échec musculaire", desc: "0 rep en réserve, intensité maximale absolue" },
+                { value: 1, label: "RIR 1 — 1 rep en réserve", desc: "Très haute intensité, 1 rep avant l'échec" },
+                { value: 2, label: "RIR 2 — 2 reps en réserve", desc: "Recommandé pour l'hypertrophie & sécurité" },
+                { value: 3, label: "RIR 3 — 3 reps en réserve", desc: "Intensité modérée, vitesse et technique" },
+                { value: 4, label: "RIR 4 — 4 reps en réserve", desc: "Charge légère ou d'adaptation" },
+                { value: 5, label: "RIR 5 — 5 reps ou plus", desc: "Très facile, série d'activation ou technique" },
+              ];
+
+              return rirOptions.map((opt) => {
+                const isSelected = currentTargetRir === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.label}
+                    style={[
+                      styles.typeOptionRow,
+                      { borderBottomColor: theme.border },
+                      isSelected && { backgroundColor: theme.surface },
+                    ]}
+                    onPress={() =>
+                      handleUpdateSetTargetRir(
+                        activeTargetRirTarget.blockId,
+                        activeTargetRirTarget.setIdx,
+                        opt.value,
+                      )
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.typeBadgeCircle,
+                        {
+                          backgroundColor:
+                            opt.value === undefined
+                              ? theme.surface
+                              : opt.value <= 1
+                              ? "#EF4444"
+                              : opt.value === 2
+                              ? "#618764"
+                              : "#D97706",
+                          borderWidth: opt.value === undefined ? 1 : 0,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.typeBadgeText,
+                          opt.value === undefined && { color: theme.textMuted },
+                        ]}
+                      >
+                        {opt.value !== undefined ? opt.value : "—"}
+                      </Text>
+                    </View>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text
+                        style={[styles.typeOptionLabel, { color: theme.text }]}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.typeOptionDesc,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected && <Check size={18} color={theme.accent} />}
+                  </TouchableOpacity>
+                );
+              });
+            })()}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -3579,6 +3772,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 12,
   },
+  targetRirBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  targetRirBadgeText: {
+    fontSize: 12,
+  },
   deleteSetBtn: {
     padding: 4,
   },
@@ -3690,6 +3894,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 17,
     fontWeight: "800",
+  },
+  modalSubHeader: {
+    fontSize: 12,
+    marginTop: 2,
   },
   typeOptionRow: {
     flexDirection: "row",

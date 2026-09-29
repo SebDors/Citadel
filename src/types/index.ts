@@ -29,6 +29,7 @@ export interface WorkoutSet {
   weightKg?: number; // Optionnel (champ vide si non renseigné)
   reps?: number;     // Optionnel (champ vide si non renseigné)
   rir?: number;      // Reps In Reserve (0 à 5+)
+  targetRir?: number;// Reps In Reserve Cible
   dropSteps?: DropStep[]; // Décharges (Drop Sets)
   durationSeconds?: number;
   previous?: string; // Ex: "100kg x 8" ou "45s"

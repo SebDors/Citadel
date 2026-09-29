@@ -18,7 +18,7 @@ interface SetTableRowProps {
 }
 
 type KeypadTarget =
-  | { type: 'main'; field: NumericFieldType }
+  | { type: 'main'; field: NumericFieldType; ghostValue?: string; ghostLabel?: string }
   | { type: 'drop'; stepId: string; field: 'weightKg' | 'reps'; ghostWeight?: string; ghostReps?: string }
   | null;
 
@@ -41,7 +41,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
   // Ouverture du clavier numérique sur un champ principal ou décharge
   const handleOpenMainKeypad = useCallback((field: NumericFieldType) => {
-    setKeypadTarget({ type: 'main', field });
+    let ghostValue: string | undefined;
+    let ghostLabel: string | undefined;
+    if (field === 'rir') {
+      ghostLabel = 'Cible RIR';
+      ghostValue = set.targetRir !== undefined ? String(set.targetRir) : undefined;
+    }
+    setKeypadTarget({ type: 'main', field, ghostValue, ghostLabel });
     let valStr = '';
     if (field === 'weightKg') {
       valStr = set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '';
@@ -51,7 +57,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       valStr = set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '';
     }
     setTempValue(valStr);
-  }, [set.weightKg, set.reps, set.rir]);
+  }, [set.weightKg, set.reps, set.rir, set.targetRir]);
 
   const handleOpenDropKeypad = useCallback((stepId: string, field: 'weightKg' | 'reps') => {
     const steps = set.dropSteps || [];
@@ -360,10 +366,16 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                       ? theme.accent
                       : (set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted),
                     fontWeight: isRirActive ? '900' : '700',
+                    opacity: (set.rir === undefined || set.rir === null) && set.targetRir !== undefined ? 0.65 : 1,
+                    fontStyle: (set.rir === undefined || set.rir === null) && set.targetRir !== undefined ? 'italic' : 'normal',
                   },
                 ]}
               >
-                {set.rir !== undefined && set.rir !== null ? (set.rir >= 5 ? '5+' : String(set.rir)) : '-'}
+                {set.rir !== undefined && set.rir !== null
+                  ? (set.rir >= 5 ? '5+' : String(set.rir))
+                  : set.targetRir !== undefined
+                  ? `~${set.targetRir}`
+                  : '-'}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -526,7 +538,9 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           previousValue={set.previous}
           ghostValue={
             keypadTarget.type === 'main'
-              ? previousMatch
+              ? keypadTarget.ghostValue !== undefined
+                ? keypadTarget.ghostValue
+                : previousMatch
                 ? keypadTarget.field === 'weightKg'
                   ? previousMatch.weight
                   : keypadTarget.field === 'reps'
@@ -539,7 +553,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 : keypadTarget.ghostReps
               : undefined
           }
-          ghostLabel={keypadTarget.type === 'drop' ? 'Estimé' : 'Précédent'}
+          ghostLabel={
+            keypadTarget.type === 'drop'
+              ? 'Estimé'
+              : keypadTarget.type === 'main' && keypadTarget.ghostLabel
+              ? keypadTarget.ghostLabel
+              : 'Précédent'
+          }
           onNextField={handleKeypadNext}
           onPreviousField={handleKeypadPrevious}
           onValidate={handleKeypadValidate}

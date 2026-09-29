@@ -10,7 +10,22 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   KeyboardAvoidingView,
+  Animated,
 } from "react-native";
+
+function getRirNudge(
+  targetRir: number | undefined,
+  actualRir: number,
+  isLastSet: boolean,
+): string | null {
+  if (targetRir === undefined) return null;
+  const diff = actualRir - targetRir;
+  if (diff >= 2)
+    return `Cible RIR ${targetRir}, tu as loggé RIR ${actualRir} — tu peux pousser plus sur la série suivante.`;
+  if (diff <= -2 && !isLastSet)
+    return `Il reste des séries après celle-ci — garde un peu de marge.`;
+  return null;
+}
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWorkout } from "../src/context/WorkoutContext";
 import { useTheme } from "../src/context/ThemeContext";
@@ -311,6 +326,55 @@ export default function LiveWorkoutScreen() {
     return getSessionBlocks(activeSession);
   }, [activeSession]);
 
+  // État du Toast Nudge RIR
+  const [nudgeMessage, setNudgeMessage] = useState<string | null>(null);
+  const nudgeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const nudgeAnim = useRef(new Animated.Value(0)).current;
+
+  const hideNudgeToast = useCallback(() => {
+    if (nudgeTimerRef.current) {
+      clearTimeout(nudgeTimerRef.current);
+      nudgeTimerRef.current = null;
+    }
+    Animated.timing(nudgeAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setNudgeMessage(null);
+    });
+  }, [nudgeAnim]);
+
+  const showNudgeToast = useCallback(
+    (msg: string) => {
+      if (nudgeTimerRef.current) {
+        clearTimeout(nudgeTimerRef.current);
+        nudgeTimerRef.current = null;
+      }
+      setNudgeMessage(msg);
+      nudgeAnim.setValue(0);
+      Animated.spring(nudgeAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 50,
+      }).start();
+
+      nudgeTimerRef.current = setTimeout(() => {
+        hideNudgeToast();
+      }, 4000);
+    },
+    [nudgeAnim, hideNudgeToast],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (nudgeTimerRef.current) {
+        clearTimeout(nudgeTimerRef.current);
+      }
+    };
+  }, []);
+
   // Calcul de la prochaine série cible pour surbrillance intelligente du contour
   const nextTargetSet = useMemo(() => {
     if (restTimer.active && restTimer.nextSetInfo) {
@@ -337,10 +401,17 @@ export default function LiveWorkoutScreen() {
     (exerciseId: string, setId: string) => {
       // 1. Trouver le statut actuel du set
       let isCurrentlyCompleted = false;
+      let currentSet: (typeof blocks)[0] extends { exercise: { sets: Array<infer S> } } ? S : any = undefined;
+      let isLastSet = false;
+
       for (const b of blocks) {
         if (b.type === 'single' && b.exercise.id === exerciseId) {
-          const s = b.exercise.sets.find((set) => set.id === setId);
-          if (s) isCurrentlyCompleted = s.completed;
+          const sIdx = b.exercise.sets.findIndex((set) => set.id === setId);
+          if (sIdx >= 0) {
+            currentSet = b.exercise.sets[sIdx];
+            isCurrentlyCompleted = currentSet.completed;
+            isLastSet = sIdx === b.exercise.sets.length - 1;
+          }
           break;
         }
       }
@@ -350,6 +421,14 @@ export default function LiveWorkoutScreen() {
 
       // 3. Si le set devient complété, auto-scroll vers le prochain set avec seuil de tolérance
       if (!isCurrentlyCompleted) {
+        // Feature 4 : Nudge RIR toast si écart avec la cible
+        if (currentSet && currentSet.rir !== undefined) {
+          const nudge = getRirNudge(currentSet.targetRir, currentSet.rir, isLastSet);
+          if (nudge) {
+            showNudgeToast(nudge);
+          }
+        }
+
         setTimeout(() => {
           let nextBlockId: string | null = null;
 
@@ -439,7 +518,7 @@ export default function LiveWorkoutScreen() {
         }, 150);
       }
     },
-    [blocks, toggleSetComplete]
+    [blocks, toggleSetComplete, showNudgeToast]
   );
 
   // Helper to get state of a specific CircuitBlock
@@ -921,6 +1000,58 @@ export default function LiveWorkoutScreen() {
         },
       ]}
     >
+      {/* Toast Flottant Nudge RIR (Feature 4) */}
+      {nudgeMessage && (
+        <Animated.View
+          style={[
+            styles.nudgeToast,
+            {
+              backgroundColor: theme.cardBg,
+              borderColor: theme.accent,
+              opacity: nudgeAnim,
+              transform: [
+                {
+                  translateY: nudgeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.nudgeToastContent}
+            onPress={hideNudgeToast}
+          >
+            <View
+              style={[
+                styles.nudgeToastIcon,
+                { backgroundColor: `${theme.accent}20` },
+              ]}
+            >
+              <Sparkles size={16} color={theme.accent} />
+            </View>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={[styles.nudgeToastTitle, { color: theme.accent }]}>
+                Conseil RIR
+              </Text>
+              <Text style={[styles.nudgeToastText, { color: theme.text }]}>
+                {nudgeMessage}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={hideNudgeToast}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.nudgeToastClose}
+            >
+              <X size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* Top Bar Navigation */}
       <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
         <TouchableOpacity
@@ -2731,5 +2862,48 @@ const styles = StyleSheet.create({
   abandonConfirmBtnText: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  nudgeToast: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 54 : 50,
+    left: 16,
+    right: 16,
+    zIndex: 99999,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  nudgeToastContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  nudgeToastIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  nudgeToastTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  nudgeToastText: {
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 17,
+  },
+  nudgeToastClose: {
+    padding: 4,
   },
 });
