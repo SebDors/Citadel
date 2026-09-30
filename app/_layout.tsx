@@ -6,7 +6,11 @@ import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
 
 function RootLayoutNav() {
-  const { theme } = useTheme();
+  const { theme, isReady } = useTheme();
+
+  if (!isReady) {
+    return <View style={{ flex: 1, backgroundColor: '#273338' }} />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>

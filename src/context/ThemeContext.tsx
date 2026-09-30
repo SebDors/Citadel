@@ -19,6 +19,7 @@ interface ThemeContextType {
   setMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
   isDark: boolean;
+  isReady: boolean;
 }
 
 const THEME_MODE_STORAGE_KEY = '@citadel_theme_mode';
@@ -36,11 +37,13 @@ const ThemeContext = createContext<ThemeContextType>({
   setMode: () => {},
   toggleTheme: () => {},
   isDark: true,
+  isReady: false,
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setModeState] = useState<ThemeMode>('dark');
   const [themeId, setThemeIdState] = useState<ThemeId>(DEFAULT_THEME_ID);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     // Charger le mode et le thème sauvegardés
@@ -61,7 +64,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setThemeIdState('citadel');
         }
       })
-      .catch((e) => console.warn('[ThemeContext] Error loading theme preferences:', e));
+      .catch((e) => console.warn('[ThemeContext] Error loading theme preferences:', e))
+      .finally(() => {
+        setIsReady(true);
+      });
   }, []);
 
   const setMode = (newMode: ThemeMode) => {
@@ -100,6 +106,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setMode,
         toggleTheme,
         isDark: mode === 'dark',
+        isReady,
       }}
     >
       {children}
