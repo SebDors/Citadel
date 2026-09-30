@@ -49,6 +49,7 @@ import {
   CircuitExerciseItem,
   SET_TYPES_CONFIG,
   SetType,
+  WorkoutSet,
 } from "../src/types";
 import {
   Plus,
@@ -411,6 +412,48 @@ export default function LiveWorkoutScreen() {
     return null;
   }, [restTimer.active, restTimer.nextSetInfo, blocks]);
 
+  const handleUpdateSet = useCallback(
+    (exerciseId: string, setId: string, field: keyof WorkoutSet, val: any) => {
+      updateSet(exerciseId, setId, field, val);
+
+      if (
+        field === 'rir' &&
+        val !== undefined &&
+        val !== null &&
+        data?.profile?.enableRir !== false
+      ) {
+        let currentSet:
+          | ((typeof blocks)[0] extends { exercise: { sets: Array<infer S> } }
+              ? S
+              : any)
+          | undefined = undefined;
+        let isLastSet = false;
+
+        for (const b of blocks) {
+          if (b.type === 'single' && b.exercise.id === exerciseId) {
+            const sIdx = b.exercise.sets.findIndex((set) => set.id === setId);
+            if (sIdx >= 0) {
+              currentSet = b.exercise.sets[sIdx];
+              isLastSet = sIdx === b.exercise.sets.length - 1;
+            }
+            break;
+          }
+        }
+
+        if (currentSet) {
+          const numVal = typeof val === 'number' ? val : parseInt(val, 10);
+          if (!isNaN(numVal)) {
+            const nudge = getRirNudge(currentSet.targetRir, numVal, isLastSet);
+            if (nudge) {
+              showNudgeToast(nudge);
+            }
+          }
+        }
+      }
+    },
+    [updateSet, blocks, data?.profile?.enableRir, showNudgeToast],
+  );
+
   const handleToggleSetComplete = useCallback(
     (exerciseId: string, setId: string) => {
       // 1. Trouver le statut actuel du set
@@ -532,7 +575,7 @@ export default function LiveWorkoutScreen() {
         }, 150);
       }
     },
-    [blocks, toggleSetComplete, showNudgeToast]
+    [blocks, toggleSetComplete, showNudgeToast, data?.profile?.enableRir]
   );
 
   // Helper to get state of a specific CircuitBlock
@@ -1239,7 +1282,7 @@ export default function LiveWorkoutScreen() {
                   supersetOrder={supersetOrder}
                   nextTargetSet={nextTargetSet}
                   onUpdateSet={(setId, field, val) =>
-                    updateSet(ex.id, setId, field, val)
+                    handleUpdateSet(ex.id, setId, field, val)
                   }
                   onToggleSetComplete={(setId) => handleToggleSetComplete(ex.id, setId)}
                   onAddSet={() => addSet(ex.id)}
