@@ -3,14 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
-import { Layers, Info, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { TermInfoTooltip } from '../UI/TermInfoTooltip';
+import { Layers, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { calculateWeeklyMuscleVolume } from '../../services/analyticsService';
 import { StorageService } from '../../services/storage';
 
 export const WeeklyMuscleVolumeCard: React.FC = () => {
   const { theme } = useTheme();
   const { data } = useWorkout();
-  const [showInfo, setShowInfo] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
@@ -94,14 +94,13 @@ export const WeeklyMuscleVolumeCard: React.FC = () => {
         </TouchableOpacity>
 
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowInfo(!showInfo)}
-            style={[styles.iconBtn, { backgroundColor: theme.surface, marginRight: 6 }]}
-            accessibilityLabel="Explication des repères MEV / MAV"
-          >
-            <Info size={14} color={theme.textMuted} />
-          </TouchableOpacity>
+          <View style={[styles.iconBtn, { backgroundColor: theme.surface, marginRight: 6 }]}>
+            <TermInfoTooltip
+              customTitle="Repères de Volume (MEV / MAV)"
+              customExplanation="MEV (Volume Minimum Efficace) : Nombre minimum de séries dures par semaine pour stimuler la croissance musculaire.\nMAV (Volume d'Adaptation Maximale) : Fourchette idéale de progression musculaire optimale."
+              size={15}
+            />
+          </View>
 
           <TouchableOpacity
             activeOpacity={0.7}
@@ -167,16 +166,6 @@ export const WeeklyMuscleVolumeCard: React.FC = () => {
         </View>
       ) : (
         <>
-          {/* Explication scientifique repliable */}
-          {showInfo && (
-            <View style={[styles.infoBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.infoText, { color: theme.textMuted }]}>
-                <Text style={{ fontWeight: '800', color: theme.text }}>MEV</Text> = Volume Minimum Efficace pour stimuler l'hypertrophie.{"\n"}
-                <Text style={{ fontWeight: '800', color: theme.text }}>MAV</Text> = Volume d'Adaptation Maximale (fourchette idéale de croissance).
-              </Text>
-            </View>
-          )}
-
           {/* Barres de progression par groupe musculaire */}
           {muscleData.length === 0 ? (
             <View style={styles.emptyWeekBox}>
@@ -328,16 +317,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     fontStyle: 'italic',
-  },
-  infoBox: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 12,
-    lineHeight: 16,
   },
   emptyWeekBox: {
     paddingVertical: 18,

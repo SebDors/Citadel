@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
+import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import {
   Activity,
-  Info,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -37,7 +37,6 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
   const { data } = useWorkout();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
   useEffect(() => {
@@ -127,14 +126,13 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
         </TouchableOpacity>
 
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowInfo(!showInfo)}
-            style={[styles.iconBtn, { backgroundColor: theme.surface, marginRight: 6 }]}
-            accessibilityLabel="Informations sur les marqueurs de fatigue"
-          >
-            <Info size={14} color={showInfo ? theme.accent : theme.textMuted} />
-          </TouchableOpacity>
+          <View style={[styles.iconBtn, { backgroundColor: theme.surface, marginRight: 6 }]}>
+            <TermInfoTooltip
+              customTitle="Marqueurs de Fatigue & Récupération"
+              customExplanation="• RIR Moyen : Si votre RIR grimpe anormalement (> moyenne 4 sem. + 1), votre système nerveux peine à recruter les unités motrices.\n• Poids de corps : Un déficit ou une perte de poids amplifie le risque de sous-récupération.\n• 4 Semaines : Moyenne glissante servant de baseline d'intensité."
+              size={15}
+            />
+          </View>
 
           <TouchableOpacity
             activeOpacity={0.7}
@@ -212,21 +210,6 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
         </View>
       ) : (
         <>
-          {/* Explication pédagogique repliable */}
-          {showInfo && (
-            <View style={[styles.infoBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.infoText, { color: theme.textMuted }]}>
-                <Text style={{ fontWeight: '800', color: theme.text }}>Détection de sous-récupération :</Text>
-                {'\n'}
-                • <Text style={{ fontWeight: '700', color: theme.text }}>RIR Moyen :</Text> Répétitions en réserve moyennes. Si votre RIR grimpe anormalement (&gt; moyenne 4 sem. + 1), votre système nerveux peine à recruter les unités motrices rapides.
-                {'\n'}
-                • <Text style={{ fontWeight: '700', color: theme.text }}>Poids corporel :</Text> Un déficit calorique ou une perte de poids amplifie le risque de surentraînement.
-                {'\n'}
-                • <Text style={{ fontWeight: '700', color: theme.text }}>Moyenne 4 semaines :</Text> Baseline glissante d'intensité pour filtrer les fluctuations ponctuelles.
-              </Text>
-            </View>
-          )}
-
           {/* Diagnostic de statut */}
           <View
             style={[
@@ -450,16 +433,6 @@ const styles = StyleSheet.create({
   },
   collapsedText: {
     fontSize: 12,
-  },
-  infoBox: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 11.5,
-    lineHeight: 17,
   },
   statusBanner: {
     borderWidth: 1,
