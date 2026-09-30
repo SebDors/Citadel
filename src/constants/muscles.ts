@@ -181,8 +181,14 @@ const EXACT_MAPPINGS: Record<string, { muscle: MuscleGroup; subRegion?: string }
   'abdominaux': { muscle: 'Abdominaux' },
   'abdos': { muscle: 'Abdominaux' },
   'grand droit': { muscle: 'Abdominaux' },
+  'grand droit de l abdomen': { muscle: 'Abdominaux' },
+  'grand droit de l\'abdomen': { muscle: 'Abdominaux' },
   'grand droit (partie haute)': { muscle: 'Abdominaux', subRegion: 'Partie haute' },
   'grand droit (partie basse)': { muscle: 'Abdominaux', subRegion: 'Partie basse' },
+  'bas des abdos': { muscle: 'Abdominaux', subRegion: 'Partie basse' },
+  'haut des abdos': { muscle: 'Abdominaux', subRegion: 'Partie haute' },
+  'biceps chef long': { muscle: 'Biceps', subRegion: 'Chef long' },
+  'biceps brachial': { muscle: 'Biceps' },
   'transverse': { muscle: 'Abdominaux', subRegion: 'Transverse' },
   'transverse / gainage': { muscle: 'Abdominaux', subRegion: 'Gainage' },
   'gainage': { muscle: 'Abdominaux', subRegion: 'Gainage' },
@@ -191,6 +197,7 @@ const EXACT_MAPPINGS: Record<string, { muscle: MuscleGroup; subRegion?: string }
   'flechisseurs': { muscle: 'Abdominaux', subRegion: 'Fléchisseurs de hanche' },
   'sangle abdominale': { muscle: 'Abdominaux' },
   'obliques': { muscle: 'Obliques' },
+  'obliques internes et externes': { muscle: 'Obliques' },
   'oblique': { muscle: 'Obliques' },
 };
 
@@ -242,7 +249,7 @@ export function normalizeMuscle(raw: string): { muscle: MuscleGroup; subRegion?:
   // 4. Fallback heuristique par mots-clés
   let resolved: { muscle: MuscleGroup; subRegion?: string } | null = null;
 
-  if (cleaned.includes('gainag') || cleaned.includes('transvers') || cleaned.includes('flechisseur')) {
+  if (cleaned.includes('gainag') || cleaned.includes('transvers') || cleaned.includes('flechisseur') || cleaned.includes('abdo') || cleaned.includes('droit') || cleaned.includes('ventre') || cleaned.includes('core')) {
     resolved = { muscle: 'Abdominaux' };
   } else if (cleaned.includes('ischio') || cleaned.includes('hamstring')) {
     resolved = { muscle: 'Ischio-Jambiers' };
@@ -250,7 +257,7 @@ export function normalizeMuscle(raw: string): { muscle: MuscleGroup; subRegion?:
     resolved = { muscle: 'Quadriceps' };
   } else if (cleaned.includes('pec')) {
     resolved = { muscle: 'Pectoraux' };
-  } else if (cleaned.includes('dorsal') || cleaned.includes('latissimus') || cleaned.includes('dos')) {
+  } else if (cleaned.includes('dorsal') || cleaned.includes('latissimus') || /(?:^|\s)dos(?:\s|$)/.test(cleaned)) {
     resolved = { muscle: 'Grand Dorsal' };
   } else if (cleaned.includes('trapez')) {
     resolved = { muscle: 'Trapèzes' };
