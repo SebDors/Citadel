@@ -172,7 +172,10 @@ const EXACT_MAPPINGS: Record<string, { muscle: MuscleGroup; subRegion?: string }
   'mollets (soleaires)': { muscle: 'Mollets (Soléaire)' },
   'soleaire': { muscle: 'Mollets (Soléaire)' },
   'tibial anterieur': { muscle: 'Mollets (Soléaire)', subRegion: 'Tibial antérieur' },
-  'flechisseurs de la hanche': { muscle: 'Quadriceps', subRegion: 'Fléchisseurs de la hanche' },
+  'cuisses': { muscle: 'Quadriceps', subRegion: 'Cuisses' },
+  'cuisse': { muscle: 'Quadriceps', subRegion: 'Cuisses' },
+  'jambes': { muscle: 'Quadriceps' },
+  'jambe': { muscle: 'Quadriceps' },
 
   // Tronco / Abdos
   'abdominaux': { muscle: 'Abdominaux' },
@@ -181,6 +184,11 @@ const EXACT_MAPPINGS: Record<string, { muscle: MuscleGroup; subRegion?: string }
   'grand droit (partie haute)': { muscle: 'Abdominaux', subRegion: 'Partie haute' },
   'grand droit (partie basse)': { muscle: 'Abdominaux', subRegion: 'Partie basse' },
   'transverse': { muscle: 'Abdominaux', subRegion: 'Transverse' },
+  'transverse / gainage': { muscle: 'Abdominaux', subRegion: 'Gainage' },
+  'gainage': { muscle: 'Abdominaux', subRegion: 'Gainage' },
+  'flechisseurs de hanche': { muscle: 'Abdominaux', subRegion: 'Fléchisseurs de hanche' },
+  'flechisseurs de la hanche': { muscle: 'Abdominaux', subRegion: 'Fléchisseurs de hanche' },
+  'flechisseurs': { muscle: 'Abdominaux', subRegion: 'Fléchisseurs de hanche' },
   'sangle abdominale': { muscle: 'Abdominaux' },
   'obliques': { muscle: 'Obliques' },
   'oblique': { muscle: 'Obliques' },
@@ -234,7 +242,13 @@ export function normalizeMuscle(raw: string): { muscle: MuscleGroup; subRegion?:
   // 4. Fallback heuristique par mots-clés
   let resolved: { muscle: MuscleGroup; subRegion?: string } | null = null;
 
-  if (cleaned.includes('pec')) {
+  if (cleaned.includes('gainag') || cleaned.includes('transvers') || cleaned.includes('flechisseur')) {
+    resolved = { muscle: 'Abdominaux' };
+  } else if (cleaned.includes('ischio') || cleaned.includes('hamstring')) {
+    resolved = { muscle: 'Ischio-Jambiers' };
+  } else if (cleaned.includes('cuisse') || cleaned.includes('jambe')) {
+    resolved = { muscle: 'Quadriceps' };
+  } else if (cleaned.includes('pec')) {
     resolved = { muscle: 'Pectoraux' };
   } else if (cleaned.includes('dorsal') || cleaned.includes('latissimus') || cleaned.includes('dos')) {
     resolved = { muscle: 'Grand Dorsal' };
@@ -262,8 +276,6 @@ export function normalizeMuscle(raw: string): { muscle: MuscleGroup; subRegion?:
     resolved = { muscle: 'Avant-bras' };
   } else if (cleaned.includes('quadri') || cleaned.includes('femoral')) {
     resolved = { muscle: 'Quadriceps' };
-  } else if (cleaned.includes('ischio') || cleaned.includes('hamstring')) {
-    resolved = { muscle: 'Ischio-Jambiers' };
   } else if (cleaned.includes('fessier') || cleaned.includes('glute')) {
     resolved = { muscle: 'Grand Fessier' };
   } else if (cleaned.includes('adduct')) {
@@ -284,8 +296,10 @@ export function normalizeMuscle(raw: string): { muscle: MuscleGroup; subRegion?:
     return resolved;
   }
 
-  // 5. Fallback ultime best-effort avec avertissement console pour révision manuelle
-  console.warn(`[normalizeMuscle] Valeur musculaire non reconnue pour révision manuelle : "${raw}" -> fallback sur Pectoraux`);
+  // 5. Fallback ultime neutre sans avertissement console
+  if (cleaned.includes('dos') || cleaned.includes('back')) {
+    return { muscle: 'Grand Dorsal' };
+  }
   return { muscle: 'Pectoraux' };
 }
 
