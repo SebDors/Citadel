@@ -12,6 +12,7 @@ interface SetTableRowProps {
   set: WorkoutSet;
   exerciseId: string;
   isNextSet?: boolean;
+  enableRir?: boolean;
   onUpdate: (field: keyof WorkoutSet, value: any) => void;
   onToggleComplete: () => void;
   onDelete: () => void;
@@ -26,12 +27,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   set,
   exerciseId,
   isNextSet,
+  enableRir: enableRirProp,
   onUpdate,
   onToggleComplete,
   onDelete,
 }) => {
   const { theme } = useTheme();
   const { data } = useWorkout();
+  const isRirEnabled = enableRirProp !== undefined ? enableRirProp : (data?.profile?.enableRir !== false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<KeypadTarget>(null);
   const [tempValue, setTempValue] = useState<string>('');
@@ -138,7 +141,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       if (keypadTarget.field === 'weightKg') {
         handleOpenMainKeypad('reps');
       } else if (keypadTarget.field === 'reps') {
-        if (set.type === 'normal') {
+        if (isRirEnabled && set.type === 'normal') {
           handleOpenMainKeypad('rir');
         } else {
           if (!set.completed) onToggleComplete();
@@ -157,7 +160,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setTimeout(() => {
       commitValue(targetToCommit, valToCommit);
     }, 0);
-  }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad, set.type, set.completed, onToggleComplete]);
+  }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad, set.type, isRirEnabled, set.completed, onToggleComplete]);
 
   // Retour au champ précédent (RIR ➔ REPS ➔ KG)
   const handleKeypadPrevious = useCallback((currentVal?: string) => {
@@ -369,43 +372,45 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Saisie RIR : Affichée UNIQUEMENT si la série est de type "normal" */}
-        <View style={styles.colInput}>
-          {set.type === 'normal' ? (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => handleOpenMainKeypad('rir')}
-              style={[
-                styles.cellBtn,
-                {
-                  borderColor: isRirActive ? theme.accent : theme.border,
-                  borderWidth: isRirActive ? 2 : 1,
-                  backgroundColor: isRirActive ? `${theme.accent}35` : theme.surface,
-                },
-              ]}
-            >
-              <Text
+        {/* Saisie RIR : Affichée UNIQUEMENT si isRirEnabled et si la série est de type "normal" */}
+        {isRirEnabled && (
+          <View style={styles.colInput}>
+            {set.type === 'normal' ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleOpenMainKeypad('rir')}
                 style={[
-                  styles.cellText,
+                  styles.cellBtn,
                   {
-                    color: isRirActive
-                      ? theme.accent
-                      : (set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted),
-                    fontWeight: isRirActive ? '900' : '700',
-                    opacity: (set.rir === undefined || set.rir === null) && set.targetRir !== undefined ? 0.65 : 1,
-                    fontStyle: (set.rir === undefined || set.rir === null) && set.targetRir !== undefined ? 'italic' : 'normal',
+                    borderColor: isRirActive ? theme.accent : theme.border,
+                    borderWidth: isRirActive ? 2 : 1,
+                    backgroundColor: isRirActive ? `${theme.accent}35` : theme.surface,
                   },
                 ]}
               >
-                {set.rir !== undefined && set.rir !== null
-                  ? (set.rir >= 5 ? '5+' : String(set.rir))
-                  : set.targetRir !== undefined
-                  ? `~${set.targetRir}`
-                  : '-'}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
+                <Text
+                  style={[
+                    styles.cellText,
+                    {
+                      color: isRirActive
+                        ? theme.accent
+                        : (set.rir !== undefined && set.rir !== null ? theme.text : theme.textMuted),
+                      fontWeight: isRirActive ? '900' : '700',
+                      opacity: (set.rir === undefined || set.rir === null) && set.targetRir !== undefined ? 0.65 : 1,
+                      fontStyle: (set.rir === undefined || set.rir === null) && set.targetRir !== undefined ? 'italic' : 'normal',
+                    },
+                  ]}
+                >
+                  {set.rir !== undefined && set.rir !== null
+                    ? (set.rir >= 5 ? '5+' : String(set.rir))
+                    : set.targetRir !== undefined
+                    ? `~${set.targetRir}`
+                    : '-'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
 
         {/* Checkbox de complétion */}
         <TouchableOpacity

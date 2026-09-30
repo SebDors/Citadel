@@ -436,7 +436,7 @@ export default function LiveWorkoutScreen() {
       // 3. Si le set devient complété, auto-scroll vers le prochain set avec seuil de tolérance
       if (!isCurrentlyCompleted) {
         // Feature 4 : Nudge RIR toast si écart avec la cible
-        if (currentSet && currentSet.rir !== undefined) {
+        if (data?.profile?.enableRir !== false && currentSet && currentSet.rir !== undefined) {
           const nudge = getRirNudge(currentSet.targetRir, currentSet.rir, isLastSet);
           if (nudge) {
             showNudgeToast(nudge);

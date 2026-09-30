@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserProfile } from '../../types';
@@ -26,7 +27,9 @@ import {
   ChevronRight,
   ShieldAlert,
   Info,
+  Activity,
 } from 'lucide-react-native';
+import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import { ExportDataModal } from './ExportDataModal';
 import { UpdateModal } from './UpdateModal';
 import { UpdateService, UpdateInfo } from '../../services/updateService';
@@ -58,6 +61,9 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   const [dropReductionPercent, setDropReductionPercent] = useState<number>(
     profile.dropSetReductionPercent ?? 20,
   );
+  const [enableRir, setEnableRir] = useState<boolean>(
+    profile.enableRir !== false,
+  );
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
@@ -67,6 +73,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   useEffect(() => {
     setAvailablePlates(profile.availablePlates || DEFAULT_PLATES);
     setDropReductionPercent(profile.dropSetReductionPercent ?? 20);
+    setEnableRir(profile.enableRir !== false);
   }, [profile]);
 
   useEffect(() => {
@@ -95,6 +102,11 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   const handleSelectDropPercent = (pct: number) => {
     setDropReductionPercent(pct);
     onUpdateProfile({ dropSetReductionPercent: pct });
+  };
+
+  const handleToggleRir = (newVal: boolean) => {
+    setEnableRir(newVal);
+    onUpdateProfile({ enableRir: newVal });
   };
 
   const handleCheckForUpdate = async (isManual: boolean) => {
@@ -329,6 +341,36 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            <View style={[styles.cardDivider, { backgroundColor: theme.border }]} />
+
+            {/* Suivi du RIR (Répétitions en réserve) */}
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabelContainer}>
+                <View style={styles.itemTitleWithIcon}>
+                  <Activity size={18} color={theme.accent} style={{ marginRight: 8 }} />
+                  <Text style={[styles.itemTitle, { color: theme.text }]}>
+                    Suivi du RIR (Répétitions en réserve)
+                  </Text>
+                  <View style={{ marginLeft: 6 }}>
+                    <TermInfoTooltip
+                      customTitle="Suivi du RIR"
+                      customExplanation="Le RIR (Reps In Reserve) indique combien de répétitions supplémentaires vous auriez pu effectuer avant l'échec musculaire. Si vous le désactivez, la colonne RIR, les alertes d'auto-régulation et les cibles RIR sont masquées pour simplifier votre interface."
+                      size={15}
+                    />
+                  </View>
+                </View>
+                <Text style={[styles.itemDescription, { color: theme.textMuted, marginTop: 4, marginBottom: 0 }]}>
+                  Définit si les colonnes et cibles RIR sont affichées dans vos séances et programmes.
+                </Text>
+              </View>
+              <Switch
+                value={enableRir}
+                onValueChange={handleToggleRir}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor="#FFFFFF"
+              />
             </View>
           </View>
 
@@ -693,5 +735,15 @@ const styles = StyleSheet.create({
   checkUpdateBtnText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 16,
   },
 });

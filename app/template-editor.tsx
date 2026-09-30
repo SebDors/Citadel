@@ -78,6 +78,7 @@ export default function TemplateEditorScreen() {
   const { theme, isDark } = useTheme();
   const { data, saveTemplate, markFirstSessionCreated, allExercises } =
     useWorkout();
+  const enableRir = data?.profile?.enableRir !== false;
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -2073,46 +2074,48 @@ export default function TemplateEditorScreen() {
                         </TouchableOpacity>
 
                         {/* Sélecteur tactile discret de RIR Cible */}
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          style={[
-                            styles.targetRirBadge,
-                            {
-                              borderColor:
-                                set.targetRir !== undefined
-                                  ? theme.accent
-                                  : theme.border,
-                              backgroundColor:
-                                set.targetRir !== undefined
-                                  ? `${theme.accent}18`
-                                  : theme.surface,
-                            },
-                          ]}
-                          onPress={() =>
-                            setActiveTargetRirTarget({
-                              blockId: block.id,
-                              setIdx,
-                            })
-                          }
-                        >
-                          <Text
+                        {enableRir && (
+                          <TouchableOpacity
+                            activeOpacity={0.7}
                             style={[
-                              styles.targetRirBadgeText,
+                              styles.targetRirBadge,
                               {
-                                color:
+                                borderColor:
                                   set.targetRir !== undefined
                                     ? theme.accent
-                                    : theme.textMuted,
-                                fontWeight:
-                                  set.targetRir !== undefined ? "700" : "500",
+                                    : theme.border,
+                                backgroundColor:
+                                  set.targetRir !== undefined
+                                    ? `${theme.accent}18`
+                                    : theme.surface,
                               },
                             ]}
+                            onPress={() =>
+                              setActiveTargetRirTarget({
+                                blockId: block.id,
+                                setIdx,
+                              })
+                            }
                           >
-                            {set.targetRir !== undefined
-                              ? `RIR ${set.targetRir}`
-                              : "RIR: Libre"}
-                          </Text>
-                        </TouchableOpacity>
+                            <Text
+                              style={[
+                                styles.targetRirBadgeText,
+                                {
+                                  color:
+                                    set.targetRir !== undefined
+                                      ? theme.accent
+                                      : theme.textMuted,
+                                  fontWeight:
+                                    set.targetRir !== undefined ? "700" : "500",
+                                },
+                              ]}
+                            >
+                              {set.targetRir !== undefined
+                                ? `RIR ${set.targetRir}`
+                                : "RIR: Libre"}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
 
                       {/* Supprimer une série */}

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
 import { WorkoutExercise, WorkoutSet } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
@@ -12,6 +13,7 @@ import { WorkoutNoteModal } from './WorkoutNoteModal';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
+  enableRir?: boolean;
   onUpdateSet: (setId: string, field: keyof WorkoutSet, value: any) => void;
   onToggleSetComplete: (setId: string) => void;
   onAddSet: () => void;
@@ -28,6 +30,7 @@ interface ExerciseCardProps {
 
 const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   exercise,
+  enableRir: enableRirProp,
   onUpdateSet,
   onToggleSetComplete,
   onAddSet,
@@ -42,6 +45,8 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   nextTargetSet,
 }) => {
   const { theme } = useTheme();
+  const { data } = useWorkout();
+  const isRirEnabled = enableRirProp !== undefined ? enableRirProp : (data?.profile?.enableRir !== false);
   const [showMenu, setShowMenu] = useState(false);
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
@@ -201,9 +206,11 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
         <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
           <Text style={[styles.thText, { color: theme.textMuted }]}>REPS</Text>
         </View>
-        <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
-          <Text style={[styles.thText, { color: theme.textMuted }]}>RIR</Text>
-        </View>
+        {isRirEnabled && (
+          <View style={{ flex: 1, marginHorizontal: 2, alignItems: 'center' }}>
+            <Text style={[styles.thText, { color: theme.textMuted }]}>RIR</Text>
+          </View>
+        )}
         <View style={{ width: 38, marginLeft: 4, alignItems: 'center' }}>
           <Text numberOfLines={1} style={[styles.thText, { color: theme.textMuted, fontSize: 10 }]}>
             Check
@@ -227,6 +234,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
             set={set}
             exerciseId={exercise.id}
             isNextSet={isNext}
+            enableRir={isRirEnabled}
             onUpdate={(field: keyof WorkoutSet, val: any) => onUpdateSet(set.id, field, val)}
             onToggleComplete={() => onToggleSetComplete(set.id)}
             onDelete={() => onRemoveSet(set.id)}
