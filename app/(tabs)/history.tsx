@@ -14,8 +14,6 @@ import { useTheme } from "../../src/context/ThemeContext";
 import { CalendarView } from "../../src/components/History/CalendarView";
 import { ActivitySummaryCard } from "../../src/components/History/ActivitySummaryCard";
 import { CardioSessionCard } from "../../src/components/History/CardioSessionCard";
-import { WeeklyMuscleVolumeCard } from "../../src/components/Analytics/WeeklyMuscleVolumeCard";
-import { FatigueMarkersCard } from "../../src/components/Analytics/FatigueMarkersCard";
 import { Calendar, Plus, ChevronDown, ChevronUp, Flame } from "lucide-react-native";
 import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import { LogPastWorkoutModal } from "../../src/components/History/LogPastWorkoutModal";
@@ -124,7 +122,7 @@ export default function HistoryTab() {
               </View>
             </View>
             <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-              Calendrier d'assiduité, séances musculation et cardio
+              Calendrier d'assiduité, séances et activités
             </Text>
           </View>
 
@@ -134,15 +132,7 @@ export default function HistoryTab() {
           {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
           <ActivitySummaryCard history={historyList} cardioSessions={cardioList} />
 
-          {/* 3. Répartition Scientifique du Volume Musculaire (MEV / MAV) */}
-          <WeeklyMuscleVolumeCard />
-
-          {/* 4. Marqueurs de fatigue simples et récupération (Feature 5) */}
-          {data?.profile?.enableFatigueMarkers !== false && (
-            <FatigueMarkersCard />
-          )}
-
-          {/* 4. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
+          {/* 3. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
           <TouchableOpacity
             activeOpacity={0.7}
             style={styles.listSectionHeader}

@@ -345,8 +345,7 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
-    marginVertical: 8,
+    marginBottom: 14,
     padding: 14,
   },
   headerRow: {

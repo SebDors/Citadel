@@ -2,7 +2,7 @@ import React from "react";
 import { Platform } from "react-native";
 import { Tabs } from "expo-router";
 import { useTheme } from "../../src/context/ThemeContext";
-import { Dumbbell, Calendar, User } from "lucide-react-native";
+import { Dumbbell, Calendar, TrendingUp, User } from "lucide-react-native";
 
 export default function TabLayout() {
   const { theme, isDark } = useTheme();
@@ -42,6 +42,15 @@ export default function TabLayout() {
           title: "Historique",
           tabBarIcon: ({ color, size }) => (
             <Calendar size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: "Analyse",
+          tabBarIcon: ({ color, size }) => (
+            <TrendingUp size={size} color={color} />
           ),
         }}
       />

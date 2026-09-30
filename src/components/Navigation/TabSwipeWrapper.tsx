@@ -6,7 +6,7 @@ import { useWorkout } from '../../context/WorkoutContext';
 
 interface TabSwipeWrapperProps {
   children: React.ReactNode;
-  tabIndex: number; // 0: Entraînement, 1: Historique, 2: Profil
+  tabIndex: number; // 0: Entraînement, 1: Historique, 2: Analyse, 3: Profil
   disabled?: boolean;
 }
 
@@ -54,9 +54,11 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
     ]).start(() => {
       if (direction === 'left') {
         if (tabIndex === 0) router.navigate('/(tabs)/history');
-        else if (tabIndex === 1) router.navigate('/(tabs)/profile');
+        else if (tabIndex === 1) router.navigate('/(tabs)/analytics');
+        else if (tabIndex === 2) router.navigate('/(tabs)/profile');
       } else {
-        if (tabIndex === 2) router.navigate('/(tabs)/history');
+        if (tabIndex === 3) router.navigate('/(tabs)/analytics');
+        else if (tabIndex === 2) router.navigate('/(tabs)/history');
         else if (tabIndex === 1) router.navigate('/(tabs)');
       }
     });
@@ -73,7 +75,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
         const isSignificant = Math.abs(gestureState.dx) > 15;
 
         if (tabIndex === 0 && gestureState.dx > 0) return false;
-        if (tabIndex === 2 && gestureState.dx < 0) return false;
+        if (tabIndex === 3 && gestureState.dx < 0) return false;
 
         return isHorizontal && isSignificant;
       },
@@ -84,7 +86,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
         const isSignificant = Math.abs(gestureState.dx) > 18;
 
         if (tabIndex === 0 && gestureState.dx > 0) return false;
-        if (tabIndex === 2 && gestureState.dx < 0) return false;
+        if (tabIndex === 3 && gestureState.dx < 0) return false;
 
         return isHorizontal && isSignificant;
       },
@@ -98,7 +100,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
       onPanResponderMove: (_, gestureState) => {
         if (disabledRef.current) return;
         let dx = gestureState.dx;
-        if ((tabIndex === 0 && dx > 0) || (tabIndex === 2 && dx < 0)) {
+        if ((tabIndex === 0 && dx > 0) || (tabIndex === 3 && dx < 0)) {
           dx = dx * 0.1;
         }
         translateX.setValue(dx * 0.25);
@@ -113,7 +115,7 @@ export const TabSwipeWrapper: React.FC<TabSwipeWrapperProps> = ({ children, tabI
         const vx = gestureState.vx;
 
         if (dx < -35 || vx < -0.25) {
-          if (tabIndex < 2) {
+          if (tabIndex < 3) {
             handleNavigate('left');
           } else {
             Animated.parallel([

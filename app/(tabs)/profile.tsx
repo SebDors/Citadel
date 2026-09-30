@@ -21,7 +21,7 @@ export default function ProfileTab() {
   if (!data) return null;
 
   return (
-    <TabSwipeWrapper tabIndex={2}>
+    <TabSwipeWrapper tabIndex={3}>
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Page Header avec boutons Thème et Paramètres dans l'angle supérieur droit */}
