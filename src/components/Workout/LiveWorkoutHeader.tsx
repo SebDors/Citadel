@@ -156,7 +156,7 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
       ]}
     >
       <View style={styles.singleRow}>
-        {/* Titre de la séance à Gauche suivi du bouton Note */}
+        {/* Titre de la séance à Gauche */}
         <View style={styles.titleBox}>
           <Text
             style={[styles.title, { color: theme.text }]}
@@ -165,31 +165,6 @@ export const LiveWorkoutHeader: React.FC<LiveWorkoutHeaderProps> = ({
           >
             {session.title}
           </Text>
-          {(onOpenNotes || onUpdateNotes) && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPressIn={() => {
-                if (onOpenNotes) {
-                  onOpenNotes();
-                }
-              }}
-              style={[
-                styles.inlineNoteBtn,
-                {
-                  backgroundColor: session.notes
-                    ? `${theme.accent}20`
-                    : theme.cardBg,
-                  borderColor: session.notes ? theme.accent : theme.border,
-                },
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            >
-              <FileText
-                size={14}
-                color={session.notes ? theme.accent : theme.textMuted}
-              />
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Badge "EN PAUSE" au centre si la séance est en pause */}
@@ -282,7 +257,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
     marginRight: 6,
   },
   title: {
@@ -290,14 +264,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "left",
     flexShrink: 1,
-  },
-  inlineNoteBtn: {
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 7,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   centerBadgeContainer: {
     alignItems: "center",
@@ -332,14 +298,6 @@ const styles = StyleSheet.create({
   pauseText: {
     fontSize: 11,
     fontWeight: "900",
-  },
-  noteBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   sessionNoteBanner: {
     flexDirection: "row",

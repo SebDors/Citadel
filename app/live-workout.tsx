@@ -73,6 +73,7 @@ import {
   AlertTriangle,
   Calculator,
   FileText,
+  MoreVertical,
 } from "lucide-react-native";
 import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
 import { WorkoutToolsModal } from "../src/components/Workout/WorkoutToolsModal";
@@ -295,6 +296,7 @@ export default function LiveWorkoutScreen() {
   const [showToolsModal, setShowToolsModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
   const [showSessionNotesModal, setShowSessionNotesModal] = useState(false);
+  const [showSessionMenuModal, setShowSessionMenuModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetCircuitBlockId, setTargetCircuitBlockId] = useState<
     string | null
@@ -1175,9 +1177,22 @@ export default function LiveWorkoutScreen() {
         <Text style={[styles.topBarTitle, { color: theme.text }]}>
           Workout Tracker
         </Text>
-        <View style={{ flexDirection: 'row', width: 60, justifyContent: 'flex-end' }}>
-          <TouchableOpacity onPress={() => setShowReorderModal(true)} style={{ padding: 4 }}>
+        <View style={styles.topBarRightActions}>
+          <TouchableOpacity
+            onPress={() => setShowReorderModal(true)}
+            style={styles.topBarActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            accessibilityLabel="Réorganiser les exercices"
+          >
             <ArrowUpDown size={20} color={theme.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowSessionMenuModal(true)}
+            style={styles.topBarActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            accessibilityLabel="Options de la séance"
+          >
+            <MoreVertical size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -2475,6 +2490,227 @@ export default function LiveWorkoutScreen() {
         onSave={updateSessionNotes}
         placeholder="Remarques générales, forme du jour, points d'attention pour la séance..."
       />
+
+      {/* Modal Menu d'actions de la séance (3 points) */}
+      <Modal
+        visible={showSessionMenuModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSessionMenuModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.sessionMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSessionMenuModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.sessionMenuCard,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+          >
+            {/* En-tête de la modale */}
+            <View style={styles.sessionMenuHeader}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[styles.sessionMenuTitle, { color: theme.text }]}>
+                  Options de la séance
+                </Text>
+                <Text
+                  style={[styles.sessionMenuSubtitle, { color: theme.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {activeSession.title}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowSessionMenuModal(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.sessionMenuCloseBtn}
+              >
+                <X size={20} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Liste des actions */}
+            <View style={styles.sessionMenuItemsContainer}>
+              {/* 1. Notes de séance */}
+              <TouchableOpacity
+                style={[
+                  styles.sessionMenuItem,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowSessionMenuModal(false);
+                  setTimeout(() => setShowSessionNotesModal(true), 150);
+                }}
+              >
+                <View
+                  style={[
+                    styles.sessionMenuIconBox,
+                    { backgroundColor: `${theme.accent}18` },
+                  ]}
+                >
+                  <FileText size={20} color={theme.accent} />
+                </View>
+                <View style={styles.sessionMenuItemContent}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text
+                      style={[styles.sessionMenuItemLabel, { color: theme.text }]}
+                    >
+                      Notes de la séance
+                    </Text>
+                    {activeSession.notes ? (
+                      <View
+                        style={[
+                          styles.sessionMenuNoteBadge,
+                          { backgroundColor: `${theme.accent}20` },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.sessionMenuNoteBadgeText,
+                            { color: theme.accent },
+                          ]}
+                        >
+                          Remplie
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text
+                    style={[
+                      styles.sessionMenuItemSublabel,
+                      { color: theme.textMuted },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {activeSession.notes
+                      ? activeSession.notes
+                      : "Consignes, charges cibles ou remarques"}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+
+              {/* 2. Calculateur & Disques */}
+              <TouchableOpacity
+                style={[
+                  styles.sessionMenuItem,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowSessionMenuModal(false);
+                  setTimeout(() => setShowToolsModal(true), 150);
+                }}
+              >
+                <View
+                  style={[
+                    styles.sessionMenuIconBox,
+                    { backgroundColor: `${theme.accent}18` },
+                  ]}
+                >
+                  <Calculator size={20} color={theme.accent} />
+                </View>
+                <View style={styles.sessionMenuItemContent}>
+                  <Text
+                    style={[styles.sessionMenuItemLabel, { color: theme.text }]}
+                  >
+                    Calculateur de disques & 1RM
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sessionMenuItemSublabel,
+                      { color: theme.textMuted },
+                    ]}
+                  >
+                    Calculateur de charges par côté et estimations
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+
+              {/* 3. Réorganiser les exercices */}
+              <TouchableOpacity
+                style={[
+                  styles.sessionMenuItem,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowSessionMenuModal(false);
+                  setTimeout(() => setShowReorderModal(true), 150);
+                }}
+              >
+                <View
+                  style={[
+                    styles.sessionMenuIconBox,
+                    { backgroundColor: `${theme.accent}18` },
+                  ]}
+                >
+                  <ArrowUpDown size={20} color={theme.accent} />
+                </View>
+                <View style={styles.sessionMenuItemContent}>
+                  <Text
+                    style={[styles.sessionMenuItemLabel, { color: theme.text }]}
+                  >
+                    Réorganiser la séance
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sessionMenuItemSublabel,
+                      { color: theme.textMuted },
+                    ]}
+                  >
+                    Changer l'ordre des séries et circuits
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+
+              {/* 4. Abandonner la séance */}
+              <TouchableOpacity
+                style={[
+                  styles.sessionMenuItem,
+                  { backgroundColor: theme.surface, borderColor: `${theme.danger}40` },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowSessionMenuModal(false);
+                  setTimeout(() => handleCancel(), 150);
+                }}
+              >
+                <View
+                  style={[
+                    styles.sessionMenuIconBox,
+                    { backgroundColor: `${theme.danger}18` },
+                  ]}
+                >
+                  <AlertTriangle size={20} color={theme.danger} />
+                </View>
+                <View style={styles.sessionMenuItemContent}>
+                  <Text
+                    style={[styles.sessionMenuItemLabel, { color: theme.danger }]}
+                  >
+                    Abandonner la séance
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sessionMenuItemSublabel,
+                      { color: theme.textMuted },
+                    ]}
+                  >
+                    Quitter sans enregistrer l'entraînement
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2503,6 +2739,15 @@ const styles = StyleSheet.create({
   topBarTitle: {
     fontSize: 16,
     fontWeight: "900",
+  },
+  topBarRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  topBarActionBtn: {
+    padding: 6,
+    borderRadius: 8,
   },
   scrollContent: {
     paddingHorizontal: 14,
@@ -3205,5 +3450,76 @@ const styles = StyleSheet.create({
   },
   nudgeToastClose: {
     padding: 4,
+  },
+  sessionMenuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  sessionMenuCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 20,
+  },
+  sessionMenuHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  sessionMenuTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  sessionMenuSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  sessionMenuCloseBtn: {
+    padding: 4,
+  },
+  sessionMenuItemsContainer: {
+    gap: 10,
+  },
+  sessionMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  sessionMenuIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  sessionMenuItemContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  sessionMenuItemLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  sessionMenuItemSublabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sessionMenuNoteBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  sessionMenuNoteBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
   },
 });
