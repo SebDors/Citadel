@@ -386,7 +386,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     category: 'Épaules',
   },
 
-  // ---------------- BRAS (15) ----------------
+  // ---------------- BRAS (14) ----------------
   {
     id: 'barbell_curl',
     name: 'Curl Barre EZ',
@@ -462,15 +462,6 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
   {
     id: 'triceps_pushdown',
     name: 'Extension Triceps Poulie Haute',
-    primaryMuscle: 'Triceps (Chef latéral), Triceps (Chef médial)',
-    primaryMuscles: ['Triceps (Chef latéral)', 'Triceps (Chef médial)'],
-    targetMuscles: ['Triceps (Chef long)'],
-    defaultRestSeconds: 75,
-    category: 'Bras',
-  },
-  {
-    id: 'triceps_rope_pushdown',
-    name: 'Extension Triceps Corde Poulie',
     primaryMuscle: 'Triceps (Chef latéral), Triceps (Chef médial)',
     primaryMuscles: ['Triceps (Chef latéral)', 'Triceps (Chef médial)'],
     targetMuscles: ['Triceps (Chef long)'],

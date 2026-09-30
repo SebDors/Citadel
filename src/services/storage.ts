@@ -15,6 +15,7 @@ let lastPendingSession: WorkoutSession | null | undefined = undefined;
 
 /**
  * Migration transparente d'un exercice individuel :
+ * - Unifie l'exercice redondant triceps_rope_pushdown -> triceps_pushdown
  * - Sauvegarde l'ancien format sous *_legacy pour rollback/traçabilité
  * - Normalise primaryMuscle et primaryMuscles selon MUSCLE_GROUPS
  * - Normalise targetMuscles selon MUSCLE_GROUPS
@@ -23,6 +24,13 @@ let lastPendingSession: WorkoutSession | null | undefined = undefined;
 function migrateExercise(ex: any): boolean {
   if (!ex) return false;
   let changed = false;
+
+  // Unification de l'exercice redondant triceps_rope_pushdown vers triceps_pushdown
+  if (ex.exerciseId === 'triceps_rope_pushdown') {
+    ex.exerciseId = 'triceps_pushdown';
+    ex.exerciseName = 'Extension Triceps Poulie Haute';
+    changed = true;
+  }
 
   // 1. Sauvegarde legacy si pas encore fait
   if (ex.primaryMuscle && !ex.primaryMuscle_legacy) {
@@ -116,6 +124,13 @@ function migrateExercise(ex: any): boolean {
 function migrateCircuitExercise(item: any): boolean {
   if (!item) return false;
   let changed = false;
+
+  // Unification de l'exercice redondant triceps_rope_pushdown vers triceps_pushdown
+  if (item.exerciseId === 'triceps_rope_pushdown') {
+    item.exerciseId = 'triceps_pushdown';
+    item.exerciseName = 'Extension Triceps Poulie Haute';
+    changed = true;
+  }
 
   if (item.primaryMuscle && !item.primaryMuscle_legacy) {
     item.primaryMuscle_legacy = item.primaryMuscle;
