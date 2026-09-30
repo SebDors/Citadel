@@ -11,16 +11,6 @@ interface CardioSessionCardProps {
   onDelete: (id: string) => void;
 }
 
-const getActivityEmoji = (activity: string): string => {
-  const lower = activity.toLowerCase();
-  if (lower.includes('boxe')) return '🥊';
-  if (lower.includes('cour')) return '🏃';
-  if (lower.includes('corde')) return '⚡';
-  if (lower.includes('nat')) return '🏊';
-  if (lower.includes('vél') || lower.includes('velo')) return '🚴';
-  return '🔥';
-};
-
 const getRpeDetails = (rpe: number): { label: string; color: string; bg: string } => {
   if (rpe <= 3) {
     return { label: 'Facile', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' };
@@ -53,7 +43,6 @@ export const CardioSessionCard: React.FC<CardioSessionCardProps> = ({
     minute: '2-digit',
   });
 
-  const emoji = getActivityEmoji(session.activity);
   const rpeInfo = getRpeDetails(session.perceivedExertion);
 
   return (
@@ -62,12 +51,12 @@ export const CardioSessionCard: React.FC<CardioSessionCardProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.titleContainer}>
           <View style={styles.titleWithEmoji}>
-            <Text style={styles.emoji}>{emoji}</Text>
+            <Flame size={16} color={theme.accent} />
             <Text style={[styles.activityTitle, { color: theme.text }]} numberOfLines={1}>
               {session.activity}
             </Text>
-            <View style={[styles.cardioBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-              <Text style={styles.cardioBadgeText}>Cardio</Text>
+            <View style={[styles.cardioBadge, { backgroundColor: `${theme.accent}15`, borderColor: `${theme.accent}30` }]}>
+              <Text style={[styles.cardioBadgeText, { color: theme.accent }]}>Cardio</Text>
             </View>
           </View>
           <Text style={[styles.dateText, { color: theme.textMuted }]}>
@@ -184,9 +173,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
-  emoji: {
-    fontSize: 16,
-  },
   activityTitle: {
     fontSize: 16,
     fontWeight: '800',
@@ -200,7 +186,6 @@ const styles = StyleSheet.create({
   cardioBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#EF4444',
     textTransform: 'uppercase',
   },
   dateText: {

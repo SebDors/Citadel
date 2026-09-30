@@ -37,11 +37,11 @@ interface LogCardioModalProps {
 }
 
 const PRESET_ACTIVITIES = [
-  { label: 'Boxe', icon: '🥊' },
-  { label: 'Course', icon: '🏃' },
-  { label: 'Corde à sauter', icon: '⚡' },
-  { label: 'Natation', icon: '🏊' },
-  { label: 'Vélo', icon: '🚴' },
+  { label: 'Boxe' },
+  { label: 'Course' },
+  { label: 'Corde à sauter' },
+  { label: 'Natation' },
+  { label: 'Vélo' },
 ];
 
 const PRESET_DURATIONS = [15, 30, 45, 60];
@@ -257,11 +257,11 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
 
               <View pointerEvents="box-none" style={styles.header}>
                 <View pointerEvents="none" style={styles.headerLeft}>
-                  <View style={[styles.headerIconBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-                    <HeartPulse size={18} color="#EF4444" />
+                  <View style={[styles.headerIconBadge, { backgroundColor: `${theme.accent}15`, borderColor: `${theme.accent}30` }]}>
+                    <HeartPulse size={18} color={theme.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.title, { color: theme.text }]}>Séance Cardio / Boxe</Text>
+                    <Text style={[styles.title, { color: theme.text }]}>Séance Cardio</Text>
                     <Text style={[styles.subtitle, { color: theme.textMuted }]}>Consigner une activité hors musculation</Text>
                   </View>
                 </View>
@@ -286,8 +286,8 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
             {/* 1. Sélection de l'Activité */}
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
-                  <Flame size={14} color="#EF4444" />
+                <View style={[styles.sectionIconBadge, { backgroundColor: `${theme.accent}15` }]}>
+                  <Flame size={14} color={theme.accent} />
                 </View>
                 <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>ACTIVITÉ</Text>
               </View>
@@ -302,13 +302,12 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
                       style={[
                         styles.chip,
                         {
-                          backgroundColor: isSelected ? '#EF4444' : theme.background,
-                          borderColor: isSelected ? '#EF4444' : theme.border,
+                          backgroundColor: isSelected ? theme.accent : theme.background,
+                          borderColor: isSelected ? theme.accent : theme.border,
                         },
                       ]}
                       onPress={() => handleSelectPresetActivity(act.label)}
                     >
-                      <Text style={styles.chipEmoji}>{act.icon}</Text>
                       <Text
                         style={[
                           styles.chipText,
@@ -326,13 +325,12 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: isCustomActivity ? '#EF4444' : theme.background,
-                      borderColor: isCustomActivity ? '#EF4444' : theme.border,
+                      backgroundColor: isCustomActivity ? theme.accent : theme.background,
+                      borderColor: isCustomActivity ? theme.accent : theme.border,
                     },
                   ]}
                   onPress={handleSelectCustomActivity}
                 >
-                  <Text style={styles.chipEmoji}>✨</Text>
                   <Text
                     style={[
                       styles.chipText,
@@ -579,11 +577,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   content: {
+    height: '78%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
-    maxHeight: '92%',
-    minHeight: '60%',
     overflow: 'hidden',
   },
   headerContainer: {

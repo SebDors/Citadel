@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary } from '../../types';
+import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary, CardioSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
@@ -26,12 +26,16 @@ import {
   BookmarkPlus,
   Eye,
   Plus,
+  Flame,
+  Zap,
 } from 'lucide-react-native';
 import { PastSessionDetailModal } from './PastSessionDetailModal';
 import { LogPastWorkoutModal } from './LogPastWorkoutModal';
+import { LogCardioModal } from './LogCardioModal';
 
 interface CalendarViewProps {
   history: WorkoutSession[];
+  cardioSessions?: CardioSession[];
 }
 
 const MONTHS_NAMES = [
@@ -49,9 +53,10 @@ const MONTHS_NAMES = [
   'Décembre',
 ];
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessions: propCardioSessions }) => {
   const { theme } = useTheme();
-  const { deleteWorkoutSession } = useWorkout();
+  const { data, deleteWorkoutSession, deleteCardioSession } = useWorkout();
+  const cardioSessions = propCardioSessions || data?.cardioSessions || [];
   const router = useRouter();
 
   const now = new Date();
@@ -64,6 +69,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [logPastModalVisible, setLogPastModalVisible] = useState(false);
+  const [logCardioModalVisible, setLogCardioModalVisible] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkoutSession | null>(null);
 
@@ -100,13 +106,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   const emptyLeadingDays = Array.from({ length: leadingOffset }, (_, i) => i);
   const monthStr = (currentMonthIndex + 1).toString().padStart(2, '0');
 
-  // Filtrer les séances pour le mois affiché
+  // Filtrer les séances (musculation + cardio) pour le mois affiché
   const currentMonthPrefix = `${currentYear}-${monthStr}`;
   const monthSessions = history.filter((s) => s.startTime.startsWith(currentMonthPrefix));
-  const monthWorkoutsCount = monthSessions.length;
-  const workoutDates = monthSessions.map((s) => s.startTime.split('T')[0]);
+  const monthCardios = cardioSessions.filter((c) => c.date.startsWith(currentMonthPrefix));
+  const totalMonthSessions = monthSessions.length + monthCardios.length;
 
-  const handleDayPress = (dateStr: string, hasWorkout: boolean) => {
+  const workoutDates = monthSessions.map((s) => s.startTime.split('T')[0]);
+  const cardioDates = monthCardios.map((c) => c.date.split('T')[0]);
+
+  const handleDayPress = (dateStr: string, hasActivity: boolean) => {
     setSelectedDate(dateStr);
     setModalVisible(true);
   };
@@ -114,6 +123,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
   // Séances du jour sélectionné
   const daySessions = selectedDate
     ? history.filter((s) => s.startTime.split('T')[0] === selectedDate)
+    : [];
+  const dayCardios = selectedDate
+    ? cardioSessions.filter((c) => c.date.split('T')[0] === selectedDate)
     : [];
 
   const formattedSelectedDate = selectedDate
@@ -144,7 +156,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
             </Text>
           </TouchableOpacity>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            {monthWorkoutsCount} {monthWorkoutsCount > 1 ? 'séances réalisées' : 'séance réalisée'}
+            {totalMonthSessions} {totalMonthSessions > 1 ? 'séances réalisées' : 'séance réalisée'}
           </Text>
         </View>
 
@@ -169,38 +181,40 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
           const dayPad = d < 10 ? `0${d}` : `${d}`;
           const dateStr = `${currentYear}-${monthStr}-${dayPad}`;
           const hasWorkout = workoutDates.includes(dateStr);
+          const hasCardio = cardioDates.includes(dateStr);
+          const hasActivity = hasWorkout || hasCardio;
           const isToday = dateStr === todayStr;
 
           return (
             <TouchableOpacity
               key={d}
-              onPress={() => handleDayPress(dateStr, hasWorkout)}
+              onPress={() => handleDayPress(dateStr, hasActivity)}
               style={[
                 styles.dayCell,
-                hasWorkout ? { backgroundColor: theme.surface, borderRadius: 8 } : null,
+                hasActivity ? { backgroundColor: theme.surface, borderRadius: 8 } : null,
                 isToday
                   ? {
                       borderColor: theme.accent,
                       borderWidth: 2,
                       borderRadius: 10,
-                      backgroundColor: hasWorkout ? `${theme.accent}25` : `${theme.accent}15`,
+                      backgroundColor: hasActivity ? `${theme.accent}25` : `${theme.accent}15`,
                     }
                   : null,
               ]}
-              activeOpacity={hasWorkout ? 0.6 : 1}
+              activeOpacity={hasActivity ? 0.6 : 1}
             >
               <Text
                 style={[
                   styles.dayNum,
                   { color: theme.text },
-                  hasWorkout ? { fontWeight: '900', color: theme.accent } : null,
+                  hasActivity ? { fontWeight: '900', color: theme.accent } : null,
                   isToday ? { fontWeight: '900', color: theme.accent } : null,
                 ]}
               >
                 {d}
               </Text>
 
-              {hasWorkout && <View style={[styles.dot, { backgroundColor: theme.accent }]} />}
+              {hasActivity && <View style={[styles.dot, { backgroundColor: theme.accent }]} />}
             </TouchableOpacity>
           );
         })}
@@ -240,140 +254,237 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
 
             {/* Modal Body */}
             <ScrollView contentContainerStyle={styles.modalScrollBody}>
-              {daySessions.length === 0 ? (
+              {daySessions.length === 0 && dayCardios.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={[styles.emptyText, { color: theme.textMuted }]}>
                     Aucune séance pour cette date.
                   </Text>
                 </View>
               ) : (
-                daySessions.map((session) => {
-                  const blocks = getSessionBlocks(session);
-                  const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
+                <>
+                  {daySessions.map((session) => {
+                    const blocks = getSessionBlocks(session);
+                    const circuitBlock = blocks.find((b): b is CircuitBlock => b.type === 'circuit');
 
-                  const isAMRAP = circuitBlock
-                    ? (circuitBlock.circuitType === 'amrap' || circuitBlock.title?.toLowerCase().includes('amrap') || session.title?.toLowerCase().includes('amrap'))
-                    : (session.isCircuit && session.title?.toLowerCase().includes('amrap'));
+                    const isAMRAP = circuitBlock
+                      ? (circuitBlock.circuitType === 'amrap' || circuitBlock.title?.toLowerCase().includes('amrap') || session.title?.toLowerCase().includes('amrap'))
+                      : (session.isCircuit && session.title?.toLowerCase().includes('amrap'));
 
-                  const isCircuitRound = !isAMRAP && (circuitBlock !== undefined || session.isCircuit === true);
-                  const circuitRounds = session.completedRoundsCount || session.circuitRounds || (circuitBlock?.rounds) || 0;
+                    const isCircuitRound = !isAMRAP && (circuitBlock !== undefined || session.isCircuit === true);
+                    const circuitRounds = session.completedRoundsCount || session.circuitRounds || (circuitBlock?.rounds) || 0;
 
-                  const fallbackSetsCount = blocks.reduce((sum, b) => {
-                    if (b.type === 'single') return sum + (b.exercise.sets?.length || 0);
-                    if (b.type === 'circuit') return sum + (b.rounds * b.exercises.length);
-                    return sum;
-                  }, 0);
+                    const fallbackSetsCount = blocks.reduce((sum, b) => {
+                      if (b.type === 'single') return sum + (b.exercise.sets?.length || 0);
+                      if (b.type === 'circuit') return sum + (b.rounds * b.exercises.length);
+                      return sum;
+                    }, 0);
 
-                  const setsCount =
-                    session.completedSetsCount ??
-                    session.totalSetsCount ??
-                    fallbackSetsCount;
+                    const setsCount =
+                      session.completedSetsCount ??
+                      session.totalSetsCount ??
+                      fallbackSetsCount;
 
-                  const blockSummaries = blocks.map((b) => {
-                    if (b.type === 'single') {
-                      return b.exercise.exerciseName;
-                    } else if (b.type === 'circuit') {
-                      return formatCircuitSummary(b);
-                    }
-                    return '';
-                  }).filter(Boolean);
+                    const blockSummaries = blocks.map((b) => {
+                      if (b.type === 'single') {
+                        return b.exercise.exerciseName;
+                      } else if (b.type === 'circuit') {
+                        return formatCircuitSummary(b);
+                      }
+                      return '';
+                    }).filter(Boolean);
 
-                  const summaryStr = blockSummaries.join(' · ');
+                    const summaryStr = blockSummaries.join(' · ');
 
-                  return (
-                    <View
-                      key={session.id}
-                      style={[
-                        styles.sessionCard,
-                        { backgroundColor: theme.surface, borderColor: theme.border },
-                      ]}
-                    >
-                      {/* Session Header: Details & Delete Session Button */}
-                      <View style={styles.sessionCardHeader}>
-                        <TouchableOpacity
-                          style={styles.sessionInfo}
-                          activeOpacity={0.7}
-                          onPress={() => setSelectedDetailSession(session)}
-                        >
-                          <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
-                            {session.title}
-                          </Text>
+                    return (
+                      <View
+                        key={session.id}
+                        style={[
+                          styles.sessionCard,
+                          { backgroundColor: theme.surface, borderColor: theme.border },
+                        ]}
+                      >
+                        {/* Session Header: Details & Delete Session Button */}
+                        <View style={styles.sessionCardHeader}>
+                          <TouchableOpacity
+                            style={styles.sessionInfo}
+                            activeOpacity={0.7}
+                            onPress={() => setSelectedDetailSession(session)}
+                          >
+                            <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
+                              {session.title}
+                            </Text>
 
-                          <View style={styles.statsRow}>
-                            <View style={styles.statBadge}>
-                              <Clock size={14} color={theme.accent} />
-                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
-                                À {new Date(session.startTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                              </Text>
+                            <View style={styles.statsRow}>
+                              <View style={styles.statBadge}>
+                                <Clock size={14} color={theme.accent} />
+                                <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                  À {new Date(session.startTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                              </View>
+
+                              <View style={styles.statBadge}>
+                                <Clock size={14} color={theme.textMuted} />
+                                <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                  {Math.floor(session.durationSeconds / 60)} min
+                                </Text>
+                              </View>
+
+                              <View style={styles.statBadge}>
+                                <Dumbbell size={14} color={theme.secondary} />
+                                <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                  {session.totalVolumeKg} kg
+                                </Text>
+                              </View>
+
+                              <View style={styles.statBadge}>
+                                {isAMRAP || isCircuitRound ? (
+                                  <RotateCw size={14} color={theme.primary} />
+                                ) : (
+                                  <Layers size={14} color={theme.primary} />
+                                )}
+                                <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                  {isAMRAP || isCircuitRound
+                                    ? `${circuitRounds} tour${circuitRounds > 1 ? 's' : ''}`
+                                    : `${setsCount} ${setsCount > 1 ? 'séries' : 'série'}`}
+                                </Text>
+                              </View>
                             </View>
 
-                            <View style={styles.statBadge}>
-                              <Clock size={14} color={theme.textMuted} />
-                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
-                                {Math.floor(session.durationSeconds / 60)} min
+                            {summaryStr ? (
+                              <Text style={[styles.modalExercisesText, { color: theme.textMuted }]} numberOfLines={2}>
+                                {summaryStr}
                               </Text>
+                            ) : null}
+                          </TouchableOpacity>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity
+                              style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                              onPress={() => setSelectedDetailSession(session)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel="Voir le détail de la séance"
+                            >
+                              <Eye size={18} color={theme.accent} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                              onPress={() => {
+                                setModalVisible(false);
+                                router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } });
+                              }}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel="Enregistrer comme modèle"
+                            >
+                              <BookmarkPlus size={18} color={theme.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionIconButton, { backgroundColor: theme.cardBg }]}
+                              onPress={() => handleDeleteSession(session.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel="Supprimer la séance"
+                            >
+                              <Trash2 size={18} color={theme.danger} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+
+                  {dayCardios.map((cardio) => {
+                    const cardioDate = new Date(cardio.date);
+                    const timeStr = !isNaN(cardioDate.getTime())
+                      ? cardioDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                      : null;
+
+                    return (
+                      <View
+                        key={cardio.id}
+                        style={[
+                          styles.sessionCard,
+                          { backgroundColor: theme.surface, borderColor: `${theme.accent}35` },
+                        ]}
+                      >
+                        <View style={styles.sessionCardHeader}>
+                          <View style={styles.sessionInfo}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                              <Flame size={16} color={theme.accent} />
+                              <Text style={[styles.sessionCardTitle, { color: theme.text, marginBottom: 0 }]}>
+                                {cardio.activity}
+                              </Text>
+                              <View
+                                style={{
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderRadius: 6,
+                                  backgroundColor: `${theme.accent}15`,
+                                  borderWidth: 1,
+                                  borderColor: `${theme.accent}30`,
+                                }}
+                              >
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: theme.accent, textTransform: 'uppercase' }}>
+                                  Cardio
+                                </Text>
+                              </View>
                             </View>
 
-                            <View style={styles.statBadge}>
-                              <Dumbbell size={14} color={theme.secondary} />
-                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
-                                {session.totalVolumeKg} kg
-                              </Text>
-                            </View>
-
-                            <View style={styles.statBadge}>
-                              {isAMRAP || isCircuitRound ? (
-                                <RotateCw size={14} color={theme.primary} />
-                              ) : (
-                                <Layers size={14} color={theme.primary} />
+                            <View style={styles.statsRow}>
+                              {timeStr && (
+                                <View style={styles.statBadge}>
+                                  <Clock size={14} color={theme.accent} />
+                                  <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                    À {timeStr}
+                                  </Text>
+                                </View>
                               )}
-                              <Text style={[styles.statBadgeText, { color: theme.text }]}>
-                                {isAMRAP || isCircuitRound
-                                  ? `${circuitRounds} tour${circuitRounds > 1 ? 's' : ''}`
-                                  : `${setsCount} ${setsCount > 1 ? 'séries' : 'série'}`}
-                              </Text>
+
+                              <View style={styles.statBadge}>
+                                <Clock size={14} color={theme.textMuted} />
+                                <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                  {cardio.durationMinutes} min
+                                </Text>
+                              </View>
+
+                              <View style={styles.statBadge}>
+                                <Zap size={14} color={theme.accent} />
+                                <Text style={[styles.statBadgeText, { color: theme.text }]}>
+                                  RPE {cardio.perceivedExertion}/10
+                                </Text>
+                              </View>
                             </View>
+
+                            {cardio.notes ? (
+                              <Text style={[styles.modalExercisesText, { color: theme.textMuted }]} numberOfLines={2}>
+                                {cardio.notes}
+                              </Text>
+                            ) : null}
                           </View>
 
-                          {summaryStr ? (
-                            <Text style={[styles.modalExercisesText, { color: theme.textMuted }]} numberOfLines={2}>
-                              {summaryStr}
-                            </Text>
-                          ) : null}
-                        </TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <TouchableOpacity
-                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
-                            onPress={() => setSelectedDetailSession(session)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="Voir le détail de la séance"
-                          >
-                            <Eye size={18} color={theme.accent} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
-                            onPress={() => {
-                              setModalVisible(false);
-                              router.push({ pathname: '/template-editor', params: { fromSessionId: session.id } });
-                            }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="Enregistrer comme modèle"
-                          >
-                            <BookmarkPlus size={18} color={theme.primary} />
-                          </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.actionIconButton, { backgroundColor: theme.cardBg }]}
-                            onPress={() => handleDeleteSession(session.id)}
+                            onPress={() => {
+                              Alert.alert(
+                                'Supprimer la séance cardio',
+                                `Voulez-vous supprimer cette séance de ${cardio.activity} ?`,
+                                [
+                                  { text: 'Annuler', style: 'cancel' },
+                                  {
+                                    text: 'Supprimer',
+                                    style: 'destructive',
+                                    onPress: () => deleteCardioSession(cardio.id),
+                                  },
+                                ]
+                              );
+                            }}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="Supprimer la séance"
+                            accessibilityLabel="Supprimer la séance cardio"
                           >
                             <Trash2 size={18} color={theme.danger} />
                           </TouchableOpacity>
                         </View>
                       </View>
-                    </View>
-                  );
-                })
+                    );
+                  })}
+                </>
               )}
               
               <Button
@@ -386,6 +497,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
                   setLogPastModalVisible(true);
                 }}
               />
+
+              <Button
+                title="Ajouter cardio passé"
+                variant="outline"
+                icon={<Flame size={16} color={theme.accent} />}
+                textStyle={{ color: theme.accent, fontWeight: '700' }}
+                style={{
+                  marginTop: 8,
+                  borderColor: `${theme.accent}50`,
+                  backgroundColor: `${theme.accent}10`,
+                }}
+                onPress={() => {
+                  setModalVisible(false);
+                  setLogCardioModalVisible(true);
+                }}
+              />
             </ScrollView>
           </View>
         </View>
@@ -394,6 +521,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history }) => {
       <LogPastWorkoutModal
         visible={logPastModalVisible}
         onClose={() => setLogPastModalVisible(false)}
+        initialDate={selectedDate || undefined}
+      />
+
+      <LogCardioModal
+        visible={logCardioModalVisible}
+        onClose={() => setLogCardioModalVisible(false)}
         initialDate={selectedDate || undefined}
       />
 

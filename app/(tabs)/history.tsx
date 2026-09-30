@@ -95,12 +95,19 @@ export default function HistoryTab() {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  style={[styles.headerBtn, { backgroundColor: '#EF4444' }]}
+                  style={[
+                    styles.headerBtn,
+                    {
+                      backgroundColor: `${theme.accent}18`,
+                      borderColor: `${theme.accent}40`,
+                      borderWidth: 1,
+                    },
+                  ]}
                   onPress={() => setCardioModalVisible(true)}
                 >
-                  <Flame size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={[styles.headerBtnText, { color: "#FFFFFF" }]}>
-                    Cardio / Boxe
+                  <Flame size={14} color={theme.accent} style={{ marginRight: 4 }} />
+                  <Text style={[styles.headerBtnText, { color: theme.accent }]}>
+                    Cardio
                   </Text>
                 </TouchableOpacity>
 
@@ -122,7 +129,7 @@ export default function HistoryTab() {
           </View>
 
           {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
-          <CalendarView history={historyList} />
+          <CalendarView history={historyList} cardioSessions={cardioList} />
 
           {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
           <ActivitySummaryCard history={historyList} />
@@ -213,7 +220,7 @@ export default function HistoryTab() {
                 style={[
                   styles.filterChip,
                   filterType === 'cardio'
-                    ? { backgroundColor: '#EF4444', borderColor: '#EF4444' }
+                    ? { backgroundColor: theme.accent, borderColor: theme.accent }
                     : { backgroundColor: theme.surface, borderColor: theme.border },
                 ]}
                 onPress={() => setFilterType('cardio')}
