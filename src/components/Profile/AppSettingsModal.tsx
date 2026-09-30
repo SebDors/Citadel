@@ -65,6 +65,9 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   const [enableRir, setEnableRir] = useState<boolean>(
     profile.enableRir !== false,
   );
+  const [enableFatigueMarkers, setEnableFatigueMarkers] = useState<boolean>(
+    profile.enableFatigueMarkers !== false,
+  );
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
@@ -75,6 +78,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
     setAvailablePlates(profile.availablePlates || DEFAULT_PLATES);
     setDropReductionPercent(profile.dropSetReductionPercent ?? 20);
     setEnableRir(profile.enableRir !== false);
+    setEnableFatigueMarkers(profile.enableFatigueMarkers !== false);
   }, [profile]);
 
   useEffect(() => {
@@ -110,9 +114,8 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
     onUpdateProfile({ enableRir: newVal });
   };
 
-  const enableFatigueMarkers = profile.enableFatigueMarkers !== false;
-
   const handleToggleFatigueMarkers = (val: boolean) => {
+    setEnableFatigueMarkers(val);
     onUpdateProfile({ enableFatigueMarkers: val });
   };
 
