@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -41,6 +41,20 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
   const dropReductionPercent = data?.profile?.dropSetReductionPercent ?? 20;
+  const userWeight = (data?.profile as any)?.weightKg ?? data?.profile?.currentWeightKg;
+
+  const isBodyweightRef = useRef(set.isBodyweight);
+  useEffect(() => {
+    isBodyweightRef.current = set.isBodyweight;
+  }, [set.isBodyweight]);
+
+  const handleToggleBodyweight = useCallback((isBw: boolean) => {
+    isBodyweightRef.current = isBw;
+    onUpdate('isBodyweight', isBw);
+    if (isBw) {
+      onUpdate('bodyweightUsedKg', userWeight);
+    }
+  }, [onUpdate, userWeight]);
 
   // Ouverture du clavier numérique sur un champ principal ou décharge
   const handleOpenMainKeypad = useCallback((field: NumericFieldType) => {
@@ -106,8 +120,13 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     if (target.type === 'main') {
       const field = target.field;
       if (field === 'weightKg') {
-        const num = parseFloatFrench(valStr);
-        onUpdate('weightKg', num);
+        const isBw = isBodyweightRef.current ?? set.isBodyweight;
+        if (isBw && (valStr === '' || valStr === undefined || valStr === null)) {
+          onUpdate('weightKg', 0);
+        } else {
+          const num = parseFloatFrench(valStr);
+          onUpdate('weightKg', num);
+        }
       } else if (field === 'reps') {
         const num = valStr === '' ? undefined : parseInt(valStr, 10);
         onUpdate('reps', num !== undefined && !isNaN(num) ? num : undefined);
@@ -128,7 +147,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num } : s));
       onUpdate('dropSteps', next);
     }
-  }, [onUpdate, set.dropSteps]);
+  }, [onUpdate, set.dropSteps, set.isBodyweight]);
 
   // Passage au champ suivant (KG ➔ REPS ➔ RIR) — Réactivité instantanée (<1ms)
   const handleKeypadNext = useCallback((currentVal?: string) => {
@@ -255,7 +274,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       if (set.weightKg === undefined || set.weightKg === null || set.weightKg === 0) {
         return 'PDC';
       }
-      return `+${set.weightKg}`;
+      if (set.weightKg > 0) {
+        return `+${set.weightKg}`;
+      }
+      return `${set.weightKg}`;
     }
     return set.weightKg !== undefined && set.weightKg !== null ? String(set.weightKg) : '-';
   }, [set.isBodyweight, set.weightKg]);
@@ -567,6 +589,8 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
           previousValue={set.previous}
+          isBodyweight={keypadTarget.type === 'main' ? set.isBodyweight : false}
+          onToggleBodyweight={keypadTarget.type === 'main' ? handleToggleBodyweight : undefined}
           ghostValue={
             keypadTarget.type === 'main'
               ? keypadTarget.ghostValue !== undefined

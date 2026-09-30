@@ -27,6 +27,8 @@ export interface CustomNumericKeypadProps {
   onValidate?: (finalVal: string) => void;
   onClear?: () => void;
   isLastField?: boolean;
+  isBodyweight?: boolean;
+  onToggleBodyweight?: (isBodyweight: boolean) => void;
 }
 
 interface KeyButtonProps {
@@ -231,6 +233,8 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   onValidate,
   onClear,
   isLastField,
+  isBodyweight,
+  onToggleBodyweight,
 }) => {
   const { theme } = useTheme();
 
@@ -239,19 +243,35 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   const localValueRef = useRef<string>(localValue);
   localValueRef.current = localValue;
 
+  const [localIsBodyweight, setLocalIsBodyweight] = useState<boolean>(Boolean(isBodyweight));
+
   // Synchronisation du buffer local uniquement lors de l'ouverture ou du changement de cible
   useEffect(() => {
     if (visible) {
       setLocalValue(value);
       localValueRef.current = value;
+      setLocalIsBodyweight(Boolean(isBodyweight));
     }
-  }, [visible, activeField, setNumber, value]);
+  }, [visible, activeField, setNumber, value, isBodyweight]);
+
+  const handleTogglePdc = useCallback(() => {
+    setLocalIsBodyweight((prev) => {
+      const next = !prev;
+      onToggleBodyweight?.(next);
+      return next;
+    });
+  }, [onToggleBodyweight]);
 
   // Titre et unité de l'en-tête selon le champ actif
   const getFieldHeaderInfo = useCallback(() => {
     switch (activeField) {
       case 'weightKg':
-        return { title: `Série ${setNumber} · Poids`, unit: 'KG' };
+        return {
+          title: localIsBodyweight
+            ? `Série ${setNumber} · Poids de corps`
+            : `Série ${setNumber} · Poids`,
+          unit: 'KG',
+        };
       case 'reps':
         return { title: `Série ${setNumber} · Répétitions`, unit: 'REPS' };
       case 'rir':
@@ -259,7 +279,7 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
       default:
         return { title: `Série ${setNumber}`, unit: '' };
     }
-  }, [activeField, setNumber]);
+  }, [activeField, setNumber, localIsBodyweight]);
 
   const { title, unit } = getFieldHeaderInfo();
 
@@ -328,6 +348,28 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     }
   }, [onClose]);
 
+  // Formatage de la valeur et de l'unité affichées dans l'en-tête
+  const isBwActive = activeField === 'weightKg' && localIsBodyweight;
+
+  let displayHeaderValue = localValue || ghostValue || '-';
+  let displayHeaderUnit = unit;
+
+  if (isBwActive) {
+    if (!localValue || localValue === '0') {
+      displayHeaderValue = 'PDC';
+      displayHeaderUnit = '';
+    } else {
+      const num = parseFloat(localValue);
+      if (!isNaN(num) && num < 0) {
+        displayHeaderValue = `PDC ${localValue}`;
+        displayHeaderUnit = 'KG';
+      } else {
+        displayHeaderValue = `PDC + ${localValue}`;
+        displayHeaderUnit = 'KG';
+      }
+    }
+  }
+
   return (
     <Modal
       visible={visible}
@@ -375,22 +417,30 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
                     style={[
                       styles.headerValue,
                       {
-                        color: localValue ? theme.text : (ghostValue ? `${theme.textMuted}99` : theme.textMuted),
-                        fontStyle: !localValue && ghostValue ? 'italic' : 'normal',
+                        color: isBwActive
+                          ? theme.text
+                          : localValue
+                          ? theme.text
+                          : (ghostValue ? `${theme.textMuted}99` : theme.textMuted),
+                        fontStyle: !isBwActive && !localValue && ghostValue ? 'italic' : 'normal',
                       },
                     ]}
                   >
-                    {localValue || ghostValue || '-'}
+                    {displayHeaderValue}
                   </Text>
-                  {Boolean(!localValue && ghostValue) && (
+                  {Boolean(!localValue && ghostValue && (!isBwActive || (ghostValue !== '0' && ghostValue !== 'PDC'))) && (
                     <View style={[styles.ghostPill, { backgroundColor: `${theme.accent}18`, borderColor: theme.accent }]}>
-                      <Text style={[styles.ghostPillText, { color: theme.accent }]}>{ghostLabel || 'Précédent'}</Text>
+                      <Text style={[styles.ghostPillText, { color: theme.accent }]}>
+                        {isBwActive ? `+${ghostValue} kg` : (ghostLabel || 'Précédent')}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>
-                <Text style={[styles.headerUnit, { color: theme.accent }]}>
-                  {unit}
-                </Text>
+                {Boolean(displayHeaderUnit) && (
+                  <Text style={[styles.headerUnit, { color: theme.accent }]}>
+                    {displayHeaderUnit}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -429,6 +479,34 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               <View style={styles.quickChipsBar}>
                 {activeField === 'weightKg' ? (
                   <>
+                    <Pressable
+                      unstable_pressDelay={0}
+                      onPress={handleTogglePdc}
+                      style={({ pressed }) => [
+                        styles.chipBtn,
+                        {
+                          backgroundColor: localIsBodyweight
+                            ? theme.accent
+                            : (pressed ? `${theme.accent}25` : theme.surface),
+                          borderColor: localIsBodyweight
+                            ? theme.accent
+                            : (pressed ? theme.accent : theme.border),
+                          transform: [{ scale: pressed ? 0.94 : 1 }],
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: localIsBodyweight ? '#FFFFFF' : theme.accent,
+                            fontWeight: '900',
+                          },
+                        ]}
+                      >
+                        PDC
+                      </Text>
+                    </Pressable>
                     <Pressable
                       unstable_pressDelay={0}
                       onPress={() => handleQuickIncrement(-2.5)}
@@ -737,7 +815,7 @@ const styles = StyleSheet.create({
   quickChipsBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
     marginBottom: 12,
     paddingHorizontal: 4,
   },
@@ -750,7 +828,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chipText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
   ghostPill: {
