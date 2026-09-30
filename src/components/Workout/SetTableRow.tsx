@@ -114,14 +114,24 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setTempValue(val !== undefined && val !== null ? String(val) : '');
   }, [set.dropSteps, set.weightKg, set.reps, dropReductionPercent]);
 
-  // Validation et mise à jour de la valeur saisie
-  const commitValue = useCallback((target: KeypadTarget, valStr: string) => {
+  // Validation et mise à jour de la valeur saisie (avec sauvegarde synchrone de l'état PDC au commit)
+  const commitValue = useCallback((target: KeypadTarget, valStr: string, isBw?: boolean) => {
     if (!target) return;
     if (target.type === 'main') {
+      // Si un état PDC a été transmis et diffère de l'état actuel de la série
+      if (isBw !== undefined && isBw !== set.isBodyweight) {
+        isBodyweightRef.current = isBw;
+        onUpdate('isBodyweight', isBw);
+        if (isBw) {
+          onUpdate('bodyweightUsedKg', userWeight);
+        }
+      }
+
+      const effectiveIsBw = isBw !== undefined ? isBw : (isBodyweightRef.current ?? set.isBodyweight);
+
       const field = target.field;
       if (field === 'weightKg') {
-        const isBw = isBodyweightRef.current ?? set.isBodyweight;
-        if (isBw && (valStr === '' || valStr === undefined || valStr === null)) {
+        if (effectiveIsBw && (valStr === '' || valStr === undefined || valStr === null)) {
           onUpdate('weightKg', 0);
         } else {
           const num = parseFloatFrench(valStr);
@@ -147,10 +157,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       const next = current.map((s) => (s.id === stepId ? { ...s, [field]: num } : s));
       onUpdate('dropSteps', next);
     }
-  }, [onUpdate, set.dropSteps, set.isBodyweight]);
+  }, [onUpdate, set.dropSteps, set.isBodyweight, userWeight]);
 
   // Passage au champ suivant (KG ➔ REPS ➔ RIR) — Réactivité instantanée (<1ms)
-  const handleKeypadNext = useCallback((currentVal?: string) => {
+  const handleKeypadNext = useCallback((currentVal?: string, isBw?: boolean) => {
     if (!keypadTarget) return;
     const targetToCommit = keypadTarget;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
@@ -177,12 +187,12 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
     // 2. Commit asynchrone non-bloquant pour 0ms de latence perçue
     setTimeout(() => {
-      commitValue(targetToCommit, valToCommit);
+      commitValue(targetToCommit, valToCommit, isBw);
     }, 0);
   }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad, set.type, isRirEnabled, set.completed, onToggleComplete]);
 
   // Retour au champ précédent (RIR ➔ REPS ➔ KG)
-  const handleKeypadPrevious = useCallback((currentVal?: string) => {
+  const handleKeypadPrevious = useCallback((currentVal?: string, isBw?: boolean) => {
     if (!keypadTarget) return;
     const targetToCommit = keypadTarget;
     const valToCommit = currentVal !== undefined ? currentVal : tempValue;
@@ -200,15 +210,15 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     }
 
     setTimeout(() => {
-      commitValue(targetToCommit, valToCommit);
+      commitValue(targetToCommit, valToCommit, isBw);
     }, 0);
   }, [keypadTarget, tempValue, commitValue, handleOpenMainKeypad, handleOpenDropKeypad]);
 
   // Validation finale
-  const handleKeypadValidate = useCallback((finalVal?: string) => {
+  const handleKeypadValidate = useCallback((finalVal?: string, isBw?: boolean) => {
     if (!keypadTarget) return;
     const valToCommit = finalVal !== undefined ? finalVal : tempValue;
-    commitValue(keypadTarget, valToCommit);
+    commitValue(keypadTarget, valToCommit, isBw);
 
     if (keypadTarget.type === 'main' && !set.completed) {
       onToggleComplete();
@@ -216,15 +226,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     setKeypadTarget(null);
   }, [keypadTarget, tempValue, commitValue, set.completed, onToggleComplete]);
 
-  const handleKeypadClose = useCallback((currentVal?: string) => {
+  const handleKeypadClose = useCallback((currentVal?: string, isBw?: boolean) => {
     if (keypadTarget) {
       const valToCommit = currentVal !== undefined ? currentVal : tempValue;
       if (valToCommit !== '') {
-        commitValue(keypadTarget, valToCommit);
+        commitValue(keypadTarget, valToCommit, isBw);
+      } else if (isBw !== undefined && isBw !== set.isBodyweight) {
+        commitValue(keypadTarget, '', isBw);
       }
     }
     setKeypadTarget(null);
-  }, [keypadTarget, tempValue, commitValue]);
+  }, [keypadTarget, tempValue, commitValue, set.isBodyweight]);
 
   const handleAddDropStep = () => {
     const current = set.dropSteps || [];
@@ -589,7 +601,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           activeField={keypadTarget.type === 'main' ? keypadTarget.field : (keypadTarget.field as NumericFieldType)}
           value={tempValue}
           previousValue={set.previous}
-          isBodyweight={keypadTarget.type === 'main' ? set.isBodyweight : false}
+          isBodyweight={keypadTarget.type === 'main' ? (isBodyweightRef.current ?? set.isBodyweight) : false}
           onToggleBodyweight={keypadTarget.type === 'main' ? handleToggleBodyweight : undefined}
           ghostValue={
             keypadTarget.type === 'main'

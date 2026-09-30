@@ -14,7 +14,7 @@ export type NumericFieldType = 'weightKg' | 'reps' | 'rir';
 
 export interface CustomNumericKeypadProps {
   visible: boolean;
-  onClose: (currentVal?: string) => void;
+  onClose: (currentVal?: string, isBodyweight?: boolean) => void;
   setNumber: number;
   activeField: NumericFieldType;
   value: string;
@@ -22,9 +22,9 @@ export interface CustomNumericKeypadProps {
   ghostValue?: string;
   ghostLabel?: string;
   onChangeValue?: (val: string) => void;
-  onNextField?: (currentVal: string) => void;
-  onPreviousField?: (currentVal: string) => void;
-  onValidate?: (finalVal: string) => void;
+  onNextField?: (currentVal: string, isBodyweight?: boolean) => void;
+  onPreviousField?: (currentVal: string, isBodyweight?: boolean) => void;
+  onValidate?: (finalVal: string, isBodyweight?: boolean) => void;
   onClear?: () => void;
   isLastField?: boolean;
   isBodyweight?: boolean;
@@ -244,23 +244,49 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   localValueRef.current = localValue;
 
   const [localIsBodyweight, setLocalIsBodyweight] = useState<boolean>(Boolean(isBodyweight));
+  const localIsBodyweightRef = useRef<boolean>(Boolean(isBodyweight));
+  localIsBodyweightRef.current = localIsBodyweight;
 
-  // Synchronisation du buffer local uniquement lors de l'ouverture ou du changement de cible
+  // Détection synchrone du changement de champ/série/valeur dès le render pour 0ms de latence
+  const [prevField, setPrevField] = useState(activeField);
+  const [prevSetNumber, setPrevSetNumber] = useState(setNumber);
+  const [prevVisible, setPrevVisible] = useState(visible);
+  const [prevIncomingValue, setPrevIncomingValue] = useState(value);
+
+  if (
+    activeField !== prevField ||
+    setNumber !== prevSetNumber ||
+    visible !== prevVisible ||
+    (value !== prevIncomingValue && value !== localValueRef.current)
+  ) {
+    setPrevField(activeField);
+    setPrevSetNumber(setNumber);
+    setPrevVisible(visible);
+    setPrevIncomingValue(value);
+    setLocalValue(value);
+    localValueRef.current = value;
+    setLocalIsBodyweight(Boolean(isBodyweight));
+    localIsBodyweightRef.current = Boolean(isBodyweight);
+  }
+
+  // Synchronisation supplémentaire du buffer local en cas d'événements asynchrones
   useEffect(() => {
     if (visible) {
       setLocalValue(value);
       localValueRef.current = value;
       setLocalIsBodyweight(Boolean(isBodyweight));
+      localIsBodyweightRef.current = Boolean(isBodyweight);
     }
   }, [visible, activeField, setNumber, value, isBodyweight]);
 
+  // Bascule instantanée du mode PDC (0ms de latence, aucun appel synchrone bloquant vers le parent)
   const handleTogglePdc = useCallback(() => {
     setLocalIsBodyweight((prev) => {
       const next = !prev;
-      onToggleBodyweight?.(next);
+      localIsBodyweightRef.current = next;
       return next;
     });
-  }, [onToggleBodyweight]);
+  }, []);
 
   // Titre et unité de l'en-tête selon le champ actif
   const getFieldHeaderInfo = useCallback(() => {
@@ -314,37 +340,46 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     }
   }, [onClear]);
 
-  // Action Suivant (passer au champ suivant en transmettant la valeur locale)
+  // Action Suivant (passer au champ suivant en transmettant la valeur locale et le statut PDC)
   const handleNext = useCallback(() => {
     const current = localValueRef.current;
+    const isBw = localIsBodyweightRef.current;
+    // Réinitialise immédiatement le buffer local pour la transition instantanée
+    setLocalValue('');
+    localValueRef.current = '';
     if (onNextField) {
-      onNextField(current);
+      onNextField(current, isBw);
     }
   }, [onNextField]);
 
-  // Action Précédent (retourner au champ précédent en transmettant la valeur locale)
+  // Action Précédent (retourner au champ précédent en transmettant la valeur locale et le statut PDC)
   const handlePrevious = useCallback(() => {
     const current = localValueRef.current;
+    const isBw = localIsBodyweightRef.current;
+    setLocalValue('');
+    localValueRef.current = '';
     if (onPreviousField) {
-      onPreviousField(current);
+      onPreviousField(current, isBw);
     }
   }, [onPreviousField]);
 
-  // Action Valider (valider et fermer en transmettant la valeur locale)
+  // Action Valider (valider et fermer en transmettant la valeur locale et le statut PDC)
   const handleValidate = useCallback(() => {
     const current = localValueRef.current;
+    const isBw = localIsBodyweightRef.current;
     if (onValidate) {
-      onValidate(current);
+      onValidate(current, isBw);
     }
   }, [onValidate]);
 
   const effectiveIsLastField = isLastField !== undefined ? isLastField : (!onNextField || activeField === 'rir');
 
-  // Action Fermer (ferme le modal en transmettant la valeur locale en cours)
+  // Action Fermer (ferme le modal en transmettant la valeur locale en cours et le statut PDC)
   const handleClose = useCallback(() => {
     const current = localValueRef.current;
+    const isBw = localIsBodyweightRef.current;
     if (onClose) {
-      onClose(current);
+      onClose(current, isBw);
     }
   }, [onClose]);
 
@@ -444,14 +479,47 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               </View>
             </View>
 
-            <TouchableOpacity
-              onPress={handleClose}
-              style={[styles.closeButton, { backgroundColor: theme.surface }]}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <X size={20} color={theme.text} />
-            </TouchableOpacity>
+            <View style={styles.headerRightContainer}>
+              {activeField === 'weightKg' && (
+                <Pressable
+                  unstable_pressDelay={0}
+                  onPress={handleTogglePdc}
+                  style={({ pressed }) => [
+                    styles.headerPdcBtn,
+                    {
+                      backgroundColor: localIsBodyweight
+                        ? theme.accent
+                        : (pressed ? `${theme.accent}25` : theme.surface),
+                      borderColor: localIsBodyweight
+                        ? theme.accent
+                        : (pressed ? theme.accent : theme.border),
+                      transform: [{ scale: pressed ? 0.94 : 1 }],
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.headerPdcText,
+                      {
+                        color: localIsBodyweight ? '#FFFFFF' : theme.accent,
+                        fontWeight: '900',
+                      },
+                    ]}
+                  >
+                    PDC
+                  </Text>
+                </Pressable>
+              )}
+
+              <TouchableOpacity
+                onPress={handleClose}
+                style={[styles.closeButton, { backgroundColor: theme.surface }]}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Affichage du mode de saisie selon le champ actif */}
@@ -479,34 +547,6 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               <View style={styles.quickChipsBar}>
                 {activeField === 'weightKg' ? (
                   <>
-                    <Pressable
-                      unstable_pressDelay={0}
-                      onPress={handleTogglePdc}
-                      style={({ pressed }) => [
-                        styles.chipBtn,
-                        {
-                          backgroundColor: localIsBodyweight
-                            ? theme.accent
-                            : (pressed ? `${theme.accent}25` : theme.surface),
-                          borderColor: localIsBodyweight
-                            ? theme.accent
-                            : (pressed ? theme.accent : theme.border),
-                          transform: [{ scale: pressed ? 0.94 : 1 }],
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          {
-                            color: localIsBodyweight ? '#FFFFFF' : theme.accent,
-                            fontWeight: '900',
-                          },
-                        ]}
-                      >
-                        PDC
-                      </Text>
-                    </Pressable>
                     <Pressable
                       unstable_pressDelay={0}
                       onPress={() => handleQuickIncrement(-2.5)}
@@ -782,13 +822,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginLeft: 6,
   },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  headerPdcBtn: {
+    paddingHorizontal: 14,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  headerPdcText: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
   /* Mode RIR : Rangée unique de choix rapide */
   rirContainer: {
