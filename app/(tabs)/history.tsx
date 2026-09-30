@@ -132,7 +132,7 @@ export default function HistoryTab() {
           <CalendarView history={historyList} cardioSessions={cardioList} />
 
           {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
-          <ActivitySummaryCard history={historyList} />
+          <ActivitySummaryCard history={historyList} cardioSessions={cardioList} />
 
           {/* 3. Répartition Scientifique du Volume Musculaire (MEV / MAV) */}
           <WeeklyMuscleVolumeCard />

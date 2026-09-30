@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary } from '../../types';
+import { WorkoutSession, CircuitBlock, getSessionBlocks, formatCircuitSummary, CardioSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
@@ -13,16 +13,18 @@ import { PastSessionDetailModal } from './PastSessionDetailModal';
 interface ActivitySummaryCardProps {
   session?: WorkoutSession;
   history?: WorkoutSession[];
+  cardioSessions?: CardioSession[];
   onDeleteSession?: (sessionId: string) => void;
 }
 
 export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   session,
   history,
+  cardioSessions,
   onDeleteSession,
 }) => {
   const { theme } = useTheme();
-  const { deleteWorkoutSession } = useWorkout();
+  const { data, deleteWorkoutSession } = useWorkout();
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const router = useRouter();
 
@@ -230,8 +232,9 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   }
 
   // Mode 2: Bloc de statistiques de l'activité de la semaine (commençant au lundi)
-  const historyList = history || [];
-  
+  const historyList = history || data?.history || [];
+  const effectiveCardio = cardioSessions || data?.cardioSessions || [];
+
   // Obtenir le lundi 00:00:00 de la semaine en cours
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0: Dimanche, 1: Lundi, ...
@@ -243,9 +246,14 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   const currentWeekSessions = historyList.filter(
     (s) => new Date(s.startTime) >= startOfCurrentWeek
   );
+  const currentWeekCardios = effectiveCardio.filter(
+    (c) => new Date(c.date) >= startOfCurrentWeek
+  );
 
+  const totalSessionsCount = currentWeekSessions.length + currentWeekCardios.length;
   const totalVolume = currentWeekSessions.reduce((acc, s) => acc + s.totalVolumeKg, 0);
-  const totalSeconds = currentWeekSessions.reduce((acc, s) => acc + s.durationSeconds, 0);
+  const cardioSeconds = currentWeekCardios.reduce((acc, c) => acc + (c.durationMinutes || 0) * 60, 0);
+  const totalSeconds = currentWeekSessions.reduce((acc, s) => acc + s.durationSeconds, 0) + cardioSeconds;
   const totalHours = Math.round((totalSeconds / 3600) * 10) / 10;
 
   return (
@@ -258,8 +266,18 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
       <View style={styles.metricsGrid}>
         <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Award size={18} color={theme.accent} />
-          <Text style={[styles.value, { color: theme.text }]}>{currentWeekSessions.length}</Text>
+          <Text style={[styles.value, { color: theme.text }]}>{totalSessionsCount}</Text>
           <Text style={[styles.label, { color: theme.textMuted }]}>Séances</Text>
+          {currentWeekCardios.length > 0 && (
+            <Text
+              style={[styles.subDetail, { color: theme.textMuted }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {currentWeekSessions.length} muscu · {currentWeekCardios.length} cardio
+            </Text>
+          )}
         </View>
 
         <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -303,8 +321,9 @@ const styles = StyleSheet.create({
   metricBox: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     borderRadius: 12,
     borderWidth: 1,
     marginHorizontal: 4,
@@ -318,6 +337,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
+  },
+  subDetail: {
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
   },
   sessionHeaderRow: {
     flexDirection: 'row',
