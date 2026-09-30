@@ -54,6 +54,7 @@ import {
   Plus,
   ArrowLeft,
   Check,
+  CheckCircle,
   Repeat,
   Search,
   SkipForward,
@@ -76,6 +77,7 @@ import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal
 import { WorkoutToolsModal } from "../src/components/Workout/WorkoutToolsModal";
 import { WorkoutNoteModal } from "../src/components/Workout/WorkoutNoteModal";
 import { TermInfoTooltip } from "../src/components/UI/TermInfoTooltip";
+import { calculateWorkoutTotalVolume } from "../src/services/analyticsService";
 
 const formatMinutesSeconds = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -91,6 +93,17 @@ const formatDuration = (seconds: number = 0): string => {
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   if (hrs > 0) {
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  }
+  return `${pad(mins)}:${pad(secs)}`;
+};
+
+const formatSummaryDuration = (seconds: number = 0): string => {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  if (hrs > 0) {
+    return `${pad(hrs)}:${pad(mins)}`;
   }
   return `${pad(mins)}:${pad(secs)}`;
 };
@@ -276,6 +289,7 @@ export default function LiveWorkoutScreen() {
   const [showAddExModal, setShowAddExModal] = useState(false);
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
+  const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showToolsModal, setShowToolsModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
@@ -763,7 +777,46 @@ export default function LiveWorkoutScreen() {
     );
   }
 
-  const handleFinish = async () => {
+  const workoutSummaryStats = useMemo(() => {
+    const stats = calculateWorkoutTotalVolume(
+      activeSession?.exercises,
+      blocks,
+      {
+        isCircuit: activeSession?.isCircuit,
+        circuitRounds: activeSession?.circuitRounds,
+        completedRoundsCount: activeSession?.completedRoundsCount,
+        circuitStates,
+      }
+    );
+    const completedSetsCount = stats.completedCount || activeSession?.completedSetsCount || 0;
+    const totalSetsCount = Math.max(stats.totalCount || 0, activeSession?.totalSetsCount || 0, completedSetsCount);
+    const totalVolume = Math.round(stats.volume || activeSession?.totalVolumeKg || 0);
+
+    let secs = activeSession?.durationSeconds || 0;
+    if (activeSession?.hasStarted && !activeSession?.isPaused && activeSession?.startTime) {
+      const elapsed = Math.floor((Date.now() - new Date(activeSession.startTime).getTime()) / 1000);
+      secs = Math.max(secs, elapsed);
+    }
+
+    return {
+      durationFormatted: formatSummaryDuration(secs),
+      totalVolumeKg: totalVolume,
+      completedSetsCount,
+      totalSetsCount,
+    };
+  }, [
+    activeSession,
+    blocks,
+    circuitStates,
+    showFinishConfirmModal,
+  ]);
+
+  const handleFinish = () => {
+    setShowFinishConfirmModal(true);
+  };
+
+  const handleConfirmFinish = async () => {
+    setShowFinishConfirmModal(false);
     const isFirstEverCompletedSession = !data?.hasCompletedFirstWorkout;
 
     const totalCompletedRounds = Object.values(circuitStates).reduce(
@@ -2231,6 +2284,118 @@ export default function LiveWorkoutScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* ---------------- MODALE DE CONFIRMATION TERMINER LA SÉANCE ---------------- */}
+      <Modal
+        visible={showFinishConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFinishConfirmModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.finishModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFinishConfirmModal(false)}
+        >
+          <View
+            style={[
+              styles.finishModalCard,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View
+              style={[
+                styles.finishModalIconCircle,
+                { backgroundColor: `${theme.accent}18` },
+              ]}
+            >
+              <CheckCircle size={36} color={theme.accent} />
+            </View>
+
+            <Text style={[styles.finishModalTitle, { color: theme.text }]}>
+              Terminer la séance ?
+            </Text>
+
+            <Text style={[styles.finishModalDesc, { color: theme.textMuted }]}>
+              Récapitulatif de votre progression avant enregistrement :
+            </Text>
+
+            <View
+              style={[
+                styles.finishStatsGrid,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
+              {/* Durée de la séance */}
+              <View style={styles.finishStatRow}>
+                <View style={styles.finishStatLabelContainer}>
+                  <Clock size={16} color={theme.accent} />
+                  <Text style={[styles.finishStatLabelText, { color: theme.textMuted }]}>
+                    Durée de la séance
+                  </Text>
+                </View>
+                <Text style={[styles.finishStatValueText, { color: theme.text }]}>
+                  {workoutSummaryStats.durationFormatted}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.finishStatDivider,
+                  { backgroundColor: theme.border },
+                ]}
+              />
+
+              {/* Volume total */}
+              <View style={styles.finishStatRow}>
+                <View style={styles.finishStatLabelContainer}>
+                  <Zap size={16} color={theme.accent} />
+                  <Text style={[styles.finishStatLabelText, { color: theme.textMuted }]}>
+                    Volume total
+                  </Text>
+                </View>
+                <Text style={[styles.finishStatValueText, { color: theme.text }]}>
+                  {workoutSummaryStats.totalVolumeKg.toLocaleString("fr-FR")} kg
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.finishStatDivider,
+                  { backgroundColor: theme.border },
+                ]}
+              />
+
+              {/* Séries validées */}
+              <View style={styles.finishStatRow}>
+                <View style={styles.finishStatLabelContainer}>
+                  <Check size={16} color={theme.accent} />
+                  <Text style={[styles.finishStatLabelText, { color: theme.textMuted }]}>
+                    Séries validées
+                  </Text>
+                </View>
+                <Text style={[styles.finishStatValueText, { color: theme.text }]}>
+                  {workoutSummaryStats.completedSetsCount}/{workoutSummaryStats.totalSetsCount}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.finishModalActions}>
+              <Button
+                title="Confirmer & Terminer"
+                variant="primary"
+                onPress={handleConfirmFinish}
+              />
+              <Button
+                title="Reprendre l'entraînement"
+                variant="outline"
+                onPress={() => setShowFinishConfirmModal(false)}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <ReorderBlocksModal
         visible={showReorderModal}
         onClose={() => setShowReorderModal(false)}
@@ -2863,6 +3028,83 @@ const styles = StyleSheet.create({
   abandonConfirmBtnText: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  finishModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  finishModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 22,
+    alignItems: "center",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+  },
+  finishModalIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  finishModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  finishModalDesc: {
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 18,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  finishStatsGrid: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+  },
+  finishStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 7,
+  },
+  finishStatLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  finishStatLabelText: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  finishStatValueText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  finishStatDivider: {
+    height: 1,
+    width: "100%",
+    marginVertical: 2,
+  },
+  finishModalActions: {
+    width: "100%",
+    gap: 10,
   },
   nudgeToast: {
     position: "absolute",
