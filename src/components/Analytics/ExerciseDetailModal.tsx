@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, 
 import { X, Trophy, Activity, Calendar, Dumbbell } from 'lucide-react-native';
 import { WorkoutSession, getSessionBlocks } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { calculateE1RM, calculateMaxE1RM } from '../../services/analyticsService';
+import { calculateE1RM } from '../../services/analyticsService';
 
 interface ExerciseDetailModalProps {
   visible: boolean;
@@ -96,8 +96,7 @@ export default function ExerciseDetailModal({
       });
     });
 
-    const maxPrRecord = calculateMaxE1RM(history, exerciseName);
-    const e1RM = maxPrRecord ? maxPrRecord.e1RM : (bestWeight > 0 ? calculateE1RM(bestWeight, bestReps) : null);
+    const e1RM = (bestWeight > 0 && bestReps > 0 && bestReps <= 12) ? calculateE1RM(bestWeight, bestReps) : null;
 
     return {
       exerciseHistory: historyItems,

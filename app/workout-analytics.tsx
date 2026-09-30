@@ -35,6 +35,7 @@ import {
 import ExerciseDetailModal from "../src/components/Analytics/ExerciseDetailModal";
 import { PastSessionDetailModal } from "../src/components/History/PastSessionDetailModal";
 import { calculateE1RM } from "../src/services/analyticsService";
+import { TermInfoTooltip } from "../src/components/UI/TermInfoTooltip";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -301,20 +302,23 @@ export default function WorkoutAnalyticsScreen() {
       if (bestWeight > 0 || bestReps > 0) {
         const e1RM = calculateE1RM(bestWeight, bestReps);
         let valueText = "";
+        let subText = "";
         if (bestWeight > 0) {
+          valueText = `${bestWeight} kg × ${bestReps}`;
           if (bestReps > 12 || e1RM === null) {
-            valueText = "Non fiable (>12 reps)";
+            subText = "Non fiable (>12 reps)";
           } else {
-            valueText = `${e1RM} kg e1RM`;
+            subText = `${e1RM} kg e1RM`;
           }
         } else {
           valueText = `${bestReps} reps`;
+          subText = "Poids de corps";
         }
         return {
           name: exItem.exerciseName,
           dateText: lastDateFormatted || "RÉCENT",
           valueText,
-          subText: bestWeight > 0 ? `${bestWeight} kg × ${bestReps}` : "Poids de corps",
+          subText,
         };
       }
 
@@ -324,8 +328,9 @@ export default function WorkoutAnalyticsScreen() {
         const r = firstSet.reps || 10;
         if (w > 0) {
           const e1RM = calculateE1RM(w, r);
-          const valueText = (r > 12 || e1RM === null) ? "Non fiable (>12 reps)" : `${e1RM} kg e1RM`;
-          return { name: exItem.exerciseName, dateText: "OBJECTIF", valueText, subText: `${w} kg × ${r}` };
+          const valueText = `${w} kg × ${r}`;
+          const subText = (r > 12 || e1RM === null) ? "Non fiable (>12 reps)" : `${e1RM} kg e1RM`;
+          return { name: exItem.exerciseName, dateText: "OBJECTIF", valueText, subText };
         }
         return { name: exItem.exerciseName, dateText: "OBJECTIF", valueText: `${r} reps`, subText: "Poids de corps" };
       }
@@ -532,7 +537,16 @@ export default function WorkoutAnalyticsScreen() {
 
         {/* Records / PRs Section */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>PRs DANS CETTE SÉANCE</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>PRs DANS CETTE SÉANCE</Text>
+            <TermInfoTooltip
+              termKey="PR_E1RM"
+              customTitle="PR & e1RM"
+              customExplanation={"PR (Record Personnel) : Meilleure performance réalisée (Poids × Répétitions).\ne1RM (1RM Estimé) : Charge maximale théorique sur 1 répétition calculée selon la formule d'Epley. Valable jusqu'à 12 répétitions."}
+              size={14}
+              iconColor={theme.textMuted}
+            />
+          </View>
           <Text style={[styles.recordsBadgeText, { color: theme.accent }]}>Records</Text>
         </View>
 

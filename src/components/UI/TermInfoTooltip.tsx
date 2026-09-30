@@ -42,6 +42,10 @@ export const WORKOUT_TERMS: Record<string, TermDefinition> = {
     title: 'Échec musculaire (Failure)',
     explanation: 'Point où le muscle ne peut plus compléter la phase concentrique d\'une répétition avec une trajectoire et une technique correctes.',
   },
+  PR_E1RM: {
+    title: 'PR & e1RM',
+    explanation: 'PR (Record Personnel) : Meilleure performance réalisée (Poids × Répétitions).\ne1RM (1RM Estimé) : Charge maximale théorique sur 1 répétition calculée selon la formule d\'Epley. Valable jusqu\'à 12 répétitions.',
+  },
 };
 
 interface TermInfoTooltipProps {
@@ -72,8 +76,8 @@ export const TermInfoTooltip: React.FC<TermInfoTooltipProps> = ({
     if (iconRef.current) {
       iconRef.current.measureInWindow((x, y, width, height) => {
         const screenWidth = Dimensions.get('window').width;
-        const bubbleWidth = 260;
-        const bubbleHeight = 110;
+        const bubbleWidth = Math.min(280, screenWidth - 32);
+        const bubbleHeight = 130;
 
         // Position horizontale centrée sur l'icône, limitée aux bordures de l'écran
         let left = x + width / 2 - bubbleWidth / 2;
@@ -152,7 +156,8 @@ const styles = StyleSheet.create({
   },
   tooltipBubble: {
     position: 'absolute',
-    width: 260,
+    width: 280,
+    maxWidth: '90%',
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 8,
