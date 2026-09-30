@@ -138,7 +138,9 @@ export default function HistoryTab() {
           <WeeklyMuscleVolumeCard />
 
           {/* 4. Marqueurs de fatigue simples et récupération (Feature 5) */}
-          <FatigueMarkersCard />
+          {data?.profile?.enableFatigueMarkers !== false && (
+            <FatigueMarkersCard />
+          )}
 
           {/* 4. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
           <TouchableOpacity

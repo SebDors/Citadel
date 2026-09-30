@@ -161,6 +161,7 @@ export interface UserProfile {
   availablePlates?: number[];
   dropSetReductionPercent?: number; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
   enableRir?: boolean; // Suivi du RIR (Reps in Reserve) actif par défaut si indéfini
+  enableFatigueMarkers?: boolean; // Actif par défaut si indéfini
 }
 
 export interface CardioSession {

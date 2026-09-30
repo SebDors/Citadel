@@ -28,6 +28,7 @@ import {
   ShieldAlert,
   Info,
   Activity,
+  HeartPulse,
 } from 'lucide-react-native';
 import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import { ExportDataModal } from './ExportDataModal';
@@ -107,6 +108,12 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   const handleToggleRir = (newVal: boolean) => {
     setEnableRir(newVal);
     onUpdateProfile({ enableRir: newVal });
+  };
+
+  const enableFatigueMarkers = profile.enableFatigueMarkers !== false;
+
+  const handleToggleFatigueMarkers = (val: boolean) => {
+    onUpdateProfile({ enableFatigueMarkers: val });
   };
 
   const handleCheckForUpdate = async (isManual: boolean) => {
@@ -368,6 +375,36 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
               <Switch
                 value={enableRir}
                 onValueChange={handleToggleRir}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
+            <View style={[styles.cardDivider, { backgroundColor: theme.border }]} />
+
+            {/* Indicateurs de fatigue & Récupération */}
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabelContainer}>
+                <View style={styles.itemTitleWithIcon}>
+                  <HeartPulse size={18} color={theme.accent} style={{ marginRight: 8 }} />
+                  <Text style={[styles.itemTitle, { color: theme.text }]}>
+                    Indicateurs de fatigue & Récupération
+                  </Text>
+                  <View style={{ marginLeft: 6 }}>
+                    <TermInfoTooltip
+                      customTitle="Indicateurs de fatigue & Récupération"
+                      customExplanation="Analyse hebdomadaire de votre niveau de fatigue physique et de sous-récupération en comparant votre RIR moyen, la durée de vos séances et l'évolution de votre poids de corps sur 4 semaines. Désactivez si vous préférez un historique plus compact sans ces indicateurs."
+                      size={15}
+                    />
+                  </View>
+                </View>
+                <Text style={[styles.itemDescription, { color: theme.textMuted, marginTop: 4, marginBottom: 0 }]}>
+                  Affiche ou masque la carte de surveillance de la récupération dans l'onglet Historique.
+                </Text>
+              </View>
+              <Switch
+                value={enableFatigueMarkers}
+                onValueChange={handleToggleFatigueMarkers}
                 trackColor={{ false: theme.border, true: theme.accent }}
                 thumbColor="#FFFFFF"
               />
