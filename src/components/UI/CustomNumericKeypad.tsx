@@ -826,6 +826,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 12,
+    alignSelf: 'flex-end',
+    marginBottom: 2,
   },
   headerPdcBtn: {
     paddingHorizontal: 14,
