@@ -1120,7 +1120,8 @@ export default function LiveWorkoutScreen() {
             styles.nudgeToast,
             {
               backgroundColor: theme.cardBg,
-              borderColor: theme.accent,
+              borderColor: theme.danger,
+              borderWidth: 1.5,
               opacity: nudgeAnim,
               transform: [
                 {
@@ -1141,13 +1142,13 @@ export default function LiveWorkoutScreen() {
             <View
               style={[
                 styles.nudgeToastIcon,
-                { backgroundColor: `${theme.accent}20` },
+                { backgroundColor: `${theme.danger}25` },
               ]}
             >
-              <Sparkles size={16} color={theme.accent} />
+              <Sparkles size={16} color={theme.danger} />
             </View>
             <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={[styles.nudgeToastTitle, { color: theme.accent }]}>
+              <Text style={[styles.nudgeToastTitle, { color: theme.danger, fontWeight: "800" }]}>
                 Conseil RIR
               </Text>
               <Text style={[styles.nudgeToastText, { color: theme.text }]}>
