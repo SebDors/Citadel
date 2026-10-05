@@ -17,8 +17,10 @@ export const MUSCLE_GROUPS = [
   'Avant-bras',
   'Quadriceps',
   'Ischio-Jambiers',
+  'Fessiers',
   'Grand Fessier',
   'Adducteurs',
+  'Mollets',
   'Mollets (Gastrocnémiens)',
   'Mollets (Soléaire)',
   'Lombaires',
@@ -49,10 +51,9 @@ export const CATEGORY_MUSCLE_GROUPS: Record<
   Jambes: [
     'Quadriceps',
     'Ischio-Jambiers',
-    'Grand Fessier',
+    'Fessiers',
     'Adducteurs',
-    'Mollets (Gastrocnémiens)',
-    'Mollets (Soléaire)',
+    'Mollets',
   ],
   Abdos: ['Abdominaux', 'Obliques'],
 };
@@ -155,23 +156,23 @@ const EXACT_MAPPINGS: Record<string, { muscle: MuscleGroup; subRegion?: string }
   'ischio jambiers': { muscle: 'Ischio-Jambiers' },
   'ischios': { muscle: 'Ischio-Jambiers' },
   'ischio': { muscle: 'Ischio-Jambiers' },
-  'grand fessier': { muscle: 'Grand Fessier' },
-  'fessiers': { muscle: 'Grand Fessier' },
-  'fessier': { muscle: 'Grand Fessier' },
-  'glutes': { muscle: 'Grand Fessier' },
-  'moyen fessier': { muscle: 'Grand Fessier', subRegion: 'Moyen Fessier' },
-  'abducteurs': { muscle: 'Grand Fessier', subRegion: 'Abducteurs' },
+  'grand fessier': { muscle: 'Fessiers', subRegion: 'Grand Fessier' },
+  'fessiers': { muscle: 'Fessiers' },
+  'fessier': { muscle: 'Fessiers' },
+  'glutes': { muscle: 'Fessiers' },
+  'moyen fessier': { muscle: 'Fessiers', subRegion: 'Moyen Fessier' },
+  'abducteurs': { muscle: 'Fessiers', subRegion: 'Abducteurs' },
   'adducteurs': { muscle: 'Adducteurs' },
   'adducteur': { muscle: 'Adducteurs' },
-  'mollets (gastrocnemiens)': { muscle: 'Mollets (Gastrocnémiens)' },
-  'mollets (gastrocnemien)': { muscle: 'Mollets (Gastrocnémiens)' },
-  'gastrocnemiens': { muscle: 'Mollets (Gastrocnémiens)' },
-  'mollets': { muscle: 'Mollets (Gastrocnémiens)' },
-  'mollet': { muscle: 'Mollets (Gastrocnémiens)' },
-  'mollets (soleaire)': { muscle: 'Mollets (Soléaire)' },
-  'mollets (soleaires)': { muscle: 'Mollets (Soléaire)' },
-  'soleaire': { muscle: 'Mollets (Soléaire)' },
-  'tibial anterieur': { muscle: 'Mollets (Soléaire)', subRegion: 'Tibial antérieur' },
+  'mollets (gastrocnemiens)': { muscle: 'Mollets', subRegion: 'Gastrocnémiens' },
+  'mollets (gastrocnemien)': { muscle: 'Mollets', subRegion: 'Gastrocnémiens' },
+  'gastrocnemiens': { muscle: 'Mollets', subRegion: 'Gastrocnémiens' },
+  'mollets': { muscle: 'Mollets' },
+  'mollet': { muscle: 'Mollets' },
+  'mollets (soleaire)': { muscle: 'Mollets', subRegion: 'Soléaire' },
+  'mollets (soleaires)': { muscle: 'Mollets', subRegion: 'Soléaire' },
+  'soleaire': { muscle: 'Mollets', subRegion: 'Soléaire' },
+  'tibial anterieur': { muscle: 'Mollets', subRegion: 'Tibial antérieur' },
   'cuisses': { muscle: 'Quadriceps', subRegion: 'Cuisses' },
   'cuisse': { muscle: 'Quadriceps', subRegion: 'Cuisses' },
   'jambes': { muscle: 'Quadriceps' },
@@ -284,13 +285,13 @@ export function normalizeMuscle(raw: string): { muscle: MuscleGroup; subRegion?:
   } else if (cleaned.includes('quadri') || cleaned.includes('femoral')) {
     resolved = { muscle: 'Quadriceps' };
   } else if (cleaned.includes('fessier') || cleaned.includes('glute')) {
-    resolved = { muscle: 'Grand Fessier' };
+    resolved = { muscle: 'Fessiers' };
   } else if (cleaned.includes('adduct')) {
     resolved = { muscle: 'Adducteurs' };
   } else if (cleaned.includes('soleaire') || cleaned.includes('soléaire')) {
-    resolved = { muscle: 'Mollets (Soléaire)' };
+    resolved = { muscle: 'Mollets', subRegion: 'Soléaire' };
   } else if (cleaned.includes('mollet') || cleaned.includes('gastroc')) {
-    resolved = { muscle: 'Mollets (Gastrocnémiens)' };
+    resolved = { muscle: 'Mollets', subRegion: 'Gastrocnémiens' };
   } else if (cleaned.includes('lomb') || cleaned.includes('rachis')) {
     resolved = { muscle: 'Lombaires' };
   } else if (cleaned.includes('oblique')) {
