@@ -632,30 +632,24 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActiveSession((prevSession) => {
       if (!prevSession) return prevSession;
 
-      const currentExercises = prevSession.exercises || [];
-      const updatedExercises = currentExercises.map((ex) => {
-        if (ex.id !== exerciseId) return ex;
-
-        const updatedSets = ex.sets.map((s) => {
-          if (s.id !== setId) return s;
-          return { ...s, [field]: value };
-        });
-
-        return { ...ex, sets: updatedSets };
+      const currentBlocks = getSessionBlocks(prevSession);
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single' && block.exercise.id === exerciseId) {
+          const updatedSets = block.exercise.sets.map((s) => {
+            if (s.id !== setId) return s;
+            return { ...s, [field]: value };
+          });
+          return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+        }
+        return block;
       });
 
-      const updatedBlocks = prevSession.blocks
-        ? prevSession.blocks.map((block) => {
-            if (block.type === 'single' && block.exercise.id === exerciseId) {
-              const updatedSets = block.exercise.sets.map((s) => {
-                if (s.id !== setId) return s;
-                return { ...s, [field]: value };
-              });
-              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
-            }
-            return block;
-          })
-        : undefined;
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
 
       const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
         updatedExercises,
@@ -786,62 +780,41 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let exerciseName = '';
       let isMarkingCompleted = false;
 
-      const currentExercises = prevSession.exercises || [];
-      const updatedExercises = currentExercises.map((ex) => {
-        if (ex.id !== exerciseId) return ex;
-        exerciseName = ex.exerciseName;
-        targetRestSeconds = ex.restSeconds || 75;
+      const currentBlocks = getSessionBlocks(prevSession);
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single' && block.exercise.id === exerciseId) {
+          exerciseName = block.exercise.exerciseName;
+          targetRestSeconds = block.exercise.restSeconds || 75;
 
-        const updatedSets = ex.sets.map((s) => {
-          if (s.id !== setId) return s;
-          const newCompleted = !s.completed;
-          if (newCompleted) isMarkingCompleted = true;
+          const updatedSets = block.exercise.sets.map((s) => {
+            if (s.id !== setId) return s;
+            const newCompleted = !s.completed;
+            if (newCompleted) isMarkingCompleted = true;
 
-          const isBw = Boolean(ex.isBodyweight || s.isBodyweight);
-          const bodyweightUsedKg = isBw && newCompleted
-            ? (data?.profile?.currentWeightKg || s.bodyweightUsedKg)
-            : s.bodyweightUsedKg;
+            const isBw = Boolean(block.exercise.isBodyweight || s.isBodyweight);
+            const bodyweightUsedKg = isBw && newCompleted
+              ? (data?.profile?.currentWeightKg || s.bodyweightUsedKg)
+              : s.bodyweightUsedKg;
 
-          return {
-            ...s,
-            completed: newCompleted,
-            completedAt: newCompleted ? new Date().toISOString() : undefined,
-            ...(isBw ? { isBodyweight: true, bodyweightUsedKg } : {}),
-          };
-        });
+            return {
+              ...s,
+              completed: newCompleted,
+              completedAt: newCompleted ? new Date().toISOString() : undefined,
+              ...(isBw ? { isBodyweight: true, bodyweightUsedKg } : {}),
+            };
+          });
 
-        return { ...ex, sets: updatedSets };
+          return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
+        }
+        return block;
       });
 
-      const updatedBlocks = prevSession.blocks
-        ? prevSession.blocks.map((block) => {
-            if (block.type === 'single' && block.exercise.id === exerciseId) {
-              exerciseName = block.exercise.exerciseName;
-              targetRestSeconds = block.exercise.restSeconds || 75;
-
-              const updatedSets = block.exercise.sets.map((s) => {
-                if (s.id !== setId) return s;
-                const newCompleted = !s.completed;
-                if (newCompleted) isMarkingCompleted = true;
-
-                const isBw = Boolean(block.exercise.isBodyweight || s.isBodyweight);
-                const bodyweightUsedKg = isBw && newCompleted
-                  ? (data?.profile?.currentWeightKg || s.bodyweightUsedKg)
-                  : s.bodyweightUsedKg;
-
-                return {
-                  ...s,
-                  completed: newCompleted,
-                  completedAt: newCompleted ? new Date().toISOString() : undefined,
-                  ...(isBw ? { isBodyweight: true, bodyweightUsedKg } : {}),
-                };
-              });
-
-              return { ...block, exercise: { ...block.exercise, sets: updatedSets } };
-            }
-            return block;
-          })
-        : undefined;
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
 
       const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
         updatedExercises,
@@ -894,68 +867,45 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addSet = (exerciseId: string) => {
     if (!activeSession) return;
 
-    const currentExercises = activeSession.exercises || [];
-    const updatedExercises = currentExercises.map((ex) => {
-      if (ex.id !== exerciseId) return ex;
+    const currentBlocks = getSessionBlocks(activeSession);
+    const updatedBlocks = currentBlocks.map((block) => {
+      if (block.type === 'single' && block.exercise.id === exerciseId) {
+        const lastSet = block.exercise.sets[block.exercise.sets.length - 1];
+        const nextSetNum = block.exercise.sets.length + 1;
+        const prevPerf = getPreviousSetPerformance(
+          data?.history || [],
+          block.exercise.exerciseId,
+          block.exercise.exerciseName,
+          nextSetNum,
+          activeSession.id
+        );
+        const isBw = Boolean(block.exercise.isBodyweight || lastSet?.isBodyweight);
+        const newSet: WorkoutSet = {
+          id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          setNumber: nextSetNum,
+          type: lastSet ? lastSet.type : 'normal',
+          weightKg: undefined,
+          reps: undefined,
+          rir: undefined,
+          completed: false,
+          previous: prevPerf || lastSet?.previous || undefined,
+          isBodyweight: isBw,
+        };
 
-      const lastSet = ex.sets[ex.sets.length - 1];
-      const nextSetNum = ex.sets.length + 1;
-      const prevPerf = getPreviousSetPerformance(
-        data?.history || [],
-        ex.exerciseId,
-        ex.exerciseName,
-        nextSetNum,
-        activeSession.id
-      );
-      const isBw = Boolean(ex.isBodyweight || lastSet?.isBodyweight);
-      const newSet: WorkoutSet = {
-        id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        setNumber: nextSetNum,
-        type: lastSet ? lastSet.type : 'normal',
-        weightKg: undefined,
-        reps: undefined,
-        rir: undefined,
-        completed: false,
-        previous: prevPerf || lastSet?.previous || undefined,
-        isBodyweight: isBw,
-      };
-
-      return { ...ex, sets: [...ex.sets, newSet] };
+        return {
+          ...block,
+          exercise: { ...block.exercise, sets: [...block.exercise.sets, newSet] },
+        };
+      }
+      return block;
     });
 
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            const lastSet = block.exercise.sets[block.exercise.sets.length - 1];
-            const nextSetNum = block.exercise.sets.length + 1;
-            const prevPerf = getPreviousSetPerformance(
-              data?.history || [],
-              block.exercise.exerciseId,
-              block.exercise.exerciseName,
-              nextSetNum,
-              activeSession.id
-            );
-            const isBw = Boolean(block.exercise.isBodyweight || lastSet?.isBodyweight);
-            const newSet: WorkoutSet = {
-              id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-              setNumber: nextSetNum,
-              type: lastSet ? lastSet.type : 'normal',
-              weightKg: undefined,
-              reps: undefined,
-              rir: undefined,
-              completed: false,
-              previous: prevPerf || lastSet?.previous || undefined,
-              isBodyweight: isBw,
-            };
-
-            return {
-              ...block,
-              exercise: { ...block.exercise, sets: [...block.exercise.sets, newSet] },
-            };
-          }
-          return block;
-        })
-      : undefined;
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -978,32 +928,27 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const removeSet = (exerciseId: string, setId: string) => {
     if (!activeSession) return;
 
-    const currentExercises = activeSession.exercises || [];
-    const updatedExercises = currentExercises.map((ex) => {
-      if (ex.id !== exerciseId) return ex;
+    const currentBlocks = getSessionBlocks(activeSession);
+    const updatedBlocks = currentBlocks.map((block) => {
+      if (block.type === 'single' && block.exercise.id === exerciseId) {
+        const filteredSets = block.exercise.sets
+          .filter((s) => s.id !== setId)
+          .map((s, idx) => ({ ...s, setNumber: idx + 1 }));
 
-      const filteredSets = ex.sets
-        .filter((s) => s.id !== setId)
-        .map((s, idx) => ({ ...s, setNumber: idx + 1 }));
-
-      return { ...ex, sets: filteredSets };
+        return {
+          ...block,
+          exercise: { ...block.exercise, sets: filteredSets },
+        };
+      }
+      return block;
     });
 
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === exerciseId) {
-            const filteredSets = block.exercise.sets
-              .filter((s) => s.id !== setId)
-              .map((s, idx) => ({ ...s, setNumber: idx + 1 }));
-
-            return {
-              ...block,
-              exercise: { ...block.exercise, sets: filteredSets },
-            };
-          }
-          return block;
-        })
-      : undefined;
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -1088,10 +1033,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       newSingleBlocks.push(newBlock);
     });
 
-    const updatedExercises = [...(activeSession.exercises || []), ...newExercises];
-    const updatedBlocks = activeSession.blocks
-      ? [...activeSession.blocks, ...newSingleBlocks]
-      : [...newSingleBlocks];
+    const currentBlocks = getSessionBlocks(activeSession);
+    const updatedBlocks = [...currentBlocks, ...newSingleBlocks];
+
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -1136,9 +1086,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
+    const updatedExercises: WorkoutExercise[] = [];
+    newBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
+
     const updatedSession: WorkoutSession = {
       ...activeSession,
       blocks: newBlocks,
+      exercises: updatedExercises,
       totalSetsCount: totalSets,
     };
 
@@ -1174,9 +1132,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
+
     const updatedSession: WorkoutSession = {
       ...activeSession,
       blocks: updatedBlocks,
+      exercises: updatedExercises,
       totalSetsCount: totalSets,
     };
 
@@ -1187,15 +1153,20 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const removeExercise = (exerciseId: string) => {
     if (!activeSession) return;
 
-    const updatedExercises = (activeSession.exercises || []).filter((ex) => ex.id !== exerciseId);
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.filter((block) => {
-          if (block.type === 'single') {
-            return block.exercise.id !== exerciseId;
-          }
-          return true;
-        })
-      : undefined;
+    const currentBlocks = getSessionBlocks(activeSession);
+    const updatedBlocks = currentBlocks.filter((block) => {
+      if (block.type === 'single') {
+        return block.exercise.id !== exerciseId;
+      }
+      return true;
+    });
+
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -1218,39 +1189,33 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const duplicateExercise = (exerciseId: string) => {
     if (!activeSession) return;
 
-    const currentExercises = activeSession.exercises || [];
-    const targetEx = currentExercises.find((ex) => ex.id === exerciseId);
+    const currentBlocks = getSessionBlocks(activeSession);
+    const updatedBlocks = [...currentBlocks];
+    const targetBlockIndex = updatedBlocks.findIndex(
+      (b) => b.type === 'single' && b.exercise.id === exerciseId
+    );
 
-    let updatedExercises = [...currentExercises];
-    if (targetEx) {
-      const duplicated: WorkoutExercise = {
-        ...JSON.parse(JSON.stringify(targetEx)),
+    if (targetBlockIndex >= 0) {
+      const targetBlock = updatedBlocks[targetBlockIndex] as SingleExerciseBlock;
+      const duplicatedEx: WorkoutExercise = {
+        ...JSON.parse(JSON.stringify(targetBlock.exercise)),
         id: `ex_${Date.now()}`,
-        exerciseName: `${targetEx.exerciseName} (Copie)`,
+        exerciseName: `${targetBlock.exercise.exerciseName} (Copie)`,
       };
-      updatedExercises.push(duplicated);
+      const duplicatedBlock: SingleExerciseBlock = {
+        id: `blk_single_${duplicatedEx.id}`,
+        type: 'single',
+        exercise: duplicatedEx,
+      };
+      updatedBlocks.splice(targetBlockIndex + 1, 0, duplicatedBlock);
     }
 
-    let updatedBlocks = activeSession.blocks ? [...activeSession.blocks] : undefined;
-    if (updatedBlocks) {
-      const targetBlockIndex = updatedBlocks.findIndex(
-        (b) => b.type === 'single' && b.exercise.id === exerciseId
-      );
-      if (targetBlockIndex >= 0) {
-        const targetBlock = updatedBlocks[targetBlockIndex] as SingleExerciseBlock;
-        const duplicatedEx: WorkoutExercise = {
-          ...JSON.parse(JSON.stringify(targetBlock.exercise)),
-          id: `ex_${Date.now()}`,
-          exerciseName: `${targetBlock.exercise.exerciseName} (Copie)`,
-        };
-        const duplicatedBlock: SingleExerciseBlock = {
-          id: `blk_single_${duplicatedEx.id}`,
-          type: 'single',
-          exercise: duplicatedEx,
-        };
-        updatedBlocks.splice(targetBlockIndex + 1, 0, duplicatedBlock);
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
       }
-    }
+    });
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -1283,78 +1248,60 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
     const isBw = catalogEx?.isBodyweight ?? false;
 
-    const updatedExercises = (activeSession.exercises || []).map((ex) => {
-      if (ex.id !== oldExerciseId) return ex;
-      return {
-        ...ex,
-        exerciseId: newExercise.id,
-        exerciseName: newExercise.name,
-        primaryMuscle: newExercise.primaryMuscle,
-        targetMuscles: newExercise.targetMuscles,
-        isBodyweight: isBw,
-        sets: ex.sets.map((s) => ({
-          ...s,
-          isBodyweight: isBw,
-          previous:
-            getPreviousSetPerformance(
-              data?.history || [],
-              newExercise.id,
-              newExercise.name,
-              s.setNumber,
-              activeSession.id
-            ) || s.previous,
-        })),
-      };
+    const currentBlocks = getSessionBlocks(activeSession);
+    const updatedBlocks = currentBlocks.map((block) => {
+      if (block.type === 'single' && block.exercise.id === oldExerciseId) {
+        return {
+          ...block,
+          exercise: {
+            ...block.exercise,
+            exerciseId: newExercise.id,
+            exerciseName: newExercise.name,
+            primaryMuscle: newExercise.primaryMuscle,
+            targetMuscles: newExercise.targetMuscles,
+            isBodyweight: isBw,
+            sets: block.exercise.sets.map((s) => ({
+              ...s,
+              isBodyweight: isBw,
+              previous:
+                getPreviousSetPerformance(
+                  data?.history || [],
+                  newExercise.id,
+                  newExercise.name,
+                  s.setNumber,
+                  activeSession.id
+                ) || s.previous,
+            })),
+          },
+        };
+      }
+      if (block.type === 'circuit') {
+        const hasEx = block.exercises.some((item) => item.id === oldExerciseId);
+        if (hasEx) {
+          return {
+            ...block,
+            exercises: block.exercises.map((item) =>
+              item.id === oldExerciseId
+                ? {
+                    ...item,
+                    exerciseName: newExercise.name,
+                    primaryMuscle: newExercise.primaryMuscle,
+                    targetMuscles: newExercise.targetMuscles,
+                  }
+                : item
+            ),
+          };
+        }
+      }
+      return block;
     });
 
-    const updatedBlocks = activeSession.blocks
-      ? activeSession.blocks.map((block) => {
-          if (block.type === 'single' && block.exercise.id === oldExerciseId) {
-            return {
-              ...block,
-              exercise: {
-                ...block.exercise,
-                exerciseId: newExercise.id,
-                exerciseName: newExercise.name,
-                primaryMuscle: newExercise.primaryMuscle,
-                targetMuscles: newExercise.targetMuscles,
-                isBodyweight: isBw,
-                sets: block.exercise.sets.map((s) => ({
-                  ...s,
-                  isBodyweight: isBw,
-                  previous:
-                    getPreviousSetPerformance(
-                      data?.history || [],
-                      newExercise.id,
-                      newExercise.name,
-                      s.setNumber,
-                      activeSession.id
-                    ) || s.previous,
-                })),
-              },
-            };
-          }
-          if (block.type === 'circuit') {
-            const hasEx = block.exercises.some((item) => item.id === oldExerciseId);
-            if (hasEx) {
-              return {
-                ...block,
-                exercises: block.exercises.map((item) =>
-                  item.id === oldExerciseId
-                    ? {
-                        ...item,
-                        exerciseName: newExercise.name,
-                        primaryMuscle: newExercise.primaryMuscle,
-                        targetMuscles: newExercise.targetMuscles,
-                      }
-                    : item
-                ),
-              };
-            }
-          }
-          return block;
-        })
-      : undefined;
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
 
     const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
       updatedExercises,
@@ -1378,22 +1325,23 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActiveSession((prevSession) => {
       if (!prevSession) return prevSession;
 
-      const updatedExercises = (prevSession.exercises || []).map((ex) => {
-        if (ex.id !== exerciseId) return ex;
-        return { ...ex, restSeconds: newRestSeconds };
+      const currentBlocks = getSessionBlocks(prevSession);
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single' && block.exercise.id === exerciseId) {
+          return {
+            ...block,
+            exercise: { ...block.exercise, restSeconds: newRestSeconds },
+          };
+        }
+        return block;
       });
 
-      const updatedBlocks = prevSession.blocks
-        ? prevSession.blocks.map((block) => {
-            if (block.type === 'single' && block.exercise.id === exerciseId) {
-              return {
-                ...block,
-                exercise: { ...block.exercise, restSeconds: newRestSeconds },
-              };
-            }
-            return block;
-          })
-        : undefined;
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
 
       const updatedSession: WorkoutSession = {
         ...prevSession,
@@ -1410,22 +1358,23 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActiveSession((prevSession) => {
       if (!prevSession) return prevSession;
 
-      const updatedExercises = (prevSession.exercises || []).map((ex) => {
-        if (ex.id !== exerciseId) return ex;
-        return { ...ex, supersetGroup };
+      const currentBlocks = getSessionBlocks(prevSession);
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single' && block.exercise.id === exerciseId) {
+          return {
+            ...block,
+            exercise: { ...block.exercise, supersetGroup },
+          };
+        }
+        return block;
       });
 
-      const updatedBlocks = prevSession.blocks
-        ? prevSession.blocks.map((block) => {
-            if (block.type === 'single' && block.exercise.id === exerciseId) {
-              return {
-                ...block,
-                exercise: { ...block.exercise, supersetGroup },
-              };
-            }
-            return block;
-          })
-        : undefined;
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
 
       const updatedSession: WorkoutSession = {
         ...prevSession,
@@ -1457,9 +1406,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActiveSession((prevSession) => {
       if (!prevSession) return prevSession;
 
+      const currentBlocks = getSessionBlocks(prevSession);
+
       // Chercher le nom de l'exercice pour match robuste ID et nom
       let matchedExName: string | undefined;
-      const singleBlock = (prevSession.blocks || []).find(
+      const singleBlock = currentBlocks.find(
         (b): b is SingleExerciseBlock => b.type === 'single' && b.exercise.id === exerciseId
       );
       if (singleBlock) {
@@ -1470,7 +1421,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           matchedExName = foundInEx.exerciseName;
         } else {
           // Chercher dans circuit
-          (prevSession.blocks || []).forEach((b) => {
+          currentBlocks.forEach((b) => {
             if (b.type === 'circuit') {
               const cEx = b.exercises.find((item) => item.id === exerciseId);
               if (cEx) matchedExName = cEx.exerciseName;
@@ -1479,54 +1430,51 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
 
-      const updatedExercises = (prevSession.exercises || []).map((ex) => {
-        const isMatch =
-          ex.id === exerciseId ||
-          (matchedExName && ex.exerciseName && ex.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
-        if (!isMatch) return ex;
-        return { ...ex, notes: trimmedNotes };
-      });
-
-      const updatedBlocks = prevSession.blocks
-        ? prevSession.blocks.map((block) => {
-            if (block.type === 'single') {
-              const isMatch =
-                block.exercise.id === exerciseId ||
-                (matchedExName &&
-                  block.exercise.exerciseName &&
-                  block.exercise.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
-              if (isMatch) {
-                return {
-                  ...block,
-                  exercise: { ...block.exercise, notes: trimmedNotes },
-                };
-              }
-            }
-            if (block.type === 'circuit') {
-              const hasEx = block.exercises.some(
-                (item) =>
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single') {
+          const isMatch =
+            block.exercise.id === exerciseId ||
+            (matchedExName &&
+              block.exercise.exerciseName &&
+              block.exercise.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
+          if (isMatch) {
+            return {
+              ...block,
+              exercise: { ...block.exercise, notes: trimmedNotes },
+            };
+          }
+        }
+        if (block.type === 'circuit') {
+          const hasEx = block.exercises.some(
+            (item) =>
+              item.id === exerciseId ||
+              (matchedExName &&
+                item.exerciseName &&
+                item.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase())
+          );
+          if (hasEx) {
+            return {
+              ...block,
+              exercises: block.exercises.map((item) => {
+                const isMatch =
                   item.id === exerciseId ||
                   (matchedExName &&
                     item.exerciseName &&
-                    item.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase())
-              );
-              if (hasEx) {
-                return {
-                  ...block,
-                  exercises: block.exercises.map((item) => {
-                    const isMatch =
-                      item.id === exerciseId ||
-                      (matchedExName &&
-                        item.exerciseName &&
-                        item.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
-                    return isMatch ? { ...item, notes: trimmedNotes } : item;
-                  }),
-                };
-              }
-            }
-            return block;
-          })
-        : undefined;
+                    item.exerciseName.trim().toLowerCase() === matchedExName.trim().toLowerCase());
+                return isMatch ? { ...item, notes: trimmedNotes } : item;
+              }),
+            };
+          }
+        }
+        return block;
+      });
+
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
 
       const updatedSession: WorkoutSession = {
         ...prevSession,
