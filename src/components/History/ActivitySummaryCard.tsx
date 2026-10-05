@@ -17,6 +17,16 @@ interface ActivitySummaryCardProps {
   onDeleteSession?: (sessionId: string) => void;
 }
 
+const formatCumulativeTime = (seconds: number): string => {
+  const totalMinutes = Math.round(seconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes} min`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h${minutes < 10 ? '0' : ''}${minutes}min` : `${hours}h`;
+};
+
 export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   session,
   history,
@@ -254,7 +264,6 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   const totalVolume = currentWeekSessions.reduce((acc, s) => acc + s.totalVolumeKg, 0);
   const cardioSeconds = currentWeekCardios.reduce((acc, c) => acc + (c.durationMinutes || 0) * 60, 0);
   const totalSeconds = currentWeekSessions.reduce((acc, s) => acc + s.durationSeconds, 0) + cardioSeconds;
-  const totalHours = Math.round((totalSeconds / 3600) * 10) / 10;
 
   return (
     <Card style={styles.cardMargin}>
@@ -288,7 +297,14 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
 
         <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Clock size={18} color={theme.primary} />
-          <Text style={[styles.value, { color: theme.text }]}>{totalHours}h</Text>
+          <Text
+            style={[styles.value, { color: theme.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {formatCumulativeTime(totalSeconds)}
+          </Text>
           <Text style={[styles.label, { color: theme.textMuted }]}>Temps Cumulé</Text>
         </View>
       </View>
