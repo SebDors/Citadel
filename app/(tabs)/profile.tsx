@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ProfileHeaderCard } from '../../src/components/Profile/ProfileHeaderCard';
-import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { ModularMeasurementChartCard } from '../../src/components/Profile/ModularMeasurementChartCard';
 import { BodyMeasurementsCard } from '../../src/components/Profile/BodyMeasurementsCard';
 import { ThemeSelectorModal } from '../../src/components/UI/ThemeSelectorModal';
@@ -30,7 +29,7 @@ export default function ProfileTab() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.text }]}>Profil</Text>
               <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                Derniers PR et Suivi des Mensurations
+                Suivi Corporel et Mensurations
               </Text>
             </View>
 
@@ -61,9 +60,6 @@ export default function ProfileTab() {
 
         {/* 2. Graphique Modulable de Mensurations (Poids, Poitrine, Cuisse, Bras) */}
         <ModularMeasurementChartCard measurements={data.measurements} />
-
-        {/* 3. Graphiques / Cartes de Performance 1RM */}
-        <OneRMChartCard />
 
         {/* 4. Suivi du Poids et Mensurations avec option de suppression */}
         <BodyMeasurementsCard
