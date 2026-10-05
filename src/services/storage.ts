@@ -449,11 +449,19 @@ export const StorageService = {
   },
 
   /**
-   * Enregistre une séance de cardio / boxe hors musculation.
+   * Enregistre ou met à jour une séance de cardio / boxe hors musculation.
    */
   async logCardioSession(session: CardioSession): Promise<FitTrackerData> {
     const currentData = await this.loadData();
-    const updatedSessions = [session, ...(currentData.cardioSessions || [])];
+    const existing = currentData.cardioSessions || [];
+    const index = existing.findIndex((s) => s.id === session.id);
+    let updatedSessions: CardioSession[];
+    if (index >= 0) {
+      updatedSessions = [...existing];
+      updatedSessions[index] = session;
+    } else {
+      updatedSessions = [session, ...existing];
+    }
     updatedSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const updatedData: FitTrackerData = {
       ...currentData,
@@ -461,6 +469,13 @@ export const StorageService = {
     };
     await this.saveData(updatedData);
     return updatedData;
+  },
+
+  /**
+   * Met à jour une séance de cardio existante.
+   */
+  async updateCardioSession(session: CardioSession): Promise<FitTrackerData> {
+    return this.logCardioSession(session);
   },
 
   /**

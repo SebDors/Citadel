@@ -30,6 +30,7 @@ export default function HistoryTab() {
   const { theme } = useTheme();
   const [logModalVisible, setLogModalVisible] = React.useState(false);
   const [cardioModalVisible, setCardioModalVisible] = React.useState(false);
+  const [editingCardioSession, setEditingCardioSession] = React.useState<CardioSession | null>(null);
   const [isLastSessionsCollapsed, setIsLastSessionsCollapsed] = React.useState(false);
   const [filterType, setFilterType] = React.useState<'all' | 'workout' | 'cardio'>('all');
 
@@ -127,7 +128,11 @@ export default function HistoryTab() {
           </View>
 
           {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
-          <CalendarView history={historyList} cardioSessions={cardioList} />
+          <CalendarView
+            history={historyList}
+            cardioSessions={cardioList}
+            onEditCardio={(session) => setEditingCardioSession(session)}
+          />
 
           {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
           <ActivitySummaryCard history={historyList} cardioSessions={cardioList} />
@@ -254,6 +259,7 @@ export default function HistoryTab() {
                     key={`cardio_${item.id}`}
                     session={item.session}
                     onDelete={deleteCardioSession}
+                    onEdit={(session) => setEditingCardioSession(session)}
                   />
                 );
               })
@@ -267,8 +273,12 @@ export default function HistoryTab() {
         />
 
         <LogCardioModal
-          visible={cardioModalVisible}
-          onClose={() => setCardioModalVisible(false)}
+          visible={cardioModalVisible || Boolean(editingCardioSession)}
+          sessionToEdit={editingCardioSession}
+          onClose={() => {
+            setCardioModalVisible(false);
+            setEditingCardioSession(null);
+          }}
         />
       </SafeAreaView>
     </TabSwipeWrapper>

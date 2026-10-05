@@ -81,6 +81,7 @@ export interface WorkoutContextType {
   deleteExerciseFromSession: (sessionId: string, exerciseId: string) => Promise<void>;
   deleteSetFromSession: (sessionId: string, exerciseId: string, setId: string) => Promise<void>;
   logCardioSession: (session: CardioSession) => Promise<void>;
+  updateCardioSession: (session: CardioSession) => Promise<void>;
   deleteCardioSession: (id: string) => Promise<void>;
   reloadAllData: () => Promise<void>;
   resetAllData: () => Promise<void>;
@@ -1929,6 +1930,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(updated);
   };
 
+  const updateCardioSession = async (session: CardioSession) => {
+    const updated = await StorageService.updateCardioSession(session);
+    setData(updated);
+  };
+
   const deleteCardioSession = async (id: string) => {
     const updated = await StorageService.deleteCardioSession(id);
     setData(updated);
@@ -2017,6 +2023,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteExerciseFromSession,
       deleteSetFromSession,
       logCardioSession,
+      updateCardioSession,
       deleteCardioSession,
       reloadAllData,
       resetAllData,

@@ -4,11 +4,12 @@ import { CardioSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { Trash2, Clock, Flame, Zap, FileText } from 'lucide-react-native';
+import { Trash2, Clock, Flame, Zap, FileText, Pencil } from 'lucide-react-native';
 
 interface CardioSessionCardProps {
   session: CardioSession;
   onDelete: (id: string) => void;
+  onEdit?: (session: CardioSession) => void;
 }
 
 const getRpeDetails = (rpe: number): { label: string; color: string; bg: string } => {
@@ -27,6 +28,7 @@ const getRpeDetails = (rpe: number): { label: string; color: string; bg: string 
 export const CardioSessionCard: React.FC<CardioSessionCardProps> = ({
   session,
   onDelete,
+  onEdit,
 }) => {
   const { theme } = useTheme();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -49,7 +51,11 @@ export const CardioSessionCard: React.FC<CardioSessionCardProps> = ({
     <Card style={styles.cardMargin}>
       {/* Header Row */}
       <View style={styles.headerRow}>
-        <View style={styles.titleContainer}>
+        <TouchableOpacity
+          style={styles.titleContainer}
+          activeOpacity={onEdit ? 0.7 : 1}
+          onPress={() => onEdit?.(session)}
+        >
           <View style={styles.titleWithEmoji}>
             <Flame size={16} color={theme.accent} />
             <Text style={[styles.activityTitle, { color: theme.text }]} numberOfLines={1}>
@@ -62,16 +68,29 @@ export const CardioSessionCard: React.FC<CardioSessionCardProps> = ({
           <Text style={[styles.dateText, { color: theme.textMuted }]}>
             {formattedDate} · {formattedTime}
           </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.deleteBtn, { backgroundColor: theme.surface }]}
-          onPress={() => setShowDeleteModal(true)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Supprimer la séance cardio"
-        >
-          <Trash2 size={16} color={theme.danger} />
         </TouchableOpacity>
+
+        <View style={styles.actionsContainer}>
+          {onEdit && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.surface }]}
+              onPress={() => onEdit(session)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Modifier la séance cardio"
+            >
+              <Pencil size={16} color={theme.accent} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.surface }]}
+            onPress={() => setShowDeleteModal(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Supprimer la séance cardio"
+          >
+            <Trash2 size={16} color={theme.danger} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Metrics Row */}
@@ -193,6 +212,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
     textTransform: 'capitalize',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionBtn: {
+    padding: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteBtn: {
     padding: 8,

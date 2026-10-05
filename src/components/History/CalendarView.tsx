@@ -28,6 +28,7 @@ import {
   Plus,
   Flame,
   Zap,
+  Pencil,
 } from 'lucide-react-native';
 import { PastSessionDetailModal } from './PastSessionDetailModal';
 import { LogPastWorkoutModal } from './LogPastWorkoutModal';
@@ -36,6 +37,7 @@ import { LogCardioModal } from './LogCardioModal';
 interface CalendarViewProps {
   history: WorkoutSession[];
   cardioSessions?: CardioSession[];
+  onEditCardio?: (session: CardioSession) => void;
 }
 
 const MONTHS_NAMES = [
@@ -53,7 +55,11 @@ const MONTHS_NAMES = [
   'Décembre',
 ];
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessions: propCardioSessions }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({
+  history,
+  cardioSessions: propCardioSessions,
+  onEditCardio,
+}) => {
   const { theme } = useTheme();
   const { data, deleteWorkoutSession, deleteCardioSession } = useWorkout();
   const cardioSessions = propCardioSessions || data?.cardioSessions || [];
@@ -70,8 +76,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessi
   const [modalVisible, setModalVisible] = useState(false);
   const [logPastModalVisible, setLogPastModalVisible] = useState(false);
   const [logCardioModalVisible, setLogCardioModalVisible] = useState(false);
+  const [editingCardioSession, setEditingCardioSession] = useState<CardioSession | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkoutSession | null>(null);
+
+  const handleEditCardio = (cardio: CardioSession) => {
+    if (onEditCardio) {
+      setModalVisible(false);
+      onEditCardio(cardio);
+    } else {
+      setEditingCardioSession(cardio);
+      setLogCardioModalVisible(true);
+    }
+  };
 
   const isCurrentMonthView =
     currentMonthIndex === now.getMonth() && currentYear === now.getFullYear();
@@ -405,7 +422,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessi
                         ]}
                       >
                         <View style={styles.sessionCardHeader}>
-                          <View style={styles.sessionInfo}>
+                          <TouchableOpacity
+                            style={styles.sessionInfo}
+                            activeOpacity={0.7}
+                            onPress={() => handleEditCardio(cardio)}
+                          >
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                               <Flame size={16} color={theme.accent} />
                               <Text style={[styles.sessionCardTitle, { color: theme.text, marginBottom: 0 }]}>
@@ -419,6 +440,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessi
                                   backgroundColor: `${theme.accent}15`,
                                   borderWidth: 1,
                                   borderColor: `${theme.accent}30`,
+                                
                                 }}
                               >
                                 <Text style={{ fontSize: 10, fontWeight: '800', color: theme.accent, textTransform: 'uppercase' }}>
@@ -457,29 +479,40 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessi
                                 {cardio.notes}
                               </Text>
                             ) : null}
-                          </View>
-
-                          <TouchableOpacity
-                            style={[styles.actionIconButton, { backgroundColor: theme.cardBg }]}
-                            onPress={() => {
-                              Alert.alert(
-                                'Supprimer la séance cardio',
-                                `Voulez-vous supprimer cette séance de ${cardio.activity} ?`,
-                                [
-                                  { text: 'Annuler', style: 'cancel' },
-                                  {
-                                    text: 'Supprimer',
-                                    style: 'destructive',
-                                    onPress: () => deleteCardioSession(cardio.id),
-                                  },
-                                ]
-                              );
-                            }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="Supprimer la séance cardio"
-                          >
-                            <Trash2 size={18} color={theme.danger} />
                           </TouchableOpacity>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity
+                              style={[styles.actionIconButton, { backgroundColor: theme.cardBg, marginRight: 8 }]}
+                              onPress={() => handleEditCardio(cardio)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel="Modifier la séance cardio"
+                            >
+                              <Pencil size={18} color={theme.accent} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.actionIconButton, { backgroundColor: theme.cardBg }]}
+                              onPress={() => {
+                                Alert.alert(
+                                  'Supprimer la séance cardio',
+                                  `Voulez-vous supprimer cette séance de ${cardio.activity} ?`,
+                                  [
+                                    { text: 'Annuler', style: 'cancel' },
+                                    {
+                                      text: 'Supprimer',
+                                      style: 'destructive',
+                                      onPress: () => deleteCardioSession(cardio.id),
+                                    },
+                                  ]
+                                );
+                              }}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel="Supprimer la séance cardio"
+                            >
+                              <Trash2 size={18} color={theme.danger} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     );
@@ -525,8 +558,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ history, cardioSessi
       />
 
       <LogCardioModal
-        visible={logCardioModalVisible}
-        onClose={() => setLogCardioModalVisible(false)}
+        visible={logCardioModalVisible || Boolean(editingCardioSession)}
+        sessionToEdit={editingCardioSession}
+        onClose={() => {
+          setLogCardioModalVisible(false);
+          setEditingCardioSession(null);
+        }}
         initialDate={selectedDate || undefined}
       />
 

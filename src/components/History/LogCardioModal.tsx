@@ -34,6 +34,7 @@ interface LogCardioModalProps {
   onClose: () => void;
   onSave?: (session: CardioSession) => void;
   initialDate?: string;
+  sessionToEdit?: CardioSession | null;
 }
 
 const PRESET_ACTIVITIES = [
@@ -64,6 +65,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
   onClose,
   onSave,
   initialDate,
+  sessionToEdit,
 }) => {
   const { theme } = useTheme();
   const { logCardioSession } = useWorkout();
@@ -119,17 +121,49 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
     translateY.stopAnimation();
     translateY.setValue(0);
     if (visible) {
-      setDateStr(formatISOToFrench(initialDate) || todayFrenchStr);
-      setActivity('Boxe');
-      setIsCustomActivity(false);
-      setCustomActivityText('');
-      setDurationMinutes(45);
-      setRpe(7);
-      const d = new Date();
-      setTimeStr(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
-      setNotes('');
+      if (sessionToEdit) {
+        const dateObj = new Date(sessionToEdit.date);
+        if (!isNaN(dateObj.getTime())) {
+          const day = dateObj.getDate().toString().padStart(2, '0');
+          const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+          const year = dateObj.getFullYear();
+          setDateStr(`${day}/${month}/${year}`);
+          const hours = dateObj.getHours().toString().padStart(2, '0');
+          const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+          setTimeStr(`${hours}:${minutes}`);
+        } else {
+          setDateStr(formatISOToFrench(sessionToEdit.date));
+          setTimeStr('12:00');
+        }
+
+        const isPreset = PRESET_ACTIVITIES.some((p) => p.label.toLowerCase() === sessionToEdit.activity.toLowerCase());
+        if (isPreset) {
+          const matched = PRESET_ACTIVITIES.find((p) => p.label.toLowerCase() === sessionToEdit.activity.toLowerCase());
+          setActivity(matched?.label || sessionToEdit.activity);
+          setIsCustomActivity(false);
+          setCustomActivityText('');
+        } else {
+          setIsCustomActivity(true);
+          setActivity('');
+          setCustomActivityText(sessionToEdit.activity);
+        }
+
+        setDurationMinutes(sessionToEdit.durationMinutes || 45);
+        setRpe(sessionToEdit.perceivedExertion || 7);
+        setNotes(sessionToEdit.notes || '');
+      } else {
+        setDateStr(formatISOToFrench(initialDate) || todayFrenchStr);
+        setActivity('Boxe');
+        setIsCustomActivity(false);
+        setCustomActivityText('');
+        setDurationMinutes(45);
+        setRpe(7);
+        const d = new Date();
+        setTimeStr(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
+        setNotes('');
+      }
     }
-  }, [visible, initialDate, translateY]);
+  }, [visible, initialDate, sessionToEdit, translateY]);
 
   const panResponder = useMemo(
     () =>
@@ -208,7 +242,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
     }
 
     const newSession: CardioSession = {
-      id: `cardio_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: sessionToEdit ? sessionToEdit.id : `cardio_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       date: dateTimeISO,
       activity: finalActivity,
       durationMinutes: durationMinutes > 0 ? durationMinutes : 45,
@@ -261,8 +295,12 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
                     <HeartPulse size={18} color={theme.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.title, { color: theme.text }]}>Séance Cardio</Text>
-                    <Text style={[styles.subtitle, { color: theme.textMuted }]}>Consigner une activité hors musculation</Text>
+                    <Text style={[styles.title, { color: theme.text }]}>
+                      {sessionToEdit ? 'Modifier la séance cardio' : 'Séance Cardio'}
+                    </Text>
+                    <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+                      {sessionToEdit ? 'Modifier les détails de la séance' : 'Consigner une activité hors musculation'}
+                    </Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -554,7 +592,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
 
             {/* Bouton de Validation */}
             <Button
-              title="Enregistrer la séance cardio"
+              title={sessionToEdit ? "Enregistrer les modifications" : "Enregistrer la séance cardio"}
               variant="primary"
               icon={<Check size={18} color="#FFFFFF" />}
               onPress={handleSave}
