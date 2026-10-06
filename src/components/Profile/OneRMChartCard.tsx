@@ -4,12 +4,18 @@ import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Trophy, Dumbbell, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { getSessionBlocks } from '../../types';
+import { getSessionBlocks, WorkoutSession } from '../../types';
 import { formatWeight } from '../../utils/numberUtils';
 import { calculateE1RM } from '../../services/analyticsService';
 import { StorageService } from '../../services/storage';
 
-export const OneRMChartCard: React.FC = () => {
+interface OneRMChartCardProps {
+  history?: WorkoutSession[];
+}
+
+export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
+  history: propHistory,
+}) => {
   const { theme } = useTheme();
   const { data } = useWorkout();
 
@@ -30,7 +36,7 @@ export const OneRMChartCard: React.FC = () => {
     await StorageService.saveCollapsedCards({ ...saved, profile_one_rm: nextVal });
   };
 
-  const history = data?.history || [];
+  const history = propHistory ?? data?.history ?? [];
 
   // Calcul des Records Personnels (PR) obtenus par exercice
   const latestPRs = useMemo(() => {

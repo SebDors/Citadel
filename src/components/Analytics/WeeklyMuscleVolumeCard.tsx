@@ -7,8 +7,15 @@ import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import { Layers, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { calculateWeeklyMuscleVolume } from '../../services/analyticsService';
 import { StorageService } from '../../services/storage';
+import { WorkoutSession } from '../../types';
 
-export const WeeklyMuscleVolumeCard: React.FC = () => {
+interface WeeklyMuscleVolumeCardProps {
+  history?: WorkoutSession[];
+}
+
+export const WeeklyMuscleVolumeCard: React.FC<WeeklyMuscleVolumeCardProps> = ({
+  history: propHistory,
+}) => {
   const { theme } = useTheme();
   const { data } = useWorkout();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -29,7 +36,7 @@ export const WeeklyMuscleVolumeCard: React.FC = () => {
     await StorageService.saveCollapsedCards({ ...saved, weekly_muscle_volume: nextVal });
   };
 
-  const history = data?.history || [];
+  const history = propHistory ?? data?.history ?? [];
   const muscleData = calculateWeeklyMuscleVolume(history, weekOffset);
 
   // Calcul du libellé de la semaine sélectionnée

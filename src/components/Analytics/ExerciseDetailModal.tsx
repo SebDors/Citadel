@@ -1,9 +1,14 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, SafeAreaView } from 'react-native';
-import { X, Trophy, Activity, Calendar, Dumbbell } from 'lucide-react-native';
-import { WorkoutSession, getSessionBlocks } from '../../types';
+import { X, Trophy, Activity, Calendar, Dumbbell, AlertTriangle } from 'lucide-react-native';
+import { WorkoutSession, getSessionBlocks, SessionNote, NOTE_TYPES_CONFIG, SessionExceptionReason } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateE1RM } from '../../services/analyticsService';
+import {
+  hasExercisePainAlert,
+  getExercisePainSeverity,
+  formatExceptionReason,
+} from '../../utils/sessionNoteUtils';
 
 interface ExerciseDetailModalProps {
   visible: boolean;
@@ -33,6 +38,11 @@ export default function ExerciseDetailModal({
       date: string;
       dateFormatted: string;
       sets: { weightKg: number; reps: number; isPr?: boolean }[];
+      isException?: boolean;
+      exceptionReason?: SessionExceptionReason;
+      sessionNotes?: SessionNote[];
+      painAlert?: boolean;
+      painSeverity?: number;
     }[] = [];
 
     // Tri chronologique décroissant pour l'affichage de l'historique
@@ -56,10 +66,17 @@ export default function ExerciseDetailModal({
 
       const targetName = exerciseName.trim().toLowerCase();
       const blocks = getSessionBlocks(session);
+      let matchingNotes: SessionNote[] = [];
+      let painAlert = false;
+      let painSeverity: number | undefined = undefined;
 
       blocks.forEach(block => {
         if (block.type === 'single') {
           if (block.exercise.exerciseName.trim().toLowerCase() === targetName) {
+            matchingNotes = block.exercise.sessionNotes || [];
+            painAlert = hasExercisePainAlert(block.exercise);
+            const sev = getExercisePainSeverity(block.exercise);
+            painSeverity = sev !== null ? sev : undefined;
             block.exercise.sets.forEach(set => {
               if (set.completed) {
                 const w = set.weightKg || 0;
@@ -80,7 +97,12 @@ export default function ExerciseDetailModal({
         historyItems.push({
           date: dateStr,
           dateFormatted,
-          sets: foundSets
+          sets: foundSets,
+          isException: session.isException,
+          exceptionReason: session.exceptionReason,
+          sessionNotes: matchingNotes,
+          painAlert,
+          painSeverity,
         });
       }
     });
@@ -173,10 +195,28 @@ export default function ExerciseDetailModal({
                 exerciseHistory.map((item, idx) => (
                   <View key={idx} style={[styles.historyRow, idx > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
                     <View style={styles.historyDate}>
-                      <Calendar size={14} color={theme.textMuted} />
-                      <Text style={[styles.historyDateText, { color: theme.text }]}>
-                        {item.dateFormatted}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap', gap: 6 }}>
+                        <Calendar size={14} color={theme.textMuted} />
+                        <Text style={[styles.historyDateText, { color: theme.text }]}>
+                          {item.dateFormatted}
+                        </Text>
+                        {item.isException && (
+                          <View style={[styles.exceptionBadge, { backgroundColor: '#F59E0B20', borderColor: '#F59E0B' }]}>
+                            <AlertTriangle size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+                            <Text style={[styles.exceptionBadgeText, { color: '#F59E0B' }]}>
+                              Exception{item.exceptionReason ? ` · ${formatExceptionReason(item.exceptionReason, true)}` : ''}
+                            </Text>
+                          </View>
+                        )}
+                        {item.painAlert && (
+                          <View style={[styles.painBadge, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
+                            <AlertTriangle size={10} color="#EF4444" style={{ marginRight: 3 }} />
+                            <Text style={[styles.painBadgeText, { color: '#EF4444' }]}>
+                              Douleur{item.painSeverity ? ` Niv.${item.painSeverity}` : ''}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                     <View style={styles.setsContainer}>
                       {item.sets.map((set, sIdx) => (
@@ -190,6 +230,37 @@ export default function ExerciseDetailModal({
                         </View>
                       ))}
                     </View>
+                    {item.sessionNotes && item.sessionNotes.length > 0 && (
+                      <View style={styles.sessionNotesBox}>
+                        {item.sessionNotes.map((sn) => {
+                          const typeCfg = NOTE_TYPES_CONFIG[sn.type] || NOTE_TYPES_CONFIG.autre;
+                          return (
+                            <View
+                              key={sn.id}
+                              style={[
+                                styles.sessionNoteChip,
+                                {
+                                  backgroundColor: sn.type === 'douleur' ? '#EF444415' : `${typeCfg.color}15`,
+                                  borderColor: sn.type === 'douleur' ? '#EF444440' : `${typeCfg.color}35`,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.sessionNoteChipTag,
+                                  { color: sn.type === 'douleur' ? '#EF4444' : typeCfg.color },
+                                ]}
+                              >
+                                {typeCfg.label}{sn.severity ? ` (Niv.${sn.severity})` : ''} :
+                              </Text>
+                              <Text style={[styles.sessionNoteChipText, { color: theme.text }]}>
+                                {sn.text}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 ))
               ) : (
@@ -311,5 +382,53 @@ const styles = StyleSheet.create({
   setText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  exceptionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  exceptionBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  painBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  painBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  sessionNotesBox: {
+    marginTop: 8,
+    gap: 4,
+  },
+  sessionNoteChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexWrap: 'wrap',
+  },
+  sessionNoteChipTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginRight: 4,
+  },
+  sessionNoteChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
   },
 });
