@@ -1,3 +1,25 @@
+🎉 Nouveautés de la version 1.7.1 :
+
+🏷️ Notes Typées & Alertes Douleur
+- Catégorisation rapide de vos observations de séance : Performance (cyan), Douleur (rouge), Contexte (ambre), Technique (violet) et Autre.
+- Gestion du niveau de sévérité de 1 à 3 pour quantifier précisément une douleur ou gêne.
+- Alerte discrète sur l'icône de note et affichage dédié des étiquettes sous l'exercice sans encombrer le titre.
+- Séparation claire dans la modale de note entre "Observations de la séance" (datées et typées) et "Consigne technique permanente".
+- Possibilité d'ajouter des notes typées au niveau global de la séance (via le menu Outils en séance live).
+
+⚡ Flag de Séance Exceptionnelle & Anti-Pollution du Previous
+- Marquez vos séances atypiques (contrainte de matériel, manque de temps/fatigue, séance partagée, test de charge, blessure) comme "séance exceptionnelle".
+- Protection automatique de vos repères : les séances exceptionnelles sont ignorées par le calcul du "Previous" afin de ne pas fausser vos charges de référence sur le programme habituel.
+- Activation en un clic lors de la fin de séance ou rétroactivement en modifiant une séance dans l'historique.
+- Badges visuels d'exception et de douleur intégrés dans la liste de l'historique et sur le calendrier.
+
+📊 Filtre d'Exception dans l'Onglet Analyse
+- Nouvel interrupteur "Exclure les séances exceptionnelles" en haut de l'onglet Analyse pour isoler votre progression sur le programme pur.
+- Recalcul instantané du volume musculaire hebdomadaire, des marqueurs de fatigue et des records 1RM.
+- Consultation de l'historique de chaque exercice avec affichage des badges d'exception et des observations typées.
+
+---
+
 🎉 Nouveautés de la version 1.7.0 :
 
 📊 Nouvel onglet "Analyse"
