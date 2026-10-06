@@ -262,6 +262,9 @@ export default function LiveWorkoutScreen() {
     setExerciseSupersetGroup,
     updateSessionNotes,
     updateExerciseNotes,
+    addWorkoutSessionNote,
+    removeWorkoutSessionNote,
+    setWorkoutException,
     startRestTimer,
     restTimer,
     startSessionTimer,
@@ -2489,6 +2492,9 @@ export default function LiveWorkoutScreen() {
         subtitle={activeSession.title}
         initialNote={activeSession.notes || ''}
         onSave={updateSessionNotes}
+        sessionNotes={activeSession.sessionNotes || []}
+        onAddSessionNote={addWorkoutSessionNote}
+        onRemoveSessionNote={removeWorkoutSessionNote}
         placeholder="Remarques générales, forme du jour, points d'attention pour la séance..."
       />
 

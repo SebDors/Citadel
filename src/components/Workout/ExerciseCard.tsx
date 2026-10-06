@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
-import { WorkoutExercise, WorkoutSet } from '../../types';
+import { WorkoutExercise, WorkoutSet, NOTE_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { SetTableRow } from './SetTableRow';
-import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw } from 'lucide-react-native';
+import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw, AlertTriangle } from 'lucide-react-native';
 import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import { WorkoutNoteModal } from './WorkoutNoteModal';
+import { hasExercisePainAlert, getExercisePainSeverity } from '../../utils/sessionNoteUtils';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -45,13 +46,18 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   nextTargetSet,
 }) => {
   const { theme } = useTheme();
-  const { data } = useWorkout();
+  const { data, addExerciseSessionNote, removeExerciseSessionNote } = useWorkout();
   const isRirEnabled = enableRirProp !== undefined ? enableRirProp : (data?.profile?.enableRir !== false);
   const [showMenu, setShowMenu] = useState(false);
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [tempRestSeconds, setTempRestSeconds] = useState(String(exercise.restSeconds || 75));
+
+  const hasPain = useMemo(() => hasExercisePainAlert(exercise), [exercise]);
+  const painSeverity = useMemo(() => getExercisePainSeverity(exercise), [exercise]);
+  const sessionNotesCount = exercise.sessionNotes?.length || 0;
+  const hasNotes = Boolean(exercise.notes && exercise.notes.trim().length > 0);
 
   const primaryMusclesList = useMemo(() => {
     if (exercise.primaryMuscles && exercise.primaryMuscles.length > 0) {
@@ -106,6 +112,14 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           <View style={styles.titleRow}>
             <Dumbbell size={18} color={theme.accent} style={{ marginRight: 6 }} />
             <Text style={[styles.exerciseName, { color: theme.text }]}>{exercise.exerciseName}</Text>
+            {hasPain && (
+              <View style={[styles.painBadge, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
+                <AlertTriangle size={11} color="#EF4444" style={{ marginRight: 3 }} />
+                <Text style={[styles.painBadgeText, { color: '#EF4444' }]}>
+                  Douleur{painSeverity ? ` Niv.${painSeverity}` : ''}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Muscles travaillés (Ligne 1 : Principaux, Ligne 2 : Secondaires) */}
@@ -159,13 +173,34 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
               style={[
                 styles.noteIconButton,
                 {
-                  backgroundColor: exercise.notes ? `${theme.accent}20` : theme.surface,
-                  borderColor: exercise.notes ? theme.accent : theme.border,
+                  backgroundColor: hasPain
+                    ? '#EF444425'
+                    : (hasNotes || sessionNotesCount > 0)
+                    ? `${theme.accent}20`
+                    : theme.surface,
+                  borderColor: hasPain
+                    ? '#EF4444'
+                    : (hasNotes || sessionNotesCount > 0)
+                    ? theme.accent
+                    : theme.border,
                 },
               ]}
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             >
-              <FileText size={15} color={exercise.notes ? theme.accent : theme.textMuted} />
+              <FileText
+                size={15}
+                color={hasPain ? '#EF4444' : (hasNotes || sessionNotesCount > 0) ? theme.accent : theme.textMuted}
+              />
+              {sessionNotesCount > 0 && (
+                <View
+                  style={[
+                    styles.noteCountBadge,
+                    { backgroundColor: hasPain ? '#EF4444' : theme.accent },
+                  ]}
+                >
+                  <Text style={styles.noteCountText}>{sessionNotesCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -175,7 +210,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
         </View>
       </View>
 
-      {/* Note Callout (si une remarque/consigne existe sur l'exercice) */}
+      {/* Note Callout (si une remarque/consigne technique statique existe sur l'exercice) */}
       {exercise.notes ? (
         <TouchableOpacity
           activeOpacity={0.7}
@@ -191,6 +226,51 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           </Text>
         </TouchableOpacity>
       ) : null}
+
+      {/* Observations de la séance (typées) */}
+      {exercise.sessionNotes && exercise.sessionNotes.length > 0 && (
+        <View style={styles.sessionNotesContainer}>
+          {exercise.sessionNotes.map((sn) => {
+            const typeCfg = NOTE_TYPES_CONFIG[sn.type] || NOTE_TYPES_CONFIG.autre;
+            const isPain = sn.type === 'douleur';
+            return (
+              <TouchableOpacity
+                key={sn.id}
+                activeOpacity={0.7}
+                onPress={() => onUpdateNotes && setShowNoteModal(true)}
+                style={[
+                  styles.sessionNoteCard,
+                  {
+                    backgroundColor: isPain ? '#EF444415' : `${typeCfg.color}10`,
+                    borderColor: isPain ? '#EF444440' : `${typeCfg.color}30`,
+                  },
+                ]}
+              >
+                <View style={styles.sessionNoteHeaderRow}>
+                  <View style={[styles.sessionNotePill, { backgroundColor: typeCfg.color }]}>
+                    <Text style={styles.sessionNotePillText}>{typeCfg.label}</Text>
+                  </View>
+                  {isPain && sn.severity && (
+                    <View
+                      style={[
+                        styles.sessionNoteSevPill,
+                        { backgroundColor: sn.severity >= 2 ? '#EF4444' : '#F59E0B' },
+                      ]}
+                    >
+                      <Text style={styles.sessionNoteSevPillText}>
+                        Niveau {sn.severity}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.sessionNoteText, { color: theme.text }]} numberOfLines={2}>
+                  {sn.text}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* Table Header */}
       <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
@@ -416,6 +496,9 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           subtitle={exercise.exerciseName}
           initialNote={exercise.notes || ''}
           onSave={onUpdateNotes}
+          sessionNotes={exercise.sessionNotes || []}
+          onAddSessionNote={(note) => addExerciseSessionNote(exercise.id, note)}
+          onRemoveSessionNote={(noteId) => removeExerciseSessionNote(exercise.id, noteId)}
           placeholder="Consignes techniques, réglage machine, charges à viser..."
         />
       )}
@@ -637,6 +720,79 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '500',
   },
+  painBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 6,
+  },
+  painBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  noteCountBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  noteCountText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  sessionNotesContainer: {
+    marginHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 6,
+  },
+  sessionNoteCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  sessionNoteHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  sessionNotePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+  },
+  sessionNotePillText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  sessionNoteSevPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+  },
+  sessionNoteSevPillText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  sessionNoteText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
 });
 
 export const ExerciseCard = React.memo(
@@ -644,6 +800,7 @@ export const ExerciseCard = React.memo(
   (prev, next) =>
     prev.exercise === next.exercise &&
     prev.exercise.notes === next.exercise.notes &&
+    prev.exercise.sessionNotes === next.exercise.sessionNotes &&
     prev.nextTargetSet?.exerciseName === next.nextTargetSet?.exerciseName &&
     prev.nextTargetSet?.setNumber === next.nextTargetSet?.setNumber &&
     prev.supersetOrder?.index === next.supersetOrder?.index &&

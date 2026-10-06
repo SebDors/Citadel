@@ -16,6 +16,8 @@ import {
   CircuitBlock,
   CircuitExerciseItem,
   CardioSession,
+  SessionNote,
+  SessionExceptionReason,
   getTemplateBlocks,
   getSessionBlocks,
 } from '../types';
@@ -59,6 +61,11 @@ export interface WorkoutContextType {
   setExerciseSupersetGroup: (exerciseId: string, supersetGroup?: string) => void;
   updateSessionNotes: (notes: string) => void;
   updateExerciseNotes: (exerciseId: string, notes: string) => void;
+  addExerciseSessionNote: (exerciseId: string, note: Omit<SessionNote, 'id' | 'createdAt'>) => void;
+  removeExerciseSessionNote: (exerciseId: string, noteId: string) => void;
+  addWorkoutSessionNote: (note: Omit<SessionNote, 'id' | 'createdAt'>) => void;
+  removeWorkoutSessionNote: (noteId: string) => void;
+  setWorkoutException: (isException: boolean, reason?: SessionExceptionReason, note?: string) => void;
   updateActiveSessionCircuitStates: (states: Record<string, any>) => void;
   addExerciseToCircuit: (blockId: string, exerciseName: string, primaryMuscle: string, targetMuscles?: string[]) => void;
   addBatchExercisesToCircuit: (blockId: string, items: Array<{ exerciseName: string; primaryMuscle: string; targetMuscles?: string[] }>) => void;
@@ -157,6 +164,7 @@ export function getPreviousSetPerformance(
     .filter((session) => {
       if (!session) return false;
       if (currentSessionId && session.id === currentSessionId) return false;
+      if (session.isException) return false;
       return session.status === 'completed' || !!session.endTime;
     })
     .sort((a, b) => {
@@ -1487,6 +1495,132 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const addExerciseSessionNote = (exerciseId: string, note: Omit<SessionNote, 'id' | 'createdAt'>) => {
+    const newNote: SessionNote = {
+      id: `sn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+      ...note,
+    };
+
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
+
+      const currentBlocks = getSessionBlocks(prevSession);
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single' && block.exercise.id === exerciseId) {
+          const currentNotes = block.exercise.sessionNotes || [];
+          return {
+            ...block,
+            exercise: {
+              ...block.exercise,
+              sessionNotes: [...currentNotes, newNote],
+            },
+          };
+        }
+        return block;
+      });
+
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
+  };
+
+  const removeExerciseSessionNote = (exerciseId: string, noteId: string) => {
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
+
+      const currentBlocks = getSessionBlocks(prevSession);
+      const updatedBlocks = currentBlocks.map((block) => {
+        if (block.type === 'single' && block.exercise.id === exerciseId) {
+          const currentNotes = block.exercise.sessionNotes || [];
+          return {
+            ...block,
+            exercise: {
+              ...block.exercise,
+              sessionNotes: currentNotes.filter((n) => n.id !== noteId),
+            },
+          };
+        }
+        return block;
+      });
+
+      const updatedExercises: WorkoutExercise[] = [];
+      updatedBlocks.forEach((b) => {
+        if (b.type === 'single') {
+          updatedExercises.push(b.exercise);
+        }
+      });
+
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        blocks: updatedBlocks,
+        exercises: updatedExercises,
+      };
+
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
+  };
+
+  const addWorkoutSessionNote = (note: Omit<SessionNote, 'id' | 'createdAt'>) => {
+    const newNote: SessionNote = {
+      id: `sn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+      ...note,
+    };
+
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
+      const currentNotes = prevSession.sessionNotes || [];
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        sessionNotes: [...currentNotes, newNote],
+      };
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
+  };
+
+  const removeWorkoutSessionNote = (noteId: string) => {
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
+      const currentNotes = prevSession.sessionNotes || [];
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        sessionNotes: currentNotes.filter((n) => n.id !== noteId),
+      };
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
+  };
+
+  const setWorkoutException = (isException: boolean, reason?: SessionExceptionReason, note?: string) => {
+    setActiveSession((prevSession) => {
+      if (!prevSession) return prevSession;
+      const updatedSession: WorkoutSession = {
+        ...prevSession,
+        isException,
+        exceptionReason: isException ? reason : undefined,
+        exceptionNote: isException ? (note?.trim() || undefined) : undefined,
+      };
+      StorageService.saveCurrentWorkout(updatedSession);
+      return updatedSession;
+    });
+  };
+
   const updateActiveSessionCircuitStates = (states: Record<string, any>) => {
     if (!activeSession) return;
     const updatedSession: WorkoutSession = {
@@ -1949,6 +2083,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setExerciseSupersetGroup,
       updateSessionNotes,
       updateExerciseNotes,
+      addExerciseSessionNote,
+      removeExerciseSessionNote,
+      addWorkoutSessionNote,
+      removeWorkoutSessionNote,
+      setWorkoutException,
       updateActiveSessionCircuitStates,
       addExerciseToCircuit,
       addBatchExercisesToCircuit,
