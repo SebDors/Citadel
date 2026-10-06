@@ -41,6 +41,27 @@ export interface WorkoutSet {
 
 export type { MuscleGroup, MuscleTarget } from '../constants/muscles';
 export type { WeeklyFatigueSnapshot } from '../services/analyticsService';
+import type {
+  NoteType,
+  SessionExceptionReason,
+} from '../constants/sessionNotes';
+export type {
+  NoteType,
+  SessionExceptionReason,
+};
+export {
+  NOTE_TYPES_CONFIG,
+  PAIN_SEVERITY_LEVELS,
+  EXCEPTION_REASONS_CONFIG,
+} from '../constants/sessionNotes';
+
+export interface SessionNote {
+  id: string;
+  text: string;
+  type: NoteType;
+  severity?: 1 | 2 | 3;
+  createdAt: string;
+}
 
 export interface WorkoutExercise {
   id: string;
@@ -53,6 +74,7 @@ export interface WorkoutExercise {
   primaryMuscles?: string[];
   primaryMuscle_legacy?: string;
   notes?: string;
+  sessionNotes?: SessionNote[];
   restSeconds: number;
   supersetGroup?: string;
   sets: WorkoutSet[];
@@ -117,6 +139,10 @@ export interface WorkoutSession {
   restBetweenRoundsSeconds?: number;
   circuitStates?: Record<string, any>;
   notes?: string;
+  sessionNotes?: SessionNote[];
+  isException?: boolean;
+  exceptionReason?: SessionExceptionReason;
+  exceptionNote?: string;
 }
 
 export interface WorkoutTemplate {
