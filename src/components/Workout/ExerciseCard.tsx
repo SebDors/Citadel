@@ -7,10 +7,10 @@ import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { SetTableRow } from './SetTableRow';
-import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw, AlertTriangle } from 'lucide-react-native';
+import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw } from 'lucide-react-native';
 import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import { WorkoutNoteModal } from './WorkoutNoteModal';
-import { hasExercisePainAlert, getExercisePainSeverity } from '../../utils/sessionNoteUtils';
+import { hasExercisePainAlert } from '../../utils/sessionNoteUtils';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -55,7 +55,6 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   const [tempRestSeconds, setTempRestSeconds] = useState(String(exercise.restSeconds || 75));
 
   const hasPain = useMemo(() => hasExercisePainAlert(exercise), [exercise]);
-  const painSeverity = useMemo(() => getExercisePainSeverity(exercise), [exercise]);
   const sessionNotesCount = exercise.sessionNotes?.length || 0;
   const hasNotes = Boolean(exercise.notes && exercise.notes.trim().length > 0);
 
@@ -112,14 +111,6 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
           <View style={styles.titleRow}>
             <Dumbbell size={18} color={theme.accent} style={{ marginRight: 6 }} />
             <Text style={[styles.exerciseName, { color: theme.text }]}>{exercise.exerciseName}</Text>
-            {hasPain && (
-              <View style={[styles.painBadge, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
-                <AlertTriangle size={11} color="#EF4444" style={{ marginRight: 3 }} />
-                <Text style={[styles.painBadgeText, { color: '#EF4444' }]}>
-                  Douleur{painSeverity ? ` Niv.${painSeverity}` : ''}
-                </Text>
-              </View>
-            )}
           </View>
 
           {/* Muscles travaillés (Ligne 1 : Principaux, Ligne 2 : Secondaires) */}
@@ -719,19 +710,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
-  },
-  painBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    marginLeft: 6,
-  },
-  painBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
   },
   noteCountBadge: {
     position: 'absolute',
