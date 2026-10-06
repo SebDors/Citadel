@@ -7,8 +7,9 @@ import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { useRouter } from 'expo-router';
-import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw, BookmarkPlus, Eye } from 'lucide-react-native';
+import { Trash2, Clock, Dumbbell, Award, CheckCircle2, RotateCw, BookmarkPlus, Eye, AlertTriangle } from 'lucide-react-native';
 import { PastSessionDetailModal } from './PastSessionDetailModal';
+import { hasSessionPainAlert, formatExceptionReason } from '../../utils/sessionNoteUtils';
 
 interface ActivitySummaryCardProps {
   session?: WorkoutSession;
@@ -100,9 +101,25 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
             activeOpacity={0.7}
             onPress={() => setShowDetail(true)}
           >
-            <Text style={[styles.sessionTitle, { color: theme.text }]} numberOfLines={1}>
-              {session.title}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <Text style={[styles.sessionTitle, { color: theme.text }]} numberOfLines={1}>
+                {session.title}
+              </Text>
+              {session.isException && (
+                <View style={[styles.exceptionBadge, { backgroundColor: '#F59E0B20', borderColor: '#F59E0B' }]}>
+                  <AlertTriangle size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+                  <Text style={[styles.exceptionBadgeText, { color: '#F59E0B' }]}>
+                    Exception{session.exceptionReason ? ` · ${formatExceptionReason(session.exceptionReason, true)}` : ''}
+                  </Text>
+                </View>
+              )}
+              {hasSessionPainAlert(session) && (
+                <View style={[styles.painBadge, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
+                  <AlertTriangle size={10} color="#EF4444" style={{ marginRight: 3 }} />
+                  <Text style={[styles.painBadgeText, { color: '#EF4444' }]}>Douleur</Text>
+                </View>
+              )}
+            </View>
             <Text style={[styles.sessionDateText, { color: theme.textMuted }]}>
               {formattedDate} · {formattedTime}
             </Text>
@@ -449,5 +466,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  exceptionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  exceptionBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  painBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  painBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

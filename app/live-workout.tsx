@@ -11,6 +11,7 @@ import {
   StatusBar as RNStatusBar,
   KeyboardAvoidingView,
   Animated,
+  Switch,
 } from "react-native";
 
 function getRirNudge(
@@ -50,6 +51,8 @@ import {
   SET_TYPES_CONFIG,
   SetType,
   WorkoutSet,
+  SessionExceptionReason,
+  EXCEPTION_REASONS_CONFIG,
 } from "../src/types";
 import {
   Plus,
@@ -295,6 +298,10 @@ export default function LiveWorkoutScreen() {
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
+  const [isExceptionActive, setIsExceptionActive] = useState(false);
+  const [selectedExceptionReason, setSelectedExceptionReason] =
+    useState<SessionExceptionReason>('contrainte_materiel');
+  const [exceptionNoteText, setExceptionNoteText] = useState('');
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showToolsModal, setShowToolsModal] = useState(false);
   const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
@@ -884,6 +891,13 @@ export default function LiveWorkoutScreen() {
 
     if (activeSession) {
       activeSession.completedRoundsCount = totalCompletedRounds;
+      activeSession.isException = isExceptionActive;
+      activeSession.exceptionReason = isExceptionActive
+        ? selectedExceptionReason
+        : undefined;
+      activeSession.exceptionNote = isExceptionActive
+        ? (exceptionNoteText.trim() || undefined)
+        : undefined;
     }
 
     await finishWorkout();
@@ -2456,6 +2470,103 @@ export default function LiveWorkoutScreen() {
               </View>
             </View>
 
+            {/* Toggle Séance Exceptionnelle */}
+            <View
+              style={[
+                styles.exceptionToggleCard,
+                {
+                  backgroundColor: isExceptionActive ? '#F59E0B12' : theme.surface,
+                  borderColor: isExceptionActive ? '#F59E0B50' : theme.border,
+                },
+              ]}
+            >
+              <View style={styles.exceptionToggleHeader}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <AlertTriangle
+                      size={15}
+                      color={isExceptionActive ? '#F59E0B' : theme.textMuted}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={[
+                        styles.exceptionToggleTitle,
+                        { color: isExceptionActive ? '#F59E0B' : theme.text },
+                      ]}
+                    >
+                      Séance exceptionnelle ?
+                    </Text>
+                  </View>
+                  <Text style={[styles.exceptionToggleSubtitle, { color: theme.textMuted }]}>
+                    Écarte cette séance de la référence pour le calcul du previous
+                  </Text>
+                </View>
+                <Switch
+                  value={isExceptionActive}
+                  onValueChange={setIsExceptionActive}
+                  trackColor={{ false: theme.border, true: '#F59E0B' }}
+                  thumbColor={Platform.OS === 'android' ? (isExceptionActive ? '#FFFFFF' : '#888888') : undefined}
+                />
+              </View>
+
+              {isExceptionActive && (
+                <View style={styles.exceptionDetailsBox}>
+                  <Text style={[styles.exceptionReasonLabel, { color: theme.textMuted }]}>
+                    Raison de l'écart :
+                  </Text>
+                  <View style={styles.exceptionChipsGrid}>
+                    {(Object.keys(EXCEPTION_REASONS_CONFIG) as SessionExceptionReason[]).map((rKey) => {
+                      const cfg = EXCEPTION_REASONS_CONFIG[rKey];
+                      const isSelected = selectedExceptionReason === rKey;
+                      return (
+                        <TouchableOpacity
+                          key={rKey}
+                          activeOpacity={0.7}
+                          style={[
+                            styles.exceptionReasonChip,
+                            {
+                              backgroundColor: isSelected ? '#F59E0B25' : theme.cardBg,
+                              borderColor: isSelected ? '#F59E0B' : theme.border,
+                            },
+                          ]}
+                          onPress={() => setSelectedExceptionReason(rKey)}
+                        >
+                          <Text
+                            style={[
+                              styles.exceptionReasonChipText,
+                              {
+                                color: isSelected ? '#F59E0B' : theme.text,
+                                fontWeight: isSelected ? '800' : '600',
+                              },
+                            ]}
+                          >
+                            {cfg.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <TextInput
+                    style={[
+                      styles.exceptionNoteInput,
+                      {
+                        backgroundColor: theme.cardBg,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                    ]}
+                    placeholder="Précisez la contrainte (optionnel : appareil en panne, séance partagée...)"
+                    placeholderTextColor={theme.textMuted}
+                    value={exceptionNoteText}
+                    onChangeText={setExceptionNoteText}
+                    multiline
+                    numberOfLines={2}
+                  />
+                </View>
+              )}
+            </View>
+
             <View style={styles.finishModalActions}>
               <Button
                 title="Confirmer & Terminer"
@@ -3410,6 +3521,63 @@ const styles = StyleSheet.create({
     height: 1,
     width: "100%",
     marginVertical: 2,
+  },
+  exceptionToggleCard: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 16,
+  },
+  exceptionToggleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  exceptionToggleTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  exceptionToggleSubtitle: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  exceptionDetailsBox: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    paddingTop: 10,
+  },
+  exceptionReasonLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  exceptionChipsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
+  exceptionReasonChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  exceptionReasonChipText: {
+    fontSize: 11,
+  },
+  exceptionNoteInput: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    minHeight: 48,
   },
   finishModalActions: {
     width: "100%",

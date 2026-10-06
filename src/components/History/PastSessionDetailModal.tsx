@@ -8,6 +8,8 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Switch,
+  Platform,
 } from 'react-native';
 import {
   WorkoutSession,
@@ -15,6 +17,9 @@ import {
   CircuitBlock,
   WorkoutBlock,
   WorkoutSet,
+  SessionExceptionReason,
+  EXCEPTION_REASONS_CONFIG,
+  NOTE_TYPES_CONFIG,
   getSessionBlocks,
 } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -34,9 +39,16 @@ import {
   Calendar as CalendarIcon,
   Check,
   Search,
+  AlertTriangle,
+  FileText,
 } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 import { SharedExercise } from '../../constants/exerciseDatabase';
+import {
+  formatExceptionReason,
+  hasExercisePainAlert,
+  getExercisePainSeverity,
+} from '../../utils/sessionNoteUtils';
 
 interface PastSessionDetailModalProps {
   visible: boolean;
@@ -62,6 +74,10 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
   const [editTime, setEditTime] = useState('18:00');
   const [editDurationMin, setEditDurationMin] = useState('45');
   const [editBlocks, setEditBlocks] = useState<WorkoutBlock[]>([]);
+  const [editIsException, setEditIsException] = useState(false);
+  const [editExceptionReason, setEditExceptionReason] =
+    useState<SessionExceptionReason>('contrainte_materiel');
+  const [editExceptionNote, setEditExceptionNote] = useState('');
 
   // Keypad & Exercise selector state
   const [keypadTarget, setKeypadTarget] = useState<{
@@ -126,6 +142,9 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
     setEditTime(`${hours}:${minutes}`);
     setEditDurationMin(String(Math.max(1, Math.round((currentSession.durationSeconds || 2700) / 60))));
     setEditBlocks(JSON.parse(JSON.stringify(getSessionBlocks(currentSession))));
+    setEditIsException(Boolean(currentSession.isException));
+    setEditExceptionReason(currentSession.exceptionReason || 'contrainte_materiel');
+    setEditExceptionNote(currentSession.exceptionNote || '');
     setIsEditing(true);
   };
 
@@ -471,6 +490,9 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
       durationSeconds,
       blocks: editBlocks,
       exercises: editBlocks.filter((b): b is SingleExerciseBlock => b.type === 'single').map((b) => b.exercise),
+      isException: editIsException,
+      exceptionReason: editIsException ? editExceptionReason : undefined,
+      exceptionNote: editIsException ? (editExceptionNote.trim() || undefined) : undefined,
     };
 
     await updatePastWorkout(updatedSession);
@@ -556,38 +578,154 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
 
           {/* En mode édition : champs Date / Heure / Durée */}
           {isEditing && (
-            <View style={[styles.editMetaContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <View style={styles.editMetaCol}>
-                <Text style={[styles.editMetaLabel, { color: theme.textMuted }]}>DATE</Text>
-                <TextInput
-                  style={[styles.editMetaInput, { color: theme.text, borderColor: theme.border }]}
-                  value={editDate}
-                  onChangeText={setEditDate}
-                  placeholder="JJ/MM/AAAA"
-                  placeholderTextColor={theme.textMuted}
-                />
+            <>
+              <View style={[styles.editMetaContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={styles.editMetaCol}>
+                  <Text style={[styles.editMetaLabel, { color: theme.textMuted }]}>DATE</Text>
+                  <TextInput
+                    style={[styles.editMetaInput, { color: theme.text, borderColor: theme.border }]}
+                    value={editDate}
+                    onChangeText={setEditDate}
+                    placeholder="JJ/MM/AAAA"
+                    placeholderTextColor={theme.textMuted}
+                  />
+                </View>
+                <View style={styles.editMetaCol}>
+                  <Text style={[styles.editMetaLabel, { color: theme.textMuted }]}>HEURE</Text>
+                  <TextInput
+                    style={[styles.editMetaInput, { color: theme.text, borderColor: theme.border }]}
+                    value={editTime}
+                    onChangeText={setEditTime}
+                    placeholder="HH:MM"
+                    placeholderTextColor={theme.textMuted}
+                  />
+                </View>
+                <View style={styles.editMetaCol}>
+                  <Text style={[styles.editMetaLabel, { color: theme.textMuted }]}>DURÉE (MIN)</Text>
+                  <TextInput
+                    style={[styles.editMetaInput, { color: theme.text, borderColor: theme.border }]}
+                    value={editDurationMin}
+                    onChangeText={setEditDurationMin}
+                    keyboardType="numeric"
+                    placeholder="45"
+                    placeholderTextColor={theme.textMuted}
+                  />
+                </View>
               </View>
-              <View style={styles.editMetaCol}>
-                <Text style={[styles.editMetaLabel, { color: theme.textMuted }]}>HEURE</Text>
-                <TextInput
-                  style={[styles.editMetaInput, { color: theme.text, borderColor: theme.border }]}
-                  value={editTime}
-                  onChangeText={setEditTime}
-                  placeholder="HH:MM"
-                  placeholderTextColor={theme.textMuted}
-                />
+
+              {/* Éditeur de séance exceptionnelle */}
+              <View
+                style={[
+                  styles.editExceptionCard,
+                  {
+                    backgroundColor: editIsException ? '#F59E0B12' : theme.surface,
+                    borderColor: editIsException ? '#F59E0B40' : theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.editExceptionHeader}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <AlertTriangle
+                        size={15}
+                        color={editIsException ? '#F59E0B' : theme.textMuted}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={[
+                          styles.editExceptionTitle,
+                          { color: editIsException ? '#F59E0B' : theme.text },
+                        ]}
+                      >
+                        Séance exceptionnelle ?
+                      </Text>
+                    </View>
+                    <Text style={[styles.editExceptionSubtitle, { color: theme.textMuted }]}>
+                      Écarte la séance pour le calcul du previous et des tendances
+                    </Text>
+                  </View>
+                  <Switch
+                    value={editIsException}
+                    onValueChange={setEditIsException}
+                    trackColor={{ false: theme.border, true: '#F59E0B' }}
+                    thumbColor={Platform.OS === 'android' ? (editIsException ? '#FFFFFF' : '#888888') : undefined}
+                  />
+                </View>
+
+                {editIsException && (
+                  <View style={styles.editExceptionDetails}>
+                    <Text style={[styles.editExceptionReasonLabel, { color: theme.textMuted }]}>
+                      Raison de l'écart :
+                    </Text>
+                    <View style={styles.editExceptionChips}>
+                      {(Object.keys(EXCEPTION_REASONS_CONFIG) as SessionExceptionReason[]).map((rKey) => {
+                        const cfg = EXCEPTION_REASONS_CONFIG[rKey];
+                        const isSelected = editExceptionReason === rKey;
+                        return (
+                          <TouchableOpacity
+                            key={rKey}
+                            activeOpacity={0.7}
+                            style={[
+                              styles.editExceptionChip,
+                              {
+                                backgroundColor: isSelected ? '#F59E0B25' : theme.cardBg,
+                                borderColor: isSelected ? '#F59E0B' : theme.border,
+                              },
+                            ]}
+                            onPress={() => setEditExceptionReason(rKey)}
+                          >
+                            <Text
+                              style={[
+                                styles.editExceptionChipText,
+                                {
+                                  color: isSelected ? '#F59E0B' : theme.text,
+                                  fontWeight: isSelected ? '800' : '600',
+                                },
+                              ]}
+                            >
+                              {cfg.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    <TextInput
+                      style={[
+                        styles.editExceptionInput,
+                        {
+                          backgroundColor: theme.cardBg,
+                          borderColor: theme.border,
+                          color: theme.text,
+                        },
+                      ]}
+                      placeholder="Précisez la contrainte ponctuelle (optionnel)..."
+                      placeholderTextColor={theme.textMuted}
+                      value={editExceptionNote}
+                      onChangeText={setEditExceptionNote}
+                      multiline
+                      numberOfLines={2}
+                    />
+                  </View>
+                )}
               </View>
-              <View style={styles.editMetaCol}>
-                <Text style={[styles.editMetaLabel, { color: theme.textMuted }]}>DURÉE (MIN)</Text>
-                <TextInput
-                  style={[styles.editMetaInput, { color: theme.text, borderColor: theme.border }]}
-                  value={editDurationMin}
-                  onChangeText={setEditDurationMin}
-                  keyboardType="numeric"
-                  placeholder="45"
-                  placeholderTextColor={theme.textMuted}
-                />
+            </>
+          )}
+
+          {/* Bannière Séance Exceptionnelle (Mode lecture) */}
+          {!isEditing && currentSession.isException && (
+            <View style={[styles.exceptionBanner, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B40' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AlertTriangle size={15} color="#F59E0B" style={{ marginRight: 6 }} />
+                <Text style={[styles.exceptionBannerTitle, { color: '#F59E0B' }]}>
+                  SÉANCE EXCEPTIONNELLE · {formatExceptionReason(currentSession.exceptionReason)}
+                </Text>
               </View>
+              {currentSession.exceptionNote ? (
+                <Text style={[styles.exceptionBannerNote, { color: theme.text }]}>
+                  {currentSession.exceptionNote}
+                </Text>
+              ) : null}
             </View>
           )}
 
@@ -835,12 +973,59 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
               </View>
             ) : (
               // =================== MODE LECTURE SEULE ===================
-              blocks.length === 0 ? (
-                <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                  Aucun exercice enregistré pour cette séance.
-                </Text>
-              ) : (
-                blocks.map((block, bIdx) => {
+              <>
+                {/* Notes globales de séance si existantes */}
+                {currentSession.sessionNotes && currentSession.sessionNotes.length > 0 && (
+                  <View style={[styles.sessionNotesCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <Text style={[styles.sessionNotesTitle, { color: theme.textMuted }]}>
+                      NOTES GLOBALES DE SÉANCE
+                    </Text>
+                    <View style={styles.detailSessionNotesList}>
+                      {currentSession.sessionNotes.map((sn) => {
+                        const typeCfg = NOTE_TYPES_CONFIG[sn.type] || NOTE_TYPES_CONFIG.autre;
+                        const isPain = sn.type === 'douleur';
+                        return (
+                          <View
+                            key={sn.id}
+                            style={[
+                              styles.detailSessionNoteCard,
+                              {
+                                backgroundColor: isPain ? '#EF444412' : `${typeCfg.color}10`,
+                                borderColor: isPain ? '#EF444435' : `${typeCfg.color}30`,
+                              },
+                            ]}
+                          >
+                            <View style={styles.detailSessionNoteHeader}>
+                              <View style={[styles.detailTypeBadge, { backgroundColor: typeCfg.color }]}>
+                                <Text style={styles.detailTypeBadgeText}>{typeCfg.label}</Text>
+                              </View>
+                              {isPain && sn.severity && (
+                                <View
+                                  style={[
+                                    styles.detailSevBadge,
+                                    { backgroundColor: sn.severity >= 2 ? '#EF4444' : '#F59E0B' },
+                                  ]}
+                                >
+                                  <Text style={styles.detailSevBadgeText}>Niveau {sn.severity}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={[styles.detailSessionNoteBody, { color: theme.text }]}>
+                              {sn.text}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {blocks.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                    Aucun exercice enregistré pour cette séance.
+                  </Text>
+                ) : (
+                  blocks.map((block, bIdx) => {
                   if (block.type === 'single') {
                     const ex = block.exercise;
                     const sets = ex.sets || [];
@@ -853,9 +1038,19 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
                         {/* Titre de l'exercice */}
                         <View style={styles.blockHeader}>
                           <View style={{ flex: 1 }}>
-                            <Text style={[styles.exerciseTitle, { color: theme.text }]}>
-                              {ex.exerciseName}
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Text style={[styles.exerciseTitle, { color: theme.text }]}>
+                                {ex.exerciseName}
+                              </Text>
+                              {hasExercisePainAlert(ex) && (
+                                <View style={[styles.painBadge, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
+                                  <AlertTriangle size={11} color="#EF4444" style={{ marginRight: 3 }} />
+                                  <Text style={[styles.painBadgeText, { color: '#EF4444' }]}>
+                                    Douleur{getExercisePainSeverity(ex) ? ` Niv.${getExercisePainSeverity(ex)}` : ''}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                             {/* Muscles travaillés */}
                             <View style={{ marginTop: 3 }}>
                               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
@@ -934,6 +1129,57 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
                             </View>
                           );
                         })}
+
+                        {/* Remarque statique (si existante) */}
+                        {ex.notes ? (
+                          <View style={[styles.staticNoteCallout, { backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }]}>
+                            <FileText size={12} color={theme.accent} style={{ marginRight: 6, marginTop: 1 }} />
+                            <Text style={[styles.staticNoteCalloutText, { color: theme.text }]}>
+                              {ex.notes}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {/* Observations typées de la séance */}
+                        {ex.sessionNotes && ex.sessionNotes.length > 0 && (
+                          <View style={styles.detailSessionNotesList}>
+                            {ex.sessionNotes.map((sn) => {
+                              const typeCfg = NOTE_TYPES_CONFIG[sn.type] || NOTE_TYPES_CONFIG.autre;
+                              const isPain = sn.type === 'douleur';
+                              return (
+                                <View
+                                  key={sn.id}
+                                  style={[
+                                    styles.detailSessionNoteCard,
+                                    {
+                                      backgroundColor: isPain ? '#EF444412' : `${typeCfg.color}10`,
+                                      borderColor: isPain ? '#EF444435' : `${typeCfg.color}30`,
+                                    },
+                                  ]}
+                                >
+                                  <View style={styles.detailSessionNoteHeader}>
+                                    <View style={[styles.detailTypeBadge, { backgroundColor: typeCfg.color }]}>
+                                      <Text style={styles.detailTypeBadgeText}>{typeCfg.label}</Text>
+                                    </View>
+                                    {isPain && sn.severity && (
+                                      <View
+                                        style={[
+                                          styles.detailSevBadge,
+                                          { backgroundColor: sn.severity >= 2 ? '#EF4444' : '#F59E0B' },
+                                        ]}
+                                      >
+                                        <Text style={styles.detailSevBadgeText}>Niveau {sn.severity}</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                  <Text style={[styles.detailSessionNoteBody, { color: theme.text }]}>
+                                    {sn.text}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
                       </View>
                     );
                   } else if (block.type === 'circuit') {
@@ -966,8 +1212,9 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
                   }
                   return null;
                 })
-              )
-            )}
+              )}
+            </>
+          )}
           </ScrollView>
         </View>
       </View>
@@ -1391,6 +1638,160 @@ const styles = StyleSheet.create({
   },
   exCat: {
     fontSize: 12,
+    fontWeight: '500',
+  },
+  editExceptionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 16,
+  },
+  editExceptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  editExceptionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  editExceptionSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  editExceptionDetails: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    paddingTop: 10,
+  },
+  editExceptionReasonLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  editExceptionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  editExceptionChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  editExceptionChipText: {
+    fontSize: 11,
+  },
+  editExceptionInput: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    minHeight: 48,
+  },
+  exceptionBanner: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  exceptionBannerTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  exceptionBannerNote: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  sessionNotesCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  sessionNotesTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  painBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  painBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  staticNoteCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  staticNoteCalloutText: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+    flex: 1,
+  },
+  detailSessionNotesList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  detailSessionNoteCard: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  detailSessionNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  detailTypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  detailTypeBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  detailSevBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  detailSevBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  detailSessionNoteBody: {
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '500',
   },
 });

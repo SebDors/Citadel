@@ -29,10 +29,12 @@ import {
   Flame,
   Zap,
   Pencil,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { PastSessionDetailModal } from './PastSessionDetailModal';
 import { LogPastWorkoutModal } from './LogPastWorkoutModal';
 import { LogCardioModal } from './LogCardioModal';
+import { hasSessionPainAlert, formatExceptionReason } from '../../utils/sessionNoteUtils';
 
 interface CalendarViewProps {
   history: WorkoutSession[];
@@ -327,9 +329,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             activeOpacity={0.7}
                             onPress={() => setSelectedDetailSession(session)}
                           >
-                            <Text style={[styles.sessionCardTitle, { color: theme.text }]}>
-                              {session.title}
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                              <Text style={[styles.sessionCardTitle, { color: theme.text, marginBottom: 0 }]}>
+                                {session.title}
+                              </Text>
+                              {session.isException && (
+                                <View style={[styles.exceptionBadge, { backgroundColor: '#F59E0B20', borderColor: '#F59E0B' }]}>
+                                  <AlertTriangle size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+                                  <Text style={[styles.exceptionBadgeText, { color: '#F59E0B' }]}>
+                                    Exception{session.exceptionReason ? ` · ${formatExceptionReason(session.exceptionReason, true)}` : ''}
+                                  </Text>
+                                </View>
+                              )}
+                              {hasSessionPainAlert(session) && (
+                                <View style={[styles.painBadge, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
+                                  <AlertTriangle size={10} color="#EF4444" style={{ marginRight: 3 }} />
+                                  <Text style={[styles.painBadgeText, { color: '#EF4444' }]}>Douleur</Text>
+                                </View>
+                              )}
+                            </View>
 
                             <View style={styles.statsRow}>
                               <View style={styles.statBadge}>
@@ -775,5 +793,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  exceptionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  exceptionBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  painBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  painBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
 });
