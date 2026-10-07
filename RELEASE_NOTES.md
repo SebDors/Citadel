@@ -1,3 +1,12 @@
+🎉 Nouveautés de la version 1.7.2 :
+
+🔧 Correctif Remplacement d'Exercice & Previous Fantôme
+- Lors du remplacement d'un exercice en cours de séance, si le nouvel exercice n'a jamais été pratiqué auparavant, la valeur "Previous" est désormais correctement vide (`-`) au lieu de conserver par erreur celle de l'ancien exercice remplacé.
+- Si le nouvel exercice a déjà été réalisé dans votre historique, ses véritables performances antérieures sont bien chargées comme prévu.
+- Réinitialisation propre des notes de séance et des métadonnées lors d'une substitution pour éviter toute incertitude ou confusion.
+
+---
+
 🎉 Nouveautés de la version 1.7.1 :
 
 🏷️ Notes Typées & Alertes Douleur

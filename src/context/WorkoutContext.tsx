@@ -1266,20 +1266,28 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             exerciseId: newExercise.id,
             exerciseName: newExercise.name,
             primaryMuscle: newExercise.primaryMuscle,
+            primaryMuscles: catalogEx?.primaryMuscles || [newExercise.primaryMuscle],
             targetMuscles: newExercise.targetMuscles,
             isBodyweight: isBw,
-            sets: block.exercise.sets.map((s) => ({
-              ...s,
-              isBodyweight: isBw,
-              previous:
-                getPreviousSetPerformance(
-                  data?.history || [],
-                  newExercise.id,
-                  newExercise.name,
-                  s.setNumber,
-                  activeSession.id
-                ) || s.previous,
-            })),
+            notes: undefined,
+            sessionNotes: undefined,
+            sets: block.exercise.sets.map((s) => {
+              const prevPerf = getPreviousSetPerformance(
+                data?.history || [],
+                newExercise.id,
+                newExercise.name,
+                s.setNumber,
+                activeSession.id
+              );
+              return {
+                ...s,
+                isBodyweight: isBw,
+                previous: prevPerf || undefined,
+                weightKg: s.completed ? s.weightKg : undefined,
+                reps: s.completed ? s.reps : undefined,
+                rir: s.completed ? s.rir : undefined,
+              };
+            }),
           },
         };
       }
@@ -1292,8 +1300,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
               item.id === oldExerciseId
                 ? {
                     ...item,
+                    exerciseId: newExercise.id,
                     exerciseName: newExercise.name,
                     primaryMuscle: newExercise.primaryMuscle,
+                    primaryMuscles: catalogEx?.primaryMuscles || [newExercise.primaryMuscle],
                     targetMuscles: newExercise.targetMuscles,
                   }
                 : item
