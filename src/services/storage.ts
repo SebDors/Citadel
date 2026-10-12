@@ -613,9 +613,11 @@ export const StorageService = {
     // Tri chronologique croissant par date
     updatedMeasurements.sort((a, b) => a.date.localeCompare(b.date));
 
-    // Récupérer le poids de la mesure la plus récente par date
-    const latestMeasurement = updatedMeasurements[updatedMeasurements.length - 1];
-    const latestWeight = latestMeasurement ? latestMeasurement.weightKg : currentData.profile.currentWeightKg;
+    // Récupérer le poids de la mesure la plus récente par date ayant un poids renseigné
+    const latestMeasurementWithWeight = [...updatedMeasurements]
+      .reverse()
+      .find((m) => typeof m.weightKg === 'number' && m.weightKg > 0);
+    const latestWeight = latestMeasurementWithWeight?.weightKg ?? currentData.profile.currentWeightKg;
 
     const updatedData: FitTrackerData = {
       ...currentData,

@@ -163,7 +163,7 @@ export interface WorkoutTemplate {
 export interface BodyMeasurement {
   id: string;
   date: string;
-  weightKg: number;
+  weightKg?: number;
   bodyFatPercentage?: number;
   chestCm?: number;
   waistCm?: number;

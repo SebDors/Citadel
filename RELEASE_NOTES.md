@@ -1,3 +1,12 @@
+🎉 Nouveautés de la version 1.7.3 :
+
+📏 Mensurations Libres & Flexibilité Totale
+- Suppression du caractère obligatoire du poids lors de la saisie ou de la modification d'une mesure corporelle.
+- Enregistrement flexible : saisissez uniquement vos mensurations (poitrine, cuisse, bras) ou votre poids, selon vos préférences, sans aucune contrainte de champ obligatoire.
+- Pré-remplissage et synchronisation automatique de l'enregistrement lors de la sélection d'une date existante.
+
+---
+
 🎉 Nouveautés de la version 1.7.2 :
 
 🔧 Correctif Remplacement d'Exercice & Previous Fantôme

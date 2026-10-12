@@ -109,11 +109,13 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   const updateInputsForDate = (dateStr: string) => {
     const existing = (measurements || []).find((m) => m.date === dateStr);
     if (existing) {
+      setEditingMeasurementId(existing.id);
       setWeight(existing.weightKg ? String(existing.weightKg) : '');
       setChest(existing.chestCm !== undefined ? String(existing.chestCm) : '');
       setThigh(existing.thighCm !== undefined ? String(existing.thighCm) : '');
       setBiceps(existing.bicepsCm !== undefined ? String(existing.bicepsCm) : '');
     } else {
+      setEditingMeasurementId(null);
       setWeight('');
       setChest('');
       setThigh('');
@@ -175,15 +177,31 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
   const handleSave = () => {
     const w = parseFloatFrench(weight);
-    if (!w || w <= 0) return;
+    const c = parseFloatFrench(chest);
+    const t = parseFloatFrench(thigh);
+    const b = parseFloatFrench(biceps);
+
+    const hasAnyValue =
+      (w !== undefined && w > 0) ||
+      (c !== undefined && c > 0) ||
+      (t !== undefined && t > 0) ||
+      (b !== undefined && b > 0);
+
+    if (!hasAnyValue) {
+      Alert.alert(
+        'Saisie requise',
+        'Veuillez renseigner au moins une mesure (poids, poitrine, cuisse ou bras).'
+      );
+      return;
+    }
 
     const newM: BodyMeasurement = {
       id: editingMeasurementId || `m_${Date.now()}`,
       date: selectedDateStr,
-      weightKg: w,
-      chestCm: parseFloatFrench(chest),
-      thighCm: parseFloatFrench(thigh),
-      bicepsCm: parseFloatFrench(biceps),
+      weightKg: w !== undefined && w > 0 ? w : undefined,
+      chestCm: c !== undefined && c > 0 ? c : undefined,
+      thighCm: t !== undefined && t > 0 ? t : undefined,
+      bicepsCm: b !== undefined && b > 0 ? b : undefined,
     };
 
     onAddMeasurement(newM);
@@ -526,7 +544,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                   <View style={styles.inputRow}>
                     <TextInput
                       style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Poids (kg) *"
+                      placeholder="Poids (kg)"
                       placeholderTextColor={theme.textMuted}
                       keyboardType="numeric"
                       value={weight}
