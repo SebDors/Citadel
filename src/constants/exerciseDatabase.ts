@@ -663,15 +663,15 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
   {
     id: 'hammer_curl',
     name: 'Curl Marteau (Hammer Curl)',
-    primaryMuscle: 'Avant-bras',
-    primaryMuscles: ["Avant-bras"],
-    subRegion: 'Brachioradial',
-    targetMuscles: ["Biceps"],
+    primaryMuscle: 'Biceps',
+    primaryMuscles: ["Biceps"],
+    subRegion: 'Brachial',
+    targetMuscles: ["Avant-bras"],
     defaultRestSeconds: 75,
     category: 'Bras',
     muscleTargets: [
-      { muscle: 'Avant-bras', subRegion: 'Brachioradial', role: 'primary', fraction: 1.0 },
-      { muscle: 'Biceps', role: 'secondary', fraction: 0.5 },
+      { muscle: 'Biceps', subRegion: 'Brachial', role: 'primary', fraction: 1.0 },
+      { muscle: 'Avant-bras', subRegion: 'Brachioradial', role: 'secondary', fraction: 0.5 },
     ],
   },
   {
