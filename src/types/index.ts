@@ -73,6 +73,7 @@ export interface WorkoutExercise {
   primaryMuscle: string;
   primaryMuscles?: string[];
   primaryMuscle_legacy?: string;
+  subRegion?: string;
   notes?: string;
   sessionNotes?: SessionNote[];
   restSeconds: number;
@@ -83,10 +84,12 @@ export interface WorkoutExercise {
 
 export interface CircuitExerciseItem {
   id: string;
+  exerciseId?: string;
   exerciseName: string;
   primaryMuscle: string;
   primaryMuscles?: string[];
   primaryMuscle_legacy?: string;
+  subRegion?: string;
   targetMuscles?: string[];
   targetMuscles_legacy?: string[];
   muscleTargets?: import('../constants/muscles').MuscleTarget[];

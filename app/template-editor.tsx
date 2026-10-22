@@ -333,7 +333,14 @@ export default function TemplateEditorScreen() {
                   exerciseId: newEx.id,
                   exerciseName: newEx.name,
                   primaryMuscle: newEx.primaryMuscle,
+                  primaryMuscles: newEx.primaryMuscles || [newEx.primaryMuscle],
+                  primaryMuscle_legacy: undefined,
+                  subRegion: newEx.subRegion,
                   targetMuscles: newEx.targetMuscles,
+                  targetMuscles_legacy: undefined,
+                  muscleTargets: newEx.muscleTargets,
+                  isBodyweight: newEx.isBodyweight,
+                  notes: undefined,
                 },
               };
             }
@@ -351,9 +358,16 @@ export default function TemplateEditorScreen() {
               if (updatedExercises[replaceTarget.exIdx!]) {
                 updatedExercises[replaceTarget.exIdx!] = {
                   ...updatedExercises[replaceTarget.exIdx!],
+                  exerciseId: newEx.id,
                   exerciseName: newEx.name,
                   primaryMuscle: newEx.primaryMuscle,
+                  primaryMuscles: newEx.primaryMuscles || [newEx.primaryMuscle],
+                  primaryMuscle_legacy: undefined,
+                  subRegion: newEx.subRegion,
                   targetMuscles: newEx.targetMuscles,
+                  targetMuscles_legacy: undefined,
+                  muscleTargets: newEx.muscleTargets,
+                  notes: undefined,
                 };
               }
               return {
@@ -373,9 +387,13 @@ export default function TemplateEditorScreen() {
       const newCircuitItems: CircuitExerciseItem[] = selectedExercises.map(
         (ex, idx) => ({
           id: `circ_ex_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          exerciseId: ex.id,
           exerciseName: ex.name,
           primaryMuscle: ex.primaryMuscle,
+          primaryMuscles: ex.primaryMuscles || [ex.primaryMuscle],
+          subRegion: ex.subRegion,
           targetMuscles: ex.targetMuscles,
+          muscleTargets: ex.muscleTargets,
           targetValue: 12,
           targetType: "reps",
         }),
@@ -401,7 +419,11 @@ export default function TemplateEditorScreen() {
             exerciseId: ex.id,
             exerciseName: ex.name,
             primaryMuscle: ex.primaryMuscle,
+            primaryMuscles: ex.primaryMuscles || [ex.primaryMuscle],
+            subRegion: ex.subRegion,
             targetMuscles: ex.targetMuscles,
+            muscleTargets: ex.muscleTargets,
+            isBodyweight: ex.isBodyweight,
             restSeconds: defaultRestSeconds || ex.defaultRestSeconds || 75,
             sets: [
               {
