@@ -71,6 +71,7 @@ export const PAIN_SEVERITY_LEVELS: {
 ];
 
 export type SessionExceptionReason =
+  | 'contrainte_temps'
   | 'contrainte_materiel'
   | 'contrainte_partenaire'
   | 'voyage'
@@ -85,6 +86,12 @@ export interface ExceptionReasonConfig {
 }
 
 export const EXCEPTION_REASONS_CONFIG: Record<SessionExceptionReason, ExceptionReasonConfig> = {
+  contrainte_temps: {
+    reason: 'contrainte_temps',
+    label: 'Manque de temps',
+    shortLabel: 'Temps',
+    description: 'Séance écourtée ou exercices adaptés faute de temps',
+  },
   contrainte_materiel: {
     reason: 'contrainte_materiel',
     label: 'Contrainte matériel',
