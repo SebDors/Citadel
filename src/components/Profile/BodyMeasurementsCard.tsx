@@ -99,6 +99,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   // Measurement Inputs state
   const [weight, setWeight] = useState('');
   const [chest, setChest] = useState('');
+  const [waist, setWaist] = useState('');
   const [thigh, setThigh] = useState('');
   const [biceps, setBiceps] = useState('');
 
@@ -112,12 +113,14 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       setEditingMeasurementId(existing.id);
       setWeight(existing.weightKg ? String(existing.weightKg) : '');
       setChest(existing.chestCm !== undefined ? String(existing.chestCm) : '');
+      setWaist(existing.waistCm !== undefined ? String(existing.waistCm) : '');
       setThigh(existing.thighCm !== undefined ? String(existing.thighCm) : '');
       setBiceps(existing.bicepsCm !== undefined ? String(existing.bicepsCm) : '');
     } else {
       setEditingMeasurementId(null);
       setWeight('');
       setChest('');
+      setWaist('');
       setThigh('');
       setBiceps('');
     }
@@ -146,6 +149,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     setIsCalendarOpen(false);
     setWeight(m.weightKg ? String(m.weightKg) : '');
     setChest(m.chestCm !== undefined ? String(m.chestCm) : '');
+    setWaist(m.waistCm !== undefined ? String(m.waistCm) : '');
     setThigh(m.thighCm !== undefined ? String(m.thighCm) : '');
     setBiceps(m.bicepsCm !== undefined ? String(m.bicepsCm) : '');
     setModalVisible(true);
@@ -178,19 +182,21 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   const handleSave = () => {
     const w = parseFloatFrench(weight);
     const c = parseFloatFrench(chest);
+    const wa = parseFloatFrench(waist);
     const t = parseFloatFrench(thigh);
     const b = parseFloatFrench(biceps);
 
     const hasAnyValue =
       (w !== undefined && w > 0) ||
       (c !== undefined && c > 0) ||
+      (wa !== undefined && wa > 0) ||
       (t !== undefined && t > 0) ||
       (b !== undefined && b > 0);
 
     if (!hasAnyValue) {
       Alert.alert(
         'Saisie requise',
-        'Veuillez renseigner au moins une mesure (poids, poitrine, cuisse ou bras).'
+        'Veuillez renseigner au moins une mesure (poids, poitrine, taille, cuisse ou bras).'
       );
       return;
     }
@@ -200,6 +206,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       date: selectedDateStr,
       weightKg: w !== undefined && w > 0 ? w : undefined,
       chestCm: c !== undefined && c > 0 ? c : undefined,
+      waistCm: wa !== undefined && wa > 0 ? wa : undefined,
       thighCm: t !== undefined && t > 0 ? t : undefined,
       bicepsCm: b !== undefined && b > 0 ? b : undefined,
     };
@@ -324,6 +331,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
         sortedMeasurements.map((m) => {
           const secondaryParts: string[] = [];
           if (m.chestCm !== undefined) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
+          if (m.waistCm !== undefined) secondaryParts.push(`T ${formatFixedMeasurement(m.waistCm)}`);
           if (m.thighCm !== undefined) secondaryParts.push(`C ${formatFixedMeasurement(m.thighCm)}`);
           if (m.bicepsCm !== undefined) secondaryParts.push(`B ${formatFixedMeasurement(m.bicepsCm)}`);
           const secondarySummary = secondaryParts.join(' · ');
@@ -552,11 +560,30 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                     />
                     <TextInput
                       style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                      placeholder="Tour de taille (cm)"
+                      placeholderTextColor={theme.textMuted}
+                      keyboardType="numeric"
+                      value={waist}
+                      onChangeText={setWaist}
+                    />
+                  </View>
+
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                       placeholder="Poitrine (cm)"
                       placeholderTextColor={theme.textMuted}
                       keyboardType="numeric"
                       value={chest}
                       onChangeText={setChest}
+                    />
+                    <TextInput
+                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                      placeholder="Bras (cm)"
+                      placeholderTextColor={theme.textMuted}
+                      keyboardType="numeric"
+                      value={biceps}
+                      onChangeText={setBiceps}
                     />
                   </View>
 
@@ -568,14 +595,6 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                       keyboardType="numeric"
                       value={thigh}
                       onChangeText={setThigh}
-                    />
-                    <TextInput
-                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Bras (cm)"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="numeric"
-                      value={biceps}
-                      onChangeText={setBiceps}
                     />
                   </View>
                 </View>
