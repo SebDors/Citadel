@@ -601,6 +601,7 @@ export const StorageService = {
         date: measurement.date,
         weightKg: measurement.weightKg,
         chestCm: measurement.chestCm,
+        waistCm: measurement.waistCm,
         thighCm: measurement.thighCm,
         bicepsCm: measurement.bicepsCm,
       };

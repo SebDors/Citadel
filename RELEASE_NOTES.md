@@ -1,3 +1,23 @@
+🎉 Nouveautés de la version 1.7.4 :
+
+📏 Mensurations — Tour de Taille & Suivi Graphique
+- Intégration du tour de taille (`waistCm`) dans la saisie des mensurations et l'historique (`T xx.x`).
+- Nouvelle métrique et courbe d'évolution graphique dédiée au tour de taille dans l'onglet Profil.
+- Prise en compte et synchronisation complète lors de la modification d'un enregistrement corporel.
+
+🔄 Remplacement d'Exercice & Préservation des Notes
+- Rechargement anatomique propre lors du changement d'exercice (en séance live ou dans l'éditeur de templates) : mise à jour instantanée du muscle principal, des muscles cibles, de la sous-région et des fractions de ciblage.
+- Réinitialisation propre des consignes techniques de l'ancien exercice tout en conservant intactes les observations typées (`sessionNotes`) de votre séance en cours.
+
+⏱️ Raison d'Exception : Manque de Temps
+- Ajout de la cause "Manque de temps" (`contrainte_temps`) parmi les motifs de séance exceptionnelle.
+- Marquage facile des séances raccourcies ou adaptées par contrainte horaire afin d'éviter de polluer vos charges de référence ("Previous") sur le programme régulier.
+
+💪 Harmonisation du Référentiel Musculaire
+- Ajustement anatomique du Curl Marteau (*Hammer Curl*) : ciblage principal sur le Biceps (Brachial, 1.0) et secondaire sur les Avant-bras (Brachioradial, 0.5).
+
+---
+
 🎉 Nouveautés de la version 1.7.3 :
 
 📏 Mensurations Libres & Flexibilité Totale
