@@ -2,7 +2,7 @@ import React from "react";
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Platform,
   StatusBar as RNStatusBar,
@@ -78,164 +78,194 @@ export default function HistoryTab() {
     return combinedList;
   }, [combinedList, filterType]);
 
+  const renderItem = React.useCallback(
+    ({ item }: { item: CombinedHistoryItem }) => {
+      if (item.type === 'workout') {
+        return (
+          <ActivitySummaryCard
+            key={`workout_${item.id}`}
+            session={item.session}
+            onDeleteSession={deleteWorkoutSession}
+          />
+        );
+      }
+      return (
+        <CardioSessionCard
+          key={`cardio_${item.id}`}
+          session={item.session}
+          onDelete={deleteCardioSession}
+          onEdit={(session) => setEditingCardioSession(session)}
+        />
+      );
+    },
+    [deleteWorkoutSession, deleteCardioSession]
+  );
+
+  const listHeader = (
+    <>
+      {/* Page Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={[styles.title, { color: theme.text }]}>
+            Historique
+          </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.headerBtn,
+                {
+                  backgroundColor: `${theme.accent}18`,
+                  borderColor: `${theme.accent}40`,
+                  borderWidth: 1,
+                },
+              ]}
+              onPress={() => setCardioModalVisible(true)}
+            >
+              <Flame size={14} color={theme.accent} style={{ marginRight: 4 }} />
+              <Text style={[styles.headerBtnText, { color: theme.accent }]}>
+                Cardio
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.headerBtn, { backgroundColor: theme.accent }]}
+              onPress={() => setLogModalVisible(true)}
+            >
+              <Plus size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+              <Text style={[styles.headerBtnText, { color: "#FFFFFF" }]}>
+                Séance passée
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+          Calendrier d'assiduité, séances et activités
+        </Text>
+      </View>
+
+      {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
+      <CalendarView
+        history={historyList}
+        cardioSessions={cardioList}
+        onEditCardio={(session) => setEditingCardioSession(session)}
+      />
+
+      {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
+      <ActivitySummaryCard history={historyList} cardioSessions={cardioList} />
+
+      {/* 3. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
+      <View style={styles.listSectionHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Calendar size={18} color={theme.accent} />
+          <Text style={[styles.listTitle, { color: theme.text }]}>
+            Derniers Entraînements
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {isLastSessionsCollapsed && displayList.length > 0 && (
+            <View style={[styles.collapsedBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text style={[styles.collapsedBadgeText, { color: theme.textMuted }]}>
+                {displayList.length}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={toggleLastSessionsCollapsed}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={isLastSessionsCollapsed ? 'Développer' : 'Réduire'}
+          >
+            {isLastSessionsCollapsed ? (
+              <ChevronDown size={18} color={theme.textMuted} />
+            ) : (
+              <ChevronUp size={18} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Filtres Type de Séance (Tous, Muscu, Cardio) */}
+      {!isLastSessionsCollapsed && (
+        <View style={styles.filterBar}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.filterChip,
+              filterType === 'all'
+                ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                : { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={() => setFilterType('all')}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: filterType === 'all' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'all' ? '800' : '600' },
+              ]}
+            >
+              Tous ({combinedList.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.filterChip,
+              filterType === 'workout'
+                ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                : { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={() => setFilterType('workout')}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: filterType === 'workout' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'workout' ? '800' : '600' },
+              ]}
+            >
+              Muscu ({historyList.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.filterChip,
+              filterType === 'cardio'
+                ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                : { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={() => setFilterType('cardio')}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: filterType === 'cardio' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'cardio' ? '800' : '600' },
+              ]}
+            >
+              Cardio ({cardioList.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </>
+  );
+
   return (
     <TabSwipeWrapper tabIndex={1}>
       <SafeAreaView
         edges={["top", "left", "right"]}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Page Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <Text style={[styles.title, { color: theme.text }]}>
-                Historique
-              </Text>
-              <View style={styles.headerActions}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={[
-                    styles.headerBtn,
-                    {
-                      backgroundColor: `${theme.accent}18`,
-                      borderColor: `${theme.accent}40`,
-                      borderWidth: 1,
-                    },
-                  ]}
-                  onPress={() => setCardioModalVisible(true)}
-                >
-                  <Flame size={14} color={theme.accent} style={{ marginRight: 4 }} />
-                  <Text style={[styles.headerBtnText, { color: theme.accent }]}>
-                    Cardio
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={[styles.headerBtn, { backgroundColor: theme.accent }]}
-                  onPress={() => setLogModalVisible(true)}
-                >
-                  <Plus size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={[styles.headerBtnText, { color: "#FFFFFF" }]}>
-                    Séance passée
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-              Calendrier d'assiduité, séances et activités
-            </Text>
-          </View>
-
-          {/* 1. Calendrier d'assiduité avec modale interactive des jours (Haut de page) */}
-          <CalendarView
-            history={historyList}
-            cardioSessions={cardioList}
-            onEditCardio={(session) => setEditingCardioSession(session)}
-          />
-
-          {/* 2. Bloc de Statistiques Hebdomadaires (Milieu de page) */}
-          <ActivitySummaryCard history={historyList} cardioSessions={cardioList} />
-
-          {/* 3. Liste Chronologique Compacte des Derniers Entraînements (Bas de page) */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.listSectionHeader}
-            onPress={toggleLastSessionsCollapsed}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Calendar
-                size={18}
-                color={theme.accent}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={[styles.listTitle, { color: theme.text }]}>
-                Dernières Séances Effectuées
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {isLastSessionsCollapsed && combinedList.length > 0 && (
-                <View style={[styles.collapsedBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                  <Text style={[styles.collapsedBadgeText, { color: theme.textMuted }]}>
-                    {combinedList.length}
-                  </Text>
-                </View>
-              )}
-              {isLastSessionsCollapsed ? (
-                <ChevronDown size={18} color={theme.textMuted} />
-              ) : (
-                <ChevronUp size={18} color={theme.textMuted} />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Filtres de vue (Tous / Musculation / Cardio) si au moins une séance cardio existe */}
-          {!isLastSessionsCollapsed && (cardioList.length > 0 || historyList.length > 0) && (
-            <View style={styles.filterBar}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterChip,
-                  filterType === 'all'
-                    ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                    : { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-                onPress={() => setFilterType('all')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: filterType === 'all' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'all' ? '800' : '600' },
-                  ]}
-                >
-                  Toutes ({combinedList.length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterChip,
-                  filterType === 'workout'
-                    ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                    : { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-                onPress={() => setFilterType('workout')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: filterType === 'workout' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'workout' ? '800' : '600' },
-                  ]}
-                >
-                  Muscu ({historyList.length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterChip,
-                  filterType === 'cardio'
-                    ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                    : { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-                onPress={() => setFilterType('cardio')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: filterType === 'cardio' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'cardio' ? '800' : '600' },
-                  ]}
-                >
-                  Cardio ({cardioList.length})
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!isLastSessionsCollapsed && (
-            displayList.length === 0 ? (
+        <FlatList
+          data={isLastSessionsCollapsed ? [] : displayList}
+          keyExtractor={(item: CombinedHistoryItem) => `${item.type}_${item.id}`}
+          renderItem={renderItem}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            !isLastSessionsCollapsed ? (
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>
                 {filterType === 'cardio'
                   ? 'Aucune séance cardio enregistrée.'
@@ -243,29 +273,14 @@ export default function HistoryTab() {
                   ? 'Aucune séance de musculation enregistrée.'
                   : 'Aucune séance terminée pour le moment.'}
               </Text>
-            ) : (
-              displayList.slice(0, 10).map((item) => {
-                if (item.type === 'workout') {
-                  return (
-                    <ActivitySummaryCard
-                      key={`workout_${item.id}`}
-                      session={item.session}
-                      onDeleteSession={deleteWorkoutSession}
-                    />
-                  );
-                }
-                return (
-                  <CardioSessionCard
-                    key={`cardio_${item.id}`}
-                    session={item.session}
-                    onDelete={deleteCardioSession}
-                    onEdit={(session) => setEditingCardioSession(session)}
-                  />
-                );
-              })
-            )
-          )}
-        </ScrollView>
+            ) : null
+          }
+          contentContainerStyle={styles.scrollContent}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
+        />
 
         <LogPastWorkoutModal
           visible={logModalVisible}
