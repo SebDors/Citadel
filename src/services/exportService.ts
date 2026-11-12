@@ -1,16 +1,11 @@
+import { calculateE1RM } from './analyticsService';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { shareAsync } from 'expo-sharing';
 import { getDocumentAsync } from 'expo-document-picker';
-import * as Clipboard from 'expo-clipboard';
 import { FitTrackerData, WorkoutSession, BodyMeasurement, WorkoutTemplate, getSessionBlocks } from '../types';
 
-function calculateEpley1RM(weight?: number, reps?: number): string {
-  if (weight && reps && reps > 0) {
-    return (weight * (1 + reps / 30)).toFixed(2);
-  }
-  return '';
-}
+
 
 export const ExportService = {
   exportWorkoutsToCSV(data: FitTrackerData): string {
@@ -38,7 +33,7 @@ export const ExportService = {
               set.weightKg || '',
               set.reps || '',
               set.rir || '',
-              calculateEpley1RM(set.weightKg, set.reps),
+              (set.weightKg && set.reps ? (calculateE1RM(set.weightKg, set.reps) ?? '') : ''),
               ex.restSeconds || '',
               set.completed ? 'Terminée' : 'Ignorée',
             ];

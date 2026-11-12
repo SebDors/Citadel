@@ -80,7 +80,6 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
 
   // Keypad state
-  const [keypadVisible, setKeypadVisible] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<{ blockId: string; setId: string; field: NumericFieldType; setNumber: number; value: string } | null>(null);
 
   // Exercise Selector state
@@ -112,7 +111,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
       setPrefillSourceText(null);
       setMode('detailed');
       setBlocks([]);
-      setKeypadVisible(false);
+      setKeypadTarget(null);
       setShowTemplateSelector(false);
       setTemplateSearchQuery('');
     }

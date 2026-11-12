@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FitTrackerData, WorkoutSession, WorkoutTemplate, BodyMeasurement, WorkoutFolder, CardioSession, getSessionBlocks } from '../types';
+import { FitTrackerData, WorkoutSession, BodyMeasurement, WorkoutFolder, CardioSession, getSessionBlocks } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
 import { SharedExercise } from '../constants/exerciseDatabase';
 import { normalizeMuscle, MuscleTarget } from '../constants/muscles';

@@ -52,7 +52,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [tempRestSeconds, setTempRestSeconds] = useState(String(exercise.restSeconds || 75));
+
 
   const hasPain = useMemo(() => hasExercisePainAlert(exercise), [exercise]);
   const sessionNotesCount = exercise.sessionNotes?.length || 0;
@@ -73,13 +73,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
     return list.filter((m) => !primaryMusclesList.includes(m));
   }, [exercise.targetMuscles, primaryMusclesList]);
 
-  const handleSaveRestTime = () => {
-    const val = parseInt(tempRestSeconds, 10);
-    if (!isNaN(val) && val >= 0) {
-      onUpdateRestTime(val);
-    }
-    setShowRestModal(false);
-  };
+
 
   return (
     <Card

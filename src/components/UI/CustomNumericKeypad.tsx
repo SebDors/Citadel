@@ -32,16 +32,6 @@ export interface CustomNumericKeypadProps {
   onToggleBodyweight?: (isBodyweight: boolean) => void;
 }
 
-interface KeyButtonProps {
-  value: string;
-  label?: string;
-  icon?: React.ReactNode;
-  onPress: (val: string) => void;
-  disabled?: boolean;
-  style?: any;
-  textStyle?: any;
-}
-
 export const computeNextValue = (
   prevVal: string,
   key: string,
