@@ -1,3 +1,4 @@
+import { triggerHapticSuccess, triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
@@ -449,7 +450,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
         {/* Checkbox de complétion */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={onToggleComplete}
+          onPress={() => {
+            if (!set.completed) {
+              triggerHapticSuccess();
+            } else {
+              triggerHapticLight();
+            }
+            onToggleComplete();
+          }}
           style={[
             styles.checkButton,
             {

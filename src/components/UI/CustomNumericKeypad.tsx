@@ -1,3 +1,4 @@
+import { triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -106,6 +107,7 @@ const KeyButton = React.memo<KeyButtonProps>(({
 }) => {
   const handlePressIn = useCallback(() => {
     if (!disabled) {
+      triggerHapticLight();
       onPress(value);
     }
   }, [onPress, value, disabled]);
@@ -173,6 +175,7 @@ const RirButton = React.memo<RirButtonProps>(({
   theme,
 }) => {
   const handlePressIn = useCallback(() => {
+    triggerHapticLight();
     onPress(option);
   }, [onPress, option]);
 

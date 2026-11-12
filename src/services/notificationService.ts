@@ -1,3 +1,4 @@
+import { triggerHapticTimerAlarm } from '../utils/haptics';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -179,6 +180,7 @@ export const NotificationService = {
    */
   async playTimerEndSound(): Promise<void> {
     try {
+      triggerHapticTimerAlarm();
       // Arrêt immédiat de tout lecteur audio en cours
       if (currentAudioPlayer) {
         try {
