@@ -39,6 +39,34 @@ export const ExportService = {
             ];
             csv += row.join(';') + '\n';
           });
+        } else if (block.type === 'circuit') {
+          const circuitTitle = (block.title || 'Circuit').replace(/;/g, ',');
+          const rounds = block.rounds || 1;
+          const cState = session.circuitStates?.[block.id];
+          const completedRounds = cState?.completedRoundsCount ?? rounds;
+
+          block.exercises.forEach((item) => {
+            const exName = item.exerciseName.replace(/;/g, ',');
+            for (let round = 1; round <= rounds; round++) {
+              const isCompleted = round <= completedRounds;
+              const reps = item.targetType === 'reps' ? item.targetValue : '';
+              const row = [
+                date,
+                heure,
+                seanceTitle,
+                `[${circuitTitle}] ${exName}`,
+                round,
+                item.setType || 'normal',
+                '',
+                reps,
+                '',
+                '',
+                block.restBetweenRoundsSeconds || '',
+                isCompleted ? 'Terminée' : 'Ignorée',
+              ];
+              csv += row.join(';') + '\n';
+            }
+          });
         }
       });
     });

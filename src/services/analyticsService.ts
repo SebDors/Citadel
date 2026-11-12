@@ -63,9 +63,11 @@ export function calculateWorkoutTotalVolume(
           const cState = sessionMeta?.circuitStates?.[block.id];
           const completedRounds = cState?.completedRoundsCount ?? rounds;
           completedCount += completedRounds;
-          // Si l'exercice de circuit a une valeur en reps et un poids défini
           if (item.targetType === 'reps' && item.targetValue > 0) {
-            // Le volume est comptabilisé si applicable
+            const effectiveWeight = (cState?.customValues?.[item.id + '_weight']) || 0;
+            if (effectiveWeight > 0) {
+              volume += completedRounds * item.targetValue * effectiveWeight;
+            }
           }
         });
       }
@@ -277,32 +279,82 @@ export function calculateWeeklyMuscleVolume(
     const blocks = getSessionBlocks(session);
     blocks.forEach((block) => {
       if (block.type === 'single') {
-        const rawMuscles = (block.exercise.primaryMuscles && block.exercise.primaryMuscles.length > 0)
-          ? block.exercise.primaryMuscles
-          : (block.exercise.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
-
-        const workingSets = (block.exercise.sets || []).filter(
+        const ex = block.exercise;
+        const workingSets = (ex.sets || []).filter(
           (s) => s.completed && s.type !== 'warmup'
         ).length;
 
-        // Déduplication par groupe musculaire normalisé pour éviter de compter 2 fois la même série
-        const normalizedGroups = Array.from(new Set(rawMuscles.map((m) => normalizeMuscle(m).muscle)));
+        if (workingSets > 0) {
+          if (ex.muscleTargets && ex.muscleTargets.length > 0) {
+            const seenMuscles = new Set<string>();
+            ex.muscleTargets.forEach((target) => {
+              const normalized = normalizeMuscle(target.muscle).muscle;
+              if (!seenMuscles.has(normalized)) {
+                seenMuscles.add(normalized);
+                const fraction = target.fraction !== undefined
+                  ? target.fraction
+                  : (target.role === 'primary' ? 1.0 : 0.5);
+                muscleSetsMap.set(normalized, (muscleSetsMap.get(normalized) || 0) + (workingSets * fraction));
+              }
+            });
+          } else {
+            const rawPrimaries = (ex.primaryMuscles && ex.primaryMuscles.length > 0)
+              ? ex.primaryMuscles
+              : (ex.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
+            const primaryGroups = new Set(rawPrimaries.map((m) => normalizeMuscle(m).muscle));
 
-        normalizedGroups.forEach((muscle) => {
-          muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + workingSets);
-        });
+            primaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + workingSets);
+            });
+
+            const rawSecondaries = ex.targetMuscles || [];
+            const secondaryGroups = new Set(
+              rawSecondaries
+                .map((m) => normalizeMuscle(m).muscle)
+                .filter((m) => !primaryGroups.has(m))
+            );
+
+            secondaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + (workingSets * 0.5));
+            });
+          }
+        }
       } else if (block.type === 'circuit') {
+        const rounds = block.rounds || 1;
         block.exercises.forEach((item) => {
-          const rawMuscles = (item.primaryMuscles && item.primaryMuscles.length > 0)
-            ? item.primaryMuscles
-            : (item.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
+          if (item.muscleTargets && item.muscleTargets.length > 0) {
+            const seenMuscles = new Set<string>();
+            item.muscleTargets.forEach((target) => {
+              const normalized = normalizeMuscle(target.muscle).muscle;
+              if (!seenMuscles.has(normalized)) {
+                seenMuscles.add(normalized);
+                const fraction = target.fraction !== undefined
+                  ? target.fraction
+                  : (target.role === 'primary' ? 1.0 : 0.5);
+                muscleSetsMap.set(normalized, (muscleSetsMap.get(normalized) || 0) + (rounds * fraction));
+              }
+            });
+          } else {
+            const rawPrimaries = (item.primaryMuscles && item.primaryMuscles.length > 0)
+              ? item.primaryMuscles
+              : (item.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
+            const primaryGroups = new Set(rawPrimaries.map((m) => normalizeMuscle(m).muscle));
 
-          const rounds = block.rounds || 1;
-          const normalizedGroups = Array.from(new Set(rawMuscles.map((m) => normalizeMuscle(m).muscle)));
+            primaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + rounds);
+            });
 
-          normalizedGroups.forEach((muscle) => {
-            muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + rounds);
-          });
+            const rawSecondaries = item.targetMuscles || [];
+            const secondaryGroups = new Set(
+              rawSecondaries
+                .map((m) => normalizeMuscle(m).muscle)
+                .filter((m) => !primaryGroups.has(m))
+            );
+
+            secondaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + (rounds * 0.5));
+            });
+          }
         });
       }
     });
