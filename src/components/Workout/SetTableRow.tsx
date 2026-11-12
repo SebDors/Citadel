@@ -1,6 +1,6 @@
 import { triggerHapticSuccess, triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
@@ -248,6 +248,22 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     onUpdate('dropSteps', next);
   };
 
+  const handleDeletePress = useCallback(() => {
+    const hasData = set.completed || (set.weightKg !== undefined && set.weightKg > 0) || (set.reps !== undefined && set.reps > 0);
+    if (hasData) {
+      Alert.alert(
+        'Supprimer la série ?',
+        `Voulez-vous vraiment supprimer la série ${set.setNumber} ? Ses données seront effacées.`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Supprimer', style: 'destructive', onPress: onDelete },
+        ]
+      );
+    } else {
+      onDelete();
+    }
+  }, [set.completed, set.weightKg, set.reps, set.setNumber, onDelete]);
+
   const handleRemoveDropStep = (stepId: string) => {
     const current = set.dropSteps || [];
     const next = current.filter((s) => s.id !== stepId);
@@ -469,8 +485,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
         </TouchableOpacity>
 
-        {/* Suppression de la série */}
-        <TouchableOpacity activeOpacity={0.7} onPress={onDelete} style={styles.deleteButton}>
+        {/* Suppression de la série avec confirmation et hitSlop 44pt */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handleDeletePress}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}
+          style={styles.deleteButton}
+          accessibilityLabel={`Supprimer la série ${set.setNumber}`}
+        >
           <Trash2 size={16} color={theme.danger} />
         </TouchableOpacity>
       </View>
@@ -581,7 +603,9 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => handleRemoveDropStep(step.id)}
-                  style={{ padding: 4, marginLeft: 4 }}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}
+                  style={{ padding: 4, marginLeft: 4, minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityLabel="Supprimer cette décharge"
                 >
                   <Trash2 size={14} color={theme.danger} />
                 </TouchableOpacity>
@@ -769,7 +793,8 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   deleteButton: {
-    width: 24,
+    minWidth: 28,
+    minHeight: 34,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
