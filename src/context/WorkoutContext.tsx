@@ -1650,16 +1650,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       circuitStates: states,
     };
     setActiveSession(updatedSession);
-    if (data) {
-      const updatedData: FitTrackerData = {
-        ...data,
-        currentWorkout: updatedSession,
-      };
-      setData(updatedData);
-      StorageService.saveData(updatedData);
-    } else {
-      StorageService.saveCurrentWorkout(updatedSession);
-    }
+    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const addBatchExercisesToCircuit = (

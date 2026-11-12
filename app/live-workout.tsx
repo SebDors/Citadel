@@ -241,6 +241,7 @@ interface CircuitState {
   expandedMap: Record<string, boolean>;
   customValues: Record<string, number>;
   amrapSecondsLeft?: number;
+  amrapEndTime?: number;
   completedRoundsCount?: number;
 }
 
@@ -320,7 +321,7 @@ export default function LiveWorkoutScreen() {
   
   const { reorderActiveSessionBlocks } = useWorkout();
 
-  const isInitialMount = useRef(true);
+
 
   // Local state per CircuitBlock ID
   const [circuitStates, setCircuitStates] = useState<
@@ -337,15 +338,7 @@ export default function LiveWorkoutScreen() {
     }
   }, [activeSession?.id]);
 
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (circuitStates && Object.keys(circuitStates).length > 0) {
-      updateActiveSessionCircuitStates(circuitStates);
-    }
-  }, [circuitStates]);
+
 
   // Extract blocks sequentially (mixed single exercises & circuits)
   const blocks = useMemo(() => {
@@ -593,8 +586,17 @@ export default function LiveWorkoutScreen() {
   // Helper to get state of a specific CircuitBlock
   const getCircuitState = (block: CircuitBlock): CircuitState => {
     const existing = circuitStates[block.id];
-    if (existing) return existing;
+    if (existing) {
+      if (existing.started && existing.amrapEndTime && block.circuitType === "amrap") {
+        return {
+          ...existing,
+          amrapSecondsLeft: Math.max(0, Math.ceil((existing.amrapEndTime - Date.now()) / 1000)),
+        };
+      }
+      return existing;
+    }
 
+    const durationSec = (block.amrapDurationMinutes || 12) * 60;
     return {
       started: false,
       currentRound: 0,
@@ -602,7 +604,7 @@ export default function LiveWorkoutScreen() {
       roundStatusMap: {},
       expandedMap: {},
       customValues: {},
-      amrapSecondsLeft: (block.amrapDurationMinutes || 12) * 60,
+      amrapSecondsLeft: durationSec,
       completedRoundsCount: 0,
     };
   };
@@ -621,27 +623,33 @@ export default function LiveWorkoutScreen() {
         customValues: {},
         completedRoundsCount: 0,
       };
-      return {
+      const next = {
         ...prev,
         [blockId]: updater(current),
       };
+      // Synchronisation sur action utilisateur uniquement
+      updateActiveSessionCircuitStates(next);
+      return next;
     });
   };
 
   const handleStartCircuit = (block: CircuitBlock) => {
+    const durationSec = (block.amrapDurationMinutes || 12) * 60;
     updateCircuitState(block.id, (prev) => ({
       ...prev,
       started: true,
       currentRound: 1,
-      amrapSecondsLeft: (block.amrapDurationMinutes || 12) * 60,
+      amrapSecondsLeft: durationSec,
+      amrapEndTime: Date.now() + durationSec * 1000,
     }));
   };
 
-  // Timer dégressif AMRAP
+  // Timer dégressif AMRAP (découplé des I/O disque)
   useEffect(() => {
     const interval = setInterval(() => {
       setCircuitStates((prevStates) => {
         let hasChanges = false;
+        let amrapFinishedState: Record<string, CircuitState> | null = null;
         const nextStates = { ...prevStates };
 
         Object.keys(nextStates).forEach((blockId) => {
@@ -657,12 +665,24 @@ export default function LiveWorkoutScreen() {
             (state.amrapSecondsLeft ?? 0) > 0
           ) {
             hasChanges = true;
+            const newSeconds = state.amrapEndTime
+              ? Math.max(0, Math.ceil((state.amrapEndTime - Date.now()) / 1000))
+              : Math.max(0, (state.amrapSecondsLeft ?? 0) - 1);
+
+            if (newSeconds === 0 && (state.amrapSecondsLeft ?? 0) > 0) {
+              amrapFinishedState = nextStates;
+            }
+
             nextStates[blockId] = {
               ...state,
-              amrapSecondsLeft: Math.max(0, (state.amrapSecondsLeft ?? 0) - 1),
+              amrapSecondsLeft: newSeconds,
             };
           }
         });
+
+        if (amrapFinishedState) {
+          updateActiveSessionCircuitStates(amrapFinishedState);
+        }
 
         return hasChanges ? nextStates : prevStates;
       });
