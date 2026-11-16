@@ -10,6 +10,7 @@ export interface SharedExercise {
   category: 'Pectoraux' | 'Dos' | 'Épaules' | 'Bras' | 'Jambes' | 'Abdos';
   isCustom?: boolean;
   isBodyweight?: boolean;
+  bodyweightFactor?: number;
   subRegion?: string;
   muscleTargets?: MuscleTarget[];
 }
@@ -114,6 +115,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 90,
     category: 'Pectoraux',
     isBodyweight: true,
+    bodyweightFactor: 0.9,
     muscleTargets: [
       { muscle: 'Pectoraux', subRegion: 'Chef abdominal (Bas)', role: 'primary', fraction: 1.0 },
       { muscle: 'Triceps', role: 'secondary', fraction: 0.5 },
@@ -170,6 +172,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 60,
     category: 'Pectoraux',
     isBodyweight: true,
+    bodyweightFactor: 0.65,
     muscleTargets: [
       { muscle: 'Pectoraux', subRegion: 'Chef sterno-costal (Médian)', role: 'primary', fraction: 1.0 },
       { muscle: 'Triceps', role: 'secondary', fraction: 0.5 },
@@ -216,6 +219,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 90,
     category: 'Dos',
     isBodyweight: true,
+    bodyweightFactor: 1,
     muscleTargets: [
       { muscle: 'Grand Dorsal', role: 'primary', fraction: 1.0 },
       { muscle: 'Grand Rond', role: 'secondary', fraction: 0.5 },
@@ -232,6 +236,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 90,
     category: 'Dos',
     isBodyweight: true,
+    bodyweightFactor: 1,
     muscleTargets: [
       { muscle: 'Grand Dorsal', role: 'primary', fraction: 1.0 },
       { muscle: 'Biceps', role: 'secondary', fraction: 0.5 },
@@ -435,6 +440,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 60,
     category: 'Dos',
     isBodyweight: true,
+    bodyweightFactor: 0.45,
     muscleTargets: [
       { muscle: 'Lombaires', subRegion: 'Érecteurs du rachis', role: 'primary', fraction: 1.0 },
       { muscle: 'Fessiers', role: 'secondary', fraction: 0.5 },
@@ -778,6 +784,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 60,
     category: 'Bras',
     isBodyweight: true,
+    bodyweightFactor: 0.55,
     muscleTargets: [
       { muscle: 'Triceps', role: 'primary', fraction: 1.0 },
       { muscle: 'Deltoïde Antérieur', role: 'secondary', fraction: 0.5 },
@@ -1076,6 +1083,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 0,
     category: 'Abdos',
     isBodyweight: true,
+    bodyweightFactor: 0.3,
     muscleTargets: [
       { muscle: 'Abdominaux', subRegion: 'Partie basse', role: 'primary', fraction: 1.0 },
     ],
@@ -1090,6 +1098,7 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     defaultRestSeconds: 0,
     category: 'Abdos',
     isBodyweight: true,
+    bodyweightFactor: 0.25,
     muscleTargets: [
       { muscle: 'Abdominaux', subRegion: 'Partie basse', role: 'primary', fraction: 1.0 },
     ],
@@ -1136,3 +1145,18 @@ export const EXERCISE_DATABASE: SharedExercise[] = [
     ],
   },
 ];
+
+
+/**
+ * Retourne le coefficient biomécanique de charge du poids de corps pour un exercice donné (ex: 0.65 pour pompes, 0.9 pour dips, 1.0 pour tractions).
+ */
+export function getBodyweightFactor(exerciseId?: string, exerciseName?: string): number {
+  const byId = exerciseId ? EXERCISE_DATABASE.find((e) => e.id === exerciseId) : undefined;
+  if (byId && byId.bodyweightFactor !== undefined) return byId.bodyweightFactor;
+  if (exerciseName) {
+    const cleanName = exerciseName.toLowerCase().trim();
+    const byName = EXERCISE_DATABASE.find((e) => e.name.toLowerCase().trim() === cleanName);
+    if (byName && byName.bodyweightFactor !== undefined) return byName.bodyweightFactor;
+  }
+  return 1.0;
+}
