@@ -1577,12 +1577,12 @@ export default function LiveWorkoutScreen() {
                               {idx + 1}
                             </Text>
                           </View>
-                          <View style={{ marginLeft: 10, flex: 1 }}>
+                          <View style={{ marginLeft: 10, flex: 1, flexShrink: 1, marginRight: 8 }}>
                             <View style={{ flexDirection: "row", alignItems: "center" }}>
                               <Text
                                 style={[
                                   styles.collapsedExName,
-                                  { color: theme.text },
+                                  { color: theme.text, flexShrink: 1 },
                                 ]}
                                 numberOfLines={1}
                               >
@@ -1591,6 +1591,7 @@ export default function LiveWorkoutScreen() {
                               {(() => {
                                 const currentSetType = ex.setType || 'normal';
                                 const cfg = SET_TYPES_CONFIG[currentSetType] || SET_TYPES_CONFIG.normal;
+                                const isNormal = currentSetType === 'normal';
                                 return (
                                   <TouchableOpacity
                                     activeOpacity={0.7}
@@ -1598,15 +1599,30 @@ export default function LiveWorkoutScreen() {
                                       e.stopPropagation();
                                       handleCycleCircuitSetType(block.id, ex.id, ex.setType);
                                     }}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     style={{
-                                      backgroundColor: currentSetType === 'normal' ? `${theme.border}90` : cfg.color,
-                                      paddingHorizontal: 6,
-                                      paddingVertical: 1,
-                                      borderRadius: 4,
+                                      backgroundColor: isNormal ? theme.surface : cfg.color,
+                                      borderColor: isNormal ? theme.border : cfg.color,
+                                      borderWidth: 1,
+                                      minWidth: 20,
+                                      height: 20,
+                                      paddingHorizontal: 5,
+                                      borderRadius: 6,
                                       marginLeft: 6,
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
                                     }}
                                   >
-                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.code} · {cfg.label}</Text>
+                                    <Text
+                                      style={{
+                                        color: isNormal ? theme.textMuted : '#FFFFFF',
+                                        fontSize: 10,
+                                        fontWeight: '800',
+                                      }}
+                                    >
+                                      {cfg.code}
+                                    </Text>
                                   </TouchableOpacity>
                                 );
                               })()}
@@ -1698,12 +1714,12 @@ export default function LiveWorkoutScreen() {
                           </Text>
                         </View>
 
-                        <View style={{ flex: 1, marginLeft: 10 }}>
+                        <View style={{ flex: 1, flexShrink: 1, marginLeft: 10, marginRight: 8 }}>
                           <View style={{ flexDirection: "row", alignItems: "center" }}>
                             <Text
                               style={[
                                 styles.circuitExName,
-                                { color: theme.text },
+                                { color: theme.text, flexShrink: 1 },
                               ]}
                             >
                               {ex.exerciseName}
@@ -1711,19 +1727,35 @@ export default function LiveWorkoutScreen() {
                             {(() => {
                               const currentSetType = ex.setType || 'normal';
                               const cfg = SET_TYPES_CONFIG[currentSetType] || SET_TYPES_CONFIG.normal;
+                              const isNormal = currentSetType === 'normal';
                               return (
                                 <TouchableOpacity
                                   activeOpacity={0.7}
                                   onPress={() => handleCycleCircuitSetType(block.id, ex.id, ex.setType)}
+                                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                   style={{
-                                    backgroundColor: currentSetType === 'normal' ? `${theme.border}90` : cfg.color,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 1,
-                                    borderRadius: 4,
+                                    backgroundColor: isNormal ? theme.surface : cfg.color,
+                                    borderColor: isNormal ? theme.border : cfg.color,
+                                    borderWidth: 1,
+                                    minWidth: 20,
+                                    height: 20,
+                                    paddingHorizontal: 5,
+                                    borderRadius: 6,
                                     marginLeft: 6,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
                                   }}
                                 >
-                                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.code} · {cfg.label}</Text>
+                                  <Text
+                                    style={{
+                                      color: isNormal ? theme.textMuted : '#FFFFFF',
+                                      fontSize: 10,
+                                      fontWeight: '800',
+                                    }}
+                                  >
+                                    {cfg.code}
+                                  </Text>
                                 </TouchableOpacity>
                               );
                             })()}

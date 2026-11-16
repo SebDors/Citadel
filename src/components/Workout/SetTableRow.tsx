@@ -1,6 +1,6 @@
 import { triggerHapticSuccess, triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
@@ -37,6 +37,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const { data } = useWorkout();
   const isRirEnabled = enableRirProp !== undefined ? enableRirProp : (data?.profile?.enableRir !== false);
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<KeypadTarget>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
@@ -251,18 +252,12 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const handleDeletePress = useCallback(() => {
     const hasData = set.completed || (set.weightKg !== undefined && set.weightKg > 0) || (set.reps !== undefined && set.reps > 0);
     if (hasData) {
-      Alert.alert(
-        'Supprimer la série ?',
-        `Voulez-vous vraiment supprimer la série ${set.setNumber} ? Ses données seront effacées.`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Supprimer', style: 'destructive', onPress: onDelete },
-        ]
-      );
+      triggerHapticLight();
+      setShowDeleteConfirmModal(true);
     } else {
       onDelete();
     }
-  }, [set.completed, set.weightKg, set.reps, set.setNumber, onDelete]);
+  }, [set.completed, set.weightKg, set.reps, onDelete]);
 
   const handleRemoveDropStep = (stepId: string) => {
     const current = set.dropSteps || [];
@@ -719,6 +714,54 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modale de confirmation de suppression dans la DA de l'application */}
+      <Modal
+        visible={showDeleteConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirmModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.confirmOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDeleteConfirmModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.confirmCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          >
+            <View style={[styles.confirmIconCircle, { backgroundColor: `${theme.danger}18` }]}>
+              <Trash2 size={22} color={theme.danger} />
+            </View>
+            <Text style={[styles.confirmTitle, { color: theme.text }]}>
+              Supprimer la série {set.setNumber} ?
+            </Text>
+            <Text style={[styles.confirmDesc, { color: theme.textMuted }]}>
+              Les données enregistrées sur cette série seront définitivement effacées.
+            </Text>
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowDeleteConfirmModal(false)}
+                style={[styles.confirmBtn, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}
+              >
+                <Text style={[styles.confirmBtnText, { color: theme.text }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowDeleteConfirmModal(false);
+                  onDelete();
+                }}
+                style={[styles.confirmBtn, { backgroundColor: theme.danger }]}
+              >
+                <Text style={[styles.confirmBtnText, { color: '#FFFFFF' }]}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -799,6 +842,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 4,
     marginLeft: 4,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+    alignItems: 'center',
+  },
+  confirmIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  confirmDesc: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  confirmBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
