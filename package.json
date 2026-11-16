@@ -8,7 +8,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "eas:login": "eas-cli login",
-    "build:apk": "eas-cli build --platform android --profile preview"
+    "build:apk": "eas-cli build --platform android --profile preview",
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src app",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\""
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -36,9 +40,16 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.10",
     "@types/react-native": "^0.72.8",
     "babel-preset-expo": "~54.0.12",
+    "eslint": "^10.15.0",
+    "eslint-config-expo": "^58.0.4",
+    "jest": "^30.5.2",
+    "jest-expo": "^58.0.14",
+    "prettier": "^3.10.1",
+    "ts-jest": "^29.4.15",
     "typescript": "^5.3.3"
   },
   "private": true
