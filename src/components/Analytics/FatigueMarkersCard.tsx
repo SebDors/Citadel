@@ -95,7 +95,7 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
     statusBg = 'rgba(245, 158, 11, 0.14)';
     statusBorder = 'rgba(245, 158, 11, 0.35)';
     statusTitle = 'Signes de fatigue / Sous-récupération';
-    statusDesc = `Le RIR moyen (${currentSnapshot.avgRir}) dépasse de plus d'1 point votre référence sur 4 semaines (${currentSnapshot.avgRir4wRollingAvg}), associé à un poids stable ou baissier${
+    statusDesc = `Le RIR moyen (${currentSnapshot.avgRir}) a chuté de plus d'1 point sous votre référence sur 4 semaines (${currentSnapshot.avgRir4wRollingAvg}), signe d'un épuisement plus précoce avec un poids stable ou baissier${
       currentSnapshot.bodyweightKg !== null ? ` (${currentSnapshot.bodyweightKg} kg)` : ''
     }. Envisagez d'espacer les séances ou d'alléger le volume (deload).`;
   } else if (!hasSessions) {

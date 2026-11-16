@@ -447,17 +447,17 @@ export function flagPossibleUnderRecovery(
   snapshot: Pick<WeeklyFatigueSnapshot, 'avgRir' | 'avgRir4wRollingAvg' | 'bodyweightKg'>,
   previousWeekBodyweight?: number | null
 ): boolean {
-  if (!snapshot || snapshot.avgRir <= 0 || snapshot.avgRir4wRollingAvg <= 0) {
+  if (!snapshot || snapshot.avgRir < 0 || snapshot.avgRir4wRollingAvg <= 0) {
     return false;
   }
-  const rirElevated = snapshot.avgRir > snapshot.avgRir4wRollingAvg + 1;
+  const rirDropped = snapshot.avgRir < snapshot.avgRir4wRollingAvg - 1;
   const weightStagnantOrDropping =
     snapshot.bodyweightKg === null ||
     previousWeekBodyweight === undefined ||
     previousWeekBodyweight === null ||
     snapshot.bodyweightKg <= previousWeekBodyweight;
 
-  return rirElevated && weightStagnantOrDropping;
+  return rirDropped && weightStagnantOrDropping;
 }
 
 /**
