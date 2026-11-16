@@ -3,7 +3,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { useWorkout } from '../../context/WorkoutContext';
+import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
 import { Check, Trash2, X, Plus, CornerDownRight } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 import { parseFloatFrench } from '../../utils/numberUtils';
@@ -34,16 +34,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   onDelete,
 }) => {
   const { theme } = useTheme();
-  const { data } = useWorkout();
-  const isRirEnabled = enableRirProp !== undefined ? enableRirProp : (data?.profile?.enableRir !== false);
+  const storeEnableRir = useUserPreferencesStore((s) => s.enableRir);
+  const dropReductionPercent = useUserPreferencesStore((s) => s.dropSetReductionPercent);
+  const userWeight = useUserPreferencesStore((s) => s.userWeightKg);
+  const isRirEnabled = enableRirProp !== undefined ? enableRirProp : storeEnableRir;
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<KeypadTarget>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
-  const dropReductionPercent = data?.profile?.dropSetReductionPercent ?? 20;
-  const userWeight = (data?.profile as any)?.weightKg ?? data?.profile?.currentWeightKg;
+
 
   const isBodyweightRef = useRef(set.isBodyweight);
   useEffect(() => {

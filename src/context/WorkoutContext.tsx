@@ -22,6 +22,9 @@ import {
   getSessionBlocks,
 } from '../types';
 import { StorageService } from '../services/storage';
+import { useUserPreferencesStore } from '../stores/useUserPreferencesStore';
+import { useWorkoutDataStore } from '../stores/useWorkoutDataStore';
+import { useActiveWorkoutStore } from '../stores/useActiveWorkoutStore';
 import { NotificationService } from '../services/notificationService';
 import { calculateWorkoutTotalVolume } from '../services/analyticsService';
 import { normalizeString } from '../utils/stringUtils';
@@ -331,6 +334,33 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     secondsRemaining: 0,
     timerType: 'rest',
   });
+
+  // Synchronisation atomique avec les stores Zustand (MO-03)
+  useEffect(() => {
+    useWorkoutDataStore.getState().setData(data);
+    useUserPreferencesStore.getState().syncFromProfile(data?.profile);
+    if (data) {
+      StorageService.getExerciseRecords()
+        .then((recs) => useWorkoutDataStore.getState().setExerciseRecords(recs))
+        .catch(() => {});
+    }
+  }, [data]);
+
+  useEffect(() => {
+    useWorkoutDataStore.getState().setIsLoading(loading);
+  }, [loading]);
+
+  useEffect(() => {
+    useActiveWorkoutStore.getState().setActiveSession(activeSession);
+  }, [activeSession]);
+
+  useEffect(() => {
+    useActiveWorkoutStore.getState().setRestTimerState(
+      restTimer.secondsRemaining,
+      90,
+      restTimer.active
+    );
+  }, [restTimer.secondsRemaining, restTimer.active]);
 
   const hasPlayedEndSoundRef = React.useRef(false);
 
