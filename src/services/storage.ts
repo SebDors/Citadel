@@ -2,6 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FitTrackerData, WorkoutSession, BodyMeasurement, WorkoutFolder, CardioSession, getSessionBlocks } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
 import { SharedExercise } from '../constants/exerciseDatabase';
+import {
+  getDatabase,
+  initDatabaseSchema,
+  saveFullDataToDb,
+  loadFullDataFromDb,
+  saveActiveWorkoutSyncInDb,
+  loadExerciseRecordsFromDb,
+  ExerciseRecordEntry,
+} from './database';
 import { normalizeMuscle, MuscleTarget } from '../constants/muscles';
 
 const STORAGE_KEY = '@citadel_app_data_v1';
@@ -10,8 +19,7 @@ const COLLAPSED_CARDS_KEY = '@citadel_collapsed_cards_v1';
 const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
 const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
 
-let saveCurrentWorkoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-let lastPendingSession: WorkoutSession | null | undefined = undefined;
+let sqliteInitialized = false;
 
 /**
  * Migration transparente d'un exercice individuel :
@@ -301,6 +309,52 @@ function migrateData(data: FitTrackerData): boolean {
   return anyChange;
 }
 
+async function ensureSqliteInitialized(): Promise<ReturnType<typeof getDatabase>> {
+  const db = getDatabase();
+  if (!db) return null;
+
+  if (!sqliteInitialized) {
+    initDatabaseSchema(db);
+    const meta = db.getFirstSync<{ value: string }>(
+      "SELECT value FROM app_meta WHERE key = 'sqlite_migrated_v1'"
+    );
+
+    if (!meta || meta.value !== 'true') {
+      // Migration unique depuis AsyncStorage vers SQLite relationnel (MO-02)
+      let jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+      if (jsonValue === null) {
+        jsonValue = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+      }
+
+      let dataToMigrate: FitTrackerData;
+      if (jsonValue !== null) {
+        const parsed = JSON.parse(jsonValue) as FitTrackerData;
+        if (!parsed.folders) parsed.folders = INITIAL_MOCK_DATA.folders || [];
+        if (!parsed.cardioSessions) parsed.cardioSessions = INITIAL_MOCK_DATA.cardioSessions || [];
+        try {
+          const activeJson = await AsyncStorage.getItem(CURRENT_WORKOUT_KEY);
+          if (activeJson !== null) {
+            parsed.currentWorkout = JSON.parse(activeJson) as WorkoutSession;
+          }
+        } catch (_) {}
+        migrateData(parsed);
+        dataToMigrate = parsed;
+      } else {
+        migrateData(INITIAL_MOCK_DATA);
+        dataToMigrate = INITIAL_MOCK_DATA;
+      }
+
+      saveFullDataToDb(db, dataToMigrate);
+      db.runSync(
+        "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('sqlite_migrated_v1', 'true')"
+      );
+    }
+    sqliteInitialized = true;
+  }
+
+  return db;
+}
+
 export const StorageService = {
   /**
    * Charge toutes les données de l'application depuis AsyncStorage.
@@ -308,6 +362,14 @@ export const StorageService = {
    */
   async loadData(): Promise<FitTrackerData> {
     try {
+      const db = await ensureSqliteInitialized();
+      if (db) {
+        const sqliteData = loadFullDataFromDb(db);
+        if (sqliteData) {
+          return sqliteData;
+        }
+      }
+
       let jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
       if (jsonValue === null) {
         // Fallback pour migrer les données préexistantes de l'ancienne clé warriorfit
@@ -328,10 +390,8 @@ export const StorageService = {
           const activeSessionJson = await AsyncStorage.getItem(CURRENT_WORKOUT_KEY);
           if (activeSessionJson !== null) {
             parsed.currentWorkout = JSON.parse(activeSessionJson) as WorkoutSession;
-            lastPendingSession = parsed.currentWorkout;
           } else {
             parsed.currentWorkout = null;
-            lastPendingSession = null;
           }
         } catch {
           // Ignorer si échec de lecture de la clé isolée
@@ -362,25 +422,6 @@ export const StorageService = {
    * Importe et écrase toutes les données avec une nouvelle sauvegarde.
    */
   async importFullData(newData: FitTrackerData): Promise<FitTrackerData> {
-    if (saveCurrentWorkoutDebounceTimer) {
-      clearTimeout(saveCurrentWorkoutDebounceTimer);
-      saveCurrentWorkoutDebounceTimer = null;
-    }
-    if (newData.currentWorkout) {
-      lastPendingSession = newData.currentWorkout;
-      try {
-        await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(newData.currentWorkout));
-      } catch (e) {
-        console.error('Erreur import CURRENT_WORKOUT_KEY:', e);
-      }
-    } else {
-      lastPendingSession = null;
-      try {
-        await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
-      } catch (e) {
-        console.error('Erreur suppression import CURRENT_WORKOUT_KEY:', e);
-      }
-    }
     migrateData(newData);
     await this.saveData(newData);
     return newData;
@@ -391,6 +432,11 @@ export const StorageService = {
    */
   async saveData(data: FitTrackerData): Promise<void> {
     try {
+      const db = await ensureSqliteInitialized();
+      if (db) {
+        saveFullDataToDb(db, data);
+        return;
+      }
       const jsonValue = JSON.stringify(data);
       await AsyncStorage.setItem(STORAGE_KEY, jsonValue);
     } catch (e) {
@@ -402,15 +448,11 @@ export const StorageService = {
    * Enregistre une séance terminée dans l'historique et met à jour le profil.
    */
   async saveWorkoutSession(session: WorkoutSession): Promise<FitTrackerData> {
-    if (saveCurrentWorkoutDebounceTimer) {
-      clearTimeout(saveCurrentWorkoutDebounceTimer);
-      saveCurrentWorkoutDebounceTimer = null;
-    }
-    lastPendingSession = null;
-    try {
-      await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
-    } catch (e) {
-      console.error('Erreur suppression CURRENT_WORKOUT_KEY:', e);
+    const db = getDatabase();
+    if (db) {
+      saveActiveWorkoutSyncInDb(db, null);
+    } else {
+      AsyncStorage.removeItem(CURRENT_WORKOUT_KEY).catch(() => {});
     }
 
     const currentData = await this.loadData();
@@ -497,56 +539,41 @@ export const StorageService = {
    * Enregistre EXCLUSIVEMENT la clé isolée CURRENT_WORKOUT_KEY (~2 Ko) sans jamais
    * charger ni réécrire la base globale complète (évite les 2.1s de blocage du pont Android).
    */
+  /**
+   * Sauvegarde immédiate et atomique de la séance en cours dans SQLite (MO-09 : zéro debounce de 2s).
+   */
   saveCurrentWorkout(session: WorkoutSession | null): void {
-    lastPendingSession = session;
-
-    if (saveCurrentWorkoutDebounceTimer) {
-      clearTimeout(saveCurrentWorkoutDebounceTimer);
-      saveCurrentWorkoutDebounceTimer = null;
-    }
-
-    if (session === null) {
-      AsyncStorage.removeItem(CURRENT_WORKOUT_KEY).catch((e) => {
-        console.error('Erreur suppression immédiate CURRENT_WORKOUT_KEY:', e);
-      });
+    const db = getDatabase();
+    if (db) {
+      try {
+        saveActiveWorkoutSyncInDb(db, session);
+      } catch (e) {
+        console.error('Erreur saveActiveWorkoutSyncInDb:', e);
+      }
       return;
     }
-
-    saveCurrentWorkoutDebounceTimer = setTimeout(async () => {
-      const targetSession = lastPendingSession;
-      try {
-        if (targetSession === null) {
-          await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
-        } else {
-          await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
-        }
-      } catch (e) {
-        console.error('Erreur debounce saveCurrentWorkout:', e);
-      }
-    }, 2000);
+    if (session === null) {
+      AsyncStorage.removeItem(CURRENT_WORKOUT_KEY).catch(() => {});
+    } else {
+      AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(session)).catch(() => {});
+    }
   },
 
   /**
-   * Abandonne et supprime définitivement la séance en cours :
-   * - Annule tout timer de debounce actif
-   * - Définit lastPendingSession = null
-   * - Supprime immédiatement la clé isolée CURRENT_WORKOUT_KEY
-   * - Met à jour currentWorkout: null dans la base globale STORAGE_KEY si nécessaire
+   * Abandonne et supprime définitivement la séance en cours.
    */
   async discardCurrentWorkout(): Promise<void> {
-    if (saveCurrentWorkoutDebounceTimer) {
-      clearTimeout(saveCurrentWorkoutDebounceTimer);
-      saveCurrentWorkoutDebounceTimer = null;
+    const db = getDatabase();
+    if (db) {
+      try {
+        saveActiveWorkoutSyncInDb(db, null);
+      } catch (e) {
+        console.error('Erreur discardCurrentWorkout SQLite:', e);
+      }
+      return;
     }
-    lastPendingSession = null;
-
     try {
       await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
-    } catch (e) {
-      console.error('Erreur suppression CURRENT_WORKOUT_KEY dans discardCurrentWorkout:', e);
-    }
-
-    try {
       const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
       if (jsonValue !== null) {
         const parsed = JSON.parse(jsonValue) as FitTrackerData;
@@ -556,30 +583,24 @@ export const StorageService = {
         }
       }
     } catch (e) {
-      console.error('Erreur nettoyage global currentWorkout dans discardCurrentWorkout:', e);
+      console.error('Erreur discardCurrentWorkout:', e);
     }
   },
 
   /**
-   * Force l'écriture immédiate de la session active en cours (ex: fermeture de l'app ou mise en arrière-plan).
+   * Flush immédiat (désormais synchrone grâce à SQLite).
    */
   async flushCurrentWorkout(): Promise<void> {
-    if (saveCurrentWorkoutDebounceTimer) {
-      clearTimeout(saveCurrentWorkoutDebounceTimer);
-      saveCurrentWorkoutDebounceTimer = null;
-    }
-    const targetSession = lastPendingSession;
-    if (targetSession !== undefined) {
-      try {
-        if (targetSession === null) {
-          await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
-        } else {
-          await AsyncStorage.setItem(CURRENT_WORKOUT_KEY, JSON.stringify(targetSession));
-        }
-      } catch (e) {
-        console.error('Erreur flushCurrentWorkout:', e);
-      }
-    }
+    // Plus de timer de debounce en attente : toutes les écritures sont atomiques et immédiates.
+  },
+
+  /**
+   * Récupère les records personnels pré-calculés en O(1) depuis la table SQLite user_exercise_records (SU-09).
+   */
+  async getExerciseRecords(): Promise<Record<string, ExerciseRecordEntry>> {
+    const db = await ensureSqliteInitialized();
+    if (!db) return {};
+    return loadExerciseRecordsFromDb(db);
   },
 
   /**
@@ -982,11 +1003,6 @@ export const StorageService = {
    * Efface toutes les données de stockage local pour repartir sur une application neuve.
    */
   async resetAllData(): Promise<FitTrackerData> {
-    if (saveCurrentWorkoutDebounceTimer) {
-      clearTimeout(saveCurrentWorkoutDebounceTimer);
-      saveCurrentWorkoutDebounceTimer = null;
-    }
-    lastPendingSession = null;
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
       await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);

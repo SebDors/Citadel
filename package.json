@@ -23,6 +23,7 @@
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
     "expo-sharing": "~14.0.8",
+    "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "lucide-react-native": "^0.469.0",
     "react": "19.1.0",
