@@ -130,6 +130,30 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
     }
   };
 
+  const handleImportCSV = async () => {
+    if (!data) return;
+    setLoading(true);
+    try {
+      const parsed = await ExportService.pickAndParseWorkoutsCSV();
+      if (parsed && parsed.sessions.length > 0) {
+        const mergedHistory = [...parsed.sessions, ...(data.history || [])];
+        await importFullData({
+          ...data,
+          history: mergedHistory,
+        });
+        Alert.alert(
+          'Import CSV réussi',
+          `${parsed.importedCount} séance(s) et ${parsed.setsCount} série(s) importées depuis ${parsed.sourceApp}.`,
+          [{ text: 'OK', onPress: onClose }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Erreur d\'import CSV', error?.message || 'Fichier CSV invalide ou non reconnu.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const actions = [
     {
       id: 'export-full',
@@ -138,6 +162,14 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
       icon: FileJson,
       onPress: handleExportFullData,
       color: theme.accent,
+    },
+    {
+      id: 'import-csv',
+      title: 'Importer Historique CSV (Strong / Hevy)',
+      description: 'Importer vos anciennes séances depuis Strong, Hevy ou Citadel (.csv)',
+      icon: Upload,
+      onPress: handleImportCSV,
+      color: '#3B82F6',
     },
     {
       id: 'import-backup',
