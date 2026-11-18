@@ -98,6 +98,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
   // Measurement Inputs state
   const [weight, setWeight] = useState('');
+  const [bodyFat, setBodyFat] = useState('');
   const [chest, setChest] = useState('');
   const [waist, setWaist] = useState('');
   const [thigh, setThigh] = useState('');
@@ -112,6 +113,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     if (existing) {
       setEditingMeasurementId(existing.id);
       setWeight(existing.weightKg ? String(existing.weightKg) : '');
+      setBodyFat(existing.bodyFatPercentage !== undefined ? String(existing.bodyFatPercentage) : '');
       setChest(existing.chestCm !== undefined ? String(existing.chestCm) : '');
       setWaist(existing.waistCm !== undefined ? String(existing.waistCm) : '');
       setThigh(existing.thighCm !== undefined ? String(existing.thighCm) : '');
@@ -119,6 +121,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     } else {
       setEditingMeasurementId(null);
       setWeight('');
+      setBodyFat('');
       setChest('');
       setWaist('');
       setThigh('');
@@ -148,6 +151,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     }
     setIsCalendarOpen(false);
     setWeight(m.weightKg ? String(m.weightKg) : '');
+    setBodyFat(m.bodyFatPercentage !== undefined ? String(m.bodyFatPercentage) : '');
     setChest(m.chestCm !== undefined ? String(m.chestCm) : '');
     setWaist(m.waistCm !== undefined ? String(m.waistCm) : '');
     setThigh(m.thighCm !== undefined ? String(m.thighCm) : '');
@@ -181,6 +185,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
   const handleSave = () => {
     const w = parseFloatFrench(weight);
+    const bf = parseFloatFrench(bodyFat);
     const c = parseFloatFrench(chest);
     const wa = parseFloatFrench(waist);
     const t = parseFloatFrench(thigh);
@@ -188,6 +193,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
     const hasAnyValue =
       (w !== undefined && w > 0) ||
+      (bf !== undefined && bf > 0) ||
       (c !== undefined && c > 0) ||
       (wa !== undefined && wa > 0) ||
       (t !== undefined && t > 0) ||
@@ -205,6 +211,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       id: editingMeasurementId || `m_${Date.now()}`,
       date: selectedDateStr,
       weightKg: w !== undefined && w > 0 ? w : undefined,
+      bodyFatPercentage: bf !== undefined && bf > 0 ? bf : undefined,
       chestCm: c !== undefined && c > 0 ? c : undefined,
       waistCm: wa !== undefined && wa > 0 ? wa : undefined,
       thighCm: t !== undefined && t > 0 ? t : undefined,
@@ -330,6 +337,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
         ) : (
         sortedMeasurements.map((m) => {
           const secondaryParts: string[] = [];
+          if (m.bodyFatPercentage !== undefined) secondaryParts.push(`MG ${formatFixedMeasurement(m.bodyFatPercentage)}%`);
           if (m.chestCm !== undefined) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
           if (m.waistCm !== undefined) secondaryParts.push(`T ${formatFixedMeasurement(m.waistCm)}`);
           if (m.thighCm !== undefined) secondaryParts.push(`C ${formatFixedMeasurement(m.thighCm)}`);
@@ -595,6 +603,14 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                       keyboardType="numeric"
                       value={thigh}
                       onChangeText={setThigh}
+                    />
+                    <TextInput
+                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                      placeholder="Masse grasse (%)"
+                      placeholderTextColor={theme.textMuted}
+                      keyboardType="numeric"
+                      value={bodyFat}
+                      onChangeText={setBodyFat}
                     />
                   </View>
                 </View>

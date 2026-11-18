@@ -12,7 +12,7 @@ interface ModularMeasurementChartCardProps {
   measurements: BodyMeasurement[];
 }
 
-type MetricKey = 'weight' | 'waist' | 'chest' | 'thigh' | 'biceps';
+type MetricKey = 'weight' | 'bodyFat' | 'waist' | 'chest' | 'thigh' | 'biceps';
 
 interface MetricConfig {
   key: MetricKey;
@@ -23,6 +23,7 @@ interface MetricConfig {
 
 const METRIC_CONFIGS: MetricConfig[] = [
   { key: 'weight', label: 'Poids', field: 'weightKg', unit: 'kg' },
+  { key: 'bodyFat', label: 'Masse Grasse', field: 'bodyFatPercentage', unit: '%' },
   { key: 'waist', label: 'Taille', field: 'waistCm', unit: 'cm' },
   { key: 'chest', label: 'Poitrine', field: 'chestCm', unit: 'cm' },
   { key: 'thigh', label: 'Cuisse', field: 'thighCm', unit: 'cm' },

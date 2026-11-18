@@ -651,6 +651,7 @@ export const StorageService = {
         id: existing.id,
         date: measurement.date,
         weightKg: measurement.weightKg,
+        bodyFatPercentage: measurement.bodyFatPercentage,
         chestCm: measurement.chestCm,
         waistCm: measurement.waistCm,
         thighCm: measurement.thighCm,
