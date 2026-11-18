@@ -81,6 +81,7 @@ import {
 import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
 import { WorkoutAbandonModal } from "../src/components/Workout/WorkoutAbandonModal";
 import { WorkoutFinishModal } from "../src/components/Workout/WorkoutFinishModal";
+import { triggerHapticLight, triggerHapticMedium, triggerHapticSuccess, triggerHapticTimerAlarm } from "../src/utils/haptics";
 import { WorkoutToolsModal } from "../src/components/Workout/WorkoutToolsModal";
 import { WorkoutNoteModal } from "../src/components/Workout/WorkoutNoteModal";
 import { TermInfoTooltip } from "../src/components/UI/TermInfoTooltip";
@@ -636,6 +637,7 @@ export default function LiveWorkoutScreen() {
   };
 
   const handleStartCircuit = (block: CircuitBlock) => {
+    triggerHapticMedium();
     const durationSec = (block.amrapDurationMinutes || 12) * 60;
     updateCircuitState(block.id, (prev) => ({
       ...prev,
@@ -683,6 +685,7 @@ export default function LiveWorkoutScreen() {
         });
 
         if (amrapFinishedState) {
+          triggerHapticTimerAlarm();
           updateActiveSessionCircuitStates(amrapFinishedState);
         }
 
@@ -1076,6 +1079,7 @@ export default function LiveWorkoutScreen() {
   };
 
   const handleValidateCircuitExercise = (block: CircuitBlock, exId: string) => {
+    triggerHapticSuccess();
     const currentState = getCircuitState(block);
     if (!currentState.started) return;
     const nextStatus = {
@@ -1086,6 +1090,7 @@ export default function LiveWorkoutScreen() {
   };
 
   const handlePassCircuitExercise = (block: CircuitBlock, exId: string) => {
+    triggerHapticLight();
     const currentState = getCircuitState(block);
     if (!currentState.started) return;
     const nextStatus = {
@@ -1100,6 +1105,7 @@ export default function LiveWorkoutScreen() {
     exId: string,
     idx: number,
   ) => {
+    triggerHapticLight();
     updateCircuitState(block.id, (prev) => ({
       ...prev,
       activeExerciseIdx: idx,
@@ -1113,6 +1119,7 @@ export default function LiveWorkoutScreen() {
     exId: string,
     idx: number,
   ) => {
+    triggerHapticLight();
     updateCircuitState(block.id, (prev) => ({
       ...prev,
       activeExerciseIdx: idx,
@@ -1599,7 +1606,7 @@ export default function LiveWorkoutScreen() {
                                     activeOpacity={0.7}
                                     onPress={(e) => {
                                       e.stopPropagation();
-                                      handleCycleCircuitSetType(block.id, ex.id, ex.setType);
+                                      triggerHapticLight(); handleCycleCircuitSetType(block.id, ex.id, ex.setType);
                                     }}
                                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     style={{
@@ -1733,7 +1740,7 @@ export default function LiveWorkoutScreen() {
                               return (
                                 <TouchableOpacity
                                   activeOpacity={0.7}
-                                  onPress={() => handleCycleCircuitSetType(block.id, ex.id, ex.setType)}
+                                  onPress={() => { triggerHapticLight(); handleCycleCircuitSetType(block.id, ex.id, ex.setType); }}
                                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                   style={{
                                     backgroundColor: isNormal ? theme.surface : cfg.color,
