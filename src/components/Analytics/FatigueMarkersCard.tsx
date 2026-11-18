@@ -28,17 +28,22 @@ import { WorkoutSession, BodyMeasurement } from '../../types';
 interface FatigueMarkersCardProps {
   history?: WorkoutSession[];
   measurements?: BodyMeasurement[];
+  weekOffset?: number;
+  hideWeekSelector?: boolean;
 }
 
 export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
   history: propHistory,
   measurements: propMeasurements,
+  weekOffset: propWeekOffset,
+  hideWeekSelector = false,
 }) => {
   const { theme } = useTheme();
   const { data } = useWorkout();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [internalWeekOffset, setWeekOffset] = useState<number>(0);
+  const weekOffset = propWeekOffset !== undefined ? propWeekOffset : internalWeekOffset;
 
   useEffect(() => {
     StorageService.loadCollapsedCards().then((saved) => {
@@ -153,46 +158,48 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
       </View>
 
       {/* Navigation semaine */}
-      <View style={[styles.weekNavRow, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setWeekOffset((prev) => Math.max(minOffset, prev - 1))}
-          disabled={safeOffset <= minOffset}
-          style={[
-            styles.weekNavBtn,
-            { backgroundColor: theme.surface, opacity: safeOffset <= minOffset ? 0.3 : 1 },
-          ]}
-        >
-          <ChevronLeft size={16} color={theme.text} />
-        </TouchableOpacity>
-
-        <View style={{ alignItems: 'center' }}>
-          <Text style={[styles.weekNavLabel, { color: theme.text }]}>
-            {currentSnapshot.weekLabel}
-          </Text>
-          {safeOffset !== 0 && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setWeekOffset(0)}
-              style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
-            >
-              <Text style={[styles.todayBtnText, { color: theme.accent }]}>Revenir à cette semaine</Text>
-            </TouchableOpacity>
-          )}
+      {!hideWeekSelector && (
+        <View style={[styles.weekNavRow, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setWeekOffset((prev) => Math.max(minOffset, prev - 1))}
+            disabled={safeOffset <= minOffset}
+            style={[
+              styles.weekNavBtn,
+              { backgroundColor: theme.surface, opacity: safeOffset <= minOffset ? 0.3 : 1 },
+            ]}
+          >
+            <ChevronLeft size={16} color={theme.text} />
+          </TouchableOpacity>
+  
+          <View style={{ alignItems: 'center' }}>
+            <Text style={[styles.weekNavLabel, { color: theme.text }]}>
+              {currentSnapshot.weekLabel}
+            </Text>
+            {safeOffset !== 0 && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setWeekOffset(0)}
+                style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
+              >
+                <Text style={[styles.todayBtnText, { color: theme.accent }]}>Revenir à cette semaine</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+  
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))}
+            disabled={safeOffset >= 0}
+            style={[
+              styles.weekNavBtn,
+              { backgroundColor: theme.surface, opacity: safeOffset >= 0 ? 0.3 : 1 },
+            ]}
+          >
+            <ChevronRight size={16} color={theme.text} />
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))}
-          disabled={safeOffset >= 0}
-          style={[
-            styles.weekNavBtn,
-            { backgroundColor: theme.surface, opacity: safeOffset >= 0 ? 0.3 : 1 },
-          ]}
-        >
-          <ChevronRight size={16} color={theme.text} />
-        </TouchableOpacity>
-      </View>
+      )}
 
       {/* Résumé compact quand replié */}
       {isCollapsed ? (

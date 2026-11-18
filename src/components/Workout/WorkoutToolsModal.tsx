@@ -159,6 +159,8 @@ export const WorkoutToolsModal: React.FC<WorkoutToolsModalProps> = ({
 
   return (
     <Modal
+      navigationBarTranslucent
+      statusBarTranslucent
       visible={visible}
       transparent
       animationType="fade"

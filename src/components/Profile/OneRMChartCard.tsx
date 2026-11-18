@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Card } from '../UI/Card';
-import { Trophy, Dumbbell, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Trophy, Dumbbell, ChevronDown, ChevronUp, Search, ChevronRight, X } from 'lucide-react-native';
 import { getSessionBlocks, WorkoutSession } from '../../types';
 import { formatWeight } from '../../utils/numberUtils';
 import { calculateE1RM } from '../../services/analyticsService';
 import { StorageService } from '../../services/storage';
+import ExerciseDetailModal from '../Analytics/ExerciseDetailModal';
 
 interface OneRMChartCardProps {
   history?: WorkoutSession[];
@@ -17,9 +18,12 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
   history: propHistory,
 }) => {
   const { theme } = useTheme();
-  const { data } = useWorkout();
+  const { data, allExercises } = useWorkout();
 
   const [isCardCollapsed, setIsCardCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
 
   useEffect(() => {
     StorageService.loadCollapsedCards().then((saved) => {
@@ -78,9 +82,26 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
     });
 
     return Array.from(prMap.values())
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 6);
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [history]);
+
+  const filteredPRs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return latestPRs;
+    return latestPRs.filter((item) => item.name.toLowerCase().includes(q));
+  }, [latestPRs, searchQuery]);
+
+  const displayedPRs = useMemo(() => {
+    if (searchQuery.trim() || showAll) return filteredPRs;
+    return filteredPRs.slice(0, 6);
+  }, [filteredPRs, searchQuery, showAll]);
+
+  const selectedExerciseMeta = useMemo(() => {
+    if (!selectedExerciseName) return undefined;
+    return allExercises.find(
+      (ex) => ex.name.toLowerCase() === selectedExerciseName.toLowerCase()
+    );
+  }, [allExercises, selectedExerciseName]);
 
   return (
     <Card style={styles.card}>
@@ -112,36 +133,83 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
 
       {!isCardCollapsed && (
         latestPRs.length > 0 ? (
-          latestPRs.map((item, idx) => {
-            const formattedDate = new Date(item.date).toLocaleDateString('fr-FR', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            });
+          <>
+            {/* Barre de recherche directe d'exercice */}
+            <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Search size={15} color={theme.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Rechercher un exercice ou voir ses stats..."
+                placeholderTextColor={theme.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={15} color={theme.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
 
-            return (
-              <View key={idx} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
-                <View style={styles.itemLeft}>
-                  <Dumbbell size={15} color={theme.accent} style={{ marginRight: 10 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={[styles.itemDate, { color: theme.textMuted }]}>{formattedDate}</Text>
-                  </View>
-                </View>
+            {displayedPRs.length > 0 ? (
+              displayedPRs.map((item) => {
+                const formattedDate = new Date(item.date).toLocaleDateString('fr-FR', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                });
 
-                <View style={styles.itemRight}>
-                  <Text style={[styles.prValue, { color: theme.accent }]}>
-                    {formatWeight(item.weightKg)} kg
-                  </Text>
-                  <Text style={[styles.prSub, { color: theme.textMuted }]}>
-                    {item.reps} rep{item.reps > 1 ? 's' : ''} · 1RM ~{Math.round(item.e1RM)} kg
-                  </Text>
-                </View>
+                return (
+                  <TouchableOpacity
+                    key={item.name}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedExerciseName(item.name)}
+                    style={[styles.itemRow, { borderBottomColor: theme.border }]}
+                    accessibilityLabel={`Voir l'historique complet de ${item.name}`}
+                  >
+                    <View style={styles.itemLeft}>
+                      <Dumbbell size={15} color={theme.accent} style={{ marginRight: 10 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.itemDate, { color: theme.textMuted }]}>{formattedDate}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.itemRight}>
+                      <Text style={[styles.prValue, { color: theme.accent }]}>
+                        {formatWeight(item.weightKg)} kg
+                      </Text>
+                      <Text style={[styles.prSub, { color: theme.textMuted }]}>
+                        {item.reps} rep{item.reps > 1 ? 's' : ''} · 1RM ~{Math.round(item.e1RM)} kg
+                      </Text>
+                    </View>
+
+                    <ChevronRight size={15} color={theme.textMuted} style={{ marginLeft: 8 }} />
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View style={styles.noDataBox}>
+                <Text style={[styles.noDataText, { color: theme.textMuted }]}>
+                  Aucun exercice trouvé pour "{searchQuery}".
+                </Text>
               </View>
-            );
-          })
+            )}
+
+            {filteredPRs.length > 6 && !searchQuery.trim() && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setShowAll((prev) => !prev)}
+                style={[styles.showAllBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              >
+                <Text style={[styles.showAllText, { color: theme.accent }]}>
+                  {showAll ? 'Réduire la liste' : `Voir tous les exercices (${filteredPRs.length})`}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
         ) : (
           <View style={styles.noDataBox}>
             <Text style={[styles.noDataText, { color: theme.textMuted }]}>
@@ -150,6 +218,15 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
           </View>
         )
       )}
+
+      <ExerciseDetailModal
+        visible={selectedExerciseName !== null}
+        onClose={() => setSelectedExerciseName(null)}
+        exerciseName={selectedExerciseName || ''}
+        primaryMuscle={selectedExerciseMeta?.primaryMuscle}
+        targetMuscles={selectedExerciseMeta?.targetMuscles}
+        history={history}
+      />
     </Card>
   );
 };
@@ -231,5 +308,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    paddingVertical: 0,
+  },
+  showAllBtn: {
+    marginTop: 10,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  showAllText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

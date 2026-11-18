@@ -1,6 +1,6 @@
 import { triggerHapticSuccess, triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
@@ -664,7 +664,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       )}
 
       {/* Modal de sélection du type de série */}
-      <Modal visible={showTypeModal} transparent animationType="slide" onRequestClose={() => setShowTypeModal(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showTypeModal} transparent animationType="slide" onRequestClose={() => setShowTypeModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowTypeModal(false)}>
           <View style={[styles.modalSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
@@ -719,6 +719,8 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
       {/* Modale de confirmation de suppression dans la DA de l'application */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showDeleteConfirmModal}
         transparent
         animationType="fade"
@@ -904,7 +906,9 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 18,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
     borderTopWidth: 1,
   },
   modalHeader: {

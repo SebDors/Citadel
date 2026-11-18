@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Modal,
+  Platform,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { X, Delete, ArrowRight, Check, RotateCcw, ArrowLeft } from 'lucide-react-native';
@@ -400,6 +401,8 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
 
   return (
     <Modal
+      navigationBarTranslucent
+      statusBarTranslucent
       visible={visible}
       transparent
       animationType="fade"
@@ -777,7 +780,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1.5,
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,

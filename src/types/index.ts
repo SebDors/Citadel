@@ -184,6 +184,8 @@ export interface WorkoutFolder {
   isCollapsed?: boolean;
 }
 
+export type MeasurementMetricKey = 'weight' | 'bodyFat' | 'waist' | 'chest' | 'thigh' | 'biceps';
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -195,6 +197,7 @@ export interface UserProfile {
   oneRmFormula?: OneRMFormula; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
   enableRir?: boolean; // Suivi du RIR (Reps in Reserve) actif par défaut si indéfini
   enableFatigueMarkers?: boolean; // Actif par défaut si indéfini
+  hiddenMeasurementMetrics?: MeasurementMetricKey[];
 }
 
 export interface CardioSession {

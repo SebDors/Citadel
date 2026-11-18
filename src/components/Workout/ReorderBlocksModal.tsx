@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   SafeAreaView,
   PanResponder,
+  Animated,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { WorkoutBlock, CircuitBlock, SingleExerciseBlock } from '../../types';
@@ -25,6 +26,9 @@ interface ReorderBlocksModalProps {
 
 const ROW_HEIGHT = 68;
 
+const getBlockKey = (block: WorkoutBlock, fallbackIdx: number): string =>
+  block.id || `block_${fallbackIdx}`;
+
 export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
   visible,
   onClose,
@@ -32,13 +36,24 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
   onReorder,
 }) => {
   const { theme } = useTheme();
-  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const [dragDy, setDragDy] = useState(0);
+  const [localBlocks, setLocalBlocks] = useState<WorkoutBlock[]>(blocks);
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
 
-  const blocksRef = useRef(blocks);
-  blocksRef.current = blocks;
-  const hoverIdxRef = useRef<number | null>(null);
+  const localBlocksRef = useRef<WorkoutBlock[]>(blocks);
+  const draggingKeyRef = useRef<string | null>(null);
+  const accumulatedSwapOffsetRef = useRef(0);
+  const onReorderRef = useRef(onReorder);
+  onReorderRef.current = onReorder;
+
+  const dragY = useRef(new Animated.Value(0)).current;
+  const panRespondersRef = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
+
+  useEffect(() => {
+    if (draggingKeyRef.current === null) {
+      localBlocksRef.current = blocks;
+      setLocalBlocks(blocks);
+    }
+  }, [blocks, visible]);
 
   const getBlockTitle = (block: WorkoutBlock): string => {
     if (block.type === 'circuit') {
@@ -50,65 +65,108 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
   };
 
   const moveBlock = (index: number, direction: 'up' | 'down') => {
-    const newBlocks = [...blocks];
+    const newBlocks = [...localBlocksRef.current];
     const blockToMove = newBlocks.splice(index, 1)[0];
+    if (!blockToMove) return;
     const newIndex =
       direction === 'up'
         ? Math.max(0, index - 1)
         : Math.min(newBlocks.length, index + 1);
     newBlocks.splice(newIndex, 0, blockToMove);
+    localBlocksRef.current = newBlocks;
+    setLocalBlocks(newBlocks);
     triggerHapticLight();
-    onReorder(newBlocks);
+    onReorderRef.current(newBlocks);
   };
 
-  const createDragResponder = (index: number) =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        triggerHapticMedium();
-        setDraggingIdx(index);
-        setHoverIdx(index);
-        hoverIdxRef.current = index;
-        setDragDy(0);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        setDragDy(gestureState.dy);
-        const total = blocksRef.current.length;
-        const nextHover = Math.max(
-          0,
-          Math.min(total - 1, Math.round(index + gestureState.dy / ROW_HEIGHT))
-        );
-        if (nextHover !== hoverIdxRef.current) {
-          hoverIdxRef.current = nextHover;
-          setHoverIdx(nextHover);
-          triggerHapticLight();
-        }
-      },
-      onPanResponderRelease: () => {
-        const target = hoverIdxRef.current;
-        if (target !== null && target !== index) {
-          const nextBlocks = [...blocksRef.current];
-          const [moved] = nextBlocks.splice(index, 1);
-          nextBlocks.splice(target, 0, moved);
-          onReorder(nextBlocks);
+  const finishDrag = () => {
+    draggingKeyRef.current = null;
+    accumulatedSwapOffsetRef.current = 0;
+    dragY.setValue(0);
+    setDraggingKey(null);
+    onReorderRef.current(localBlocksRef.current);
+    triggerHapticMedium();
+  };
+
+  const getResponderForKey = (blockKey: string) => {
+    if (!panRespondersRef.current[blockKey]) {
+      panRespondersRef.current[blockKey] = PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => {
+          draggingKeyRef.current = blockKey;
+          accumulatedSwapOffsetRef.current = 0;
+          dragY.setValue(0);
+          setDraggingKey(blockKey);
           triggerHapticMedium();
-        }
-        setDraggingIdx(null);
-        setHoverIdx(null);
-        hoverIdxRef.current = null;
-        setDragDy(0);
-      },
-      onPanResponderTerminate: () => {
-        setDraggingIdx(null);
-        setHoverIdx(null);
-        hoverIdxRef.current = null;
-        setDragDy(0);
-      },
-    });
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (draggingKeyRef.current !== blockKey) return;
+
+          let relDy = gestureState.dy - accumulatedSwapOffsetRef.current;
+          let curIdx = localBlocksRef.current.findIndex(
+            (b, i) => getBlockKey(b, i) === blockKey
+          );
+
+          if (curIdx !== -1) {
+            let nextList: WorkoutBlock[] | null = null;
+            const threshold = ROW_HEIGHT * 0.55;
+
+            while (relDy > threshold && curIdx < (nextList || localBlocksRef.current).length - 1) {
+              const working: WorkoutBlock[] = nextList ? [...nextList] : [...localBlocksRef.current];
+              const temp = working[curIdx];
+              working[curIdx] = working[curIdx + 1];
+              working[curIdx + 1] = temp;
+              nextList = working;
+              accumulatedSwapOffsetRef.current += ROW_HEIGHT;
+              relDy -= ROW_HEIGHT;
+              curIdx += 1;
+            }
+
+            while (relDy < -threshold && curIdx > 0) {
+              const working: WorkoutBlock[] = nextList ? [...nextList] : [...localBlocksRef.current];
+              const temp = working[curIdx];
+              working[curIdx] = working[curIdx - 1];
+              working[curIdx - 1] = temp;
+              nextList = working;
+              accumulatedSwapOffsetRef.current -= ROW_HEIGHT;
+              relDy += ROW_HEIGHT;
+              curIdx -= 1;
+            }
+
+            if (nextList) {
+              localBlocksRef.current = nextList;
+              setLocalBlocks(nextList);
+              triggerHapticLight();
+            }
+          }
+
+          dragY.setValue(gestureState.dy - accumulatedSwapOffsetRef.current);
+        },
+        onPanResponderRelease: () => {
+          finishDrag();
+        },
+        onPanResponderTerminate: () => {
+          finishDrag();
+        },
+      });
+    }
+    return panRespondersRef.current[blockKey];
+  };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
@@ -128,35 +186,35 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
           <ScrollView
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContent}
-            scrollEnabled={draggingIdx === null}
+            scrollEnabled={draggingKey === null}
           >
-            {blocks.map((block, index) => {
-              const isDragging = draggingIdx === index;
-              const isDropTarget =
-                draggingIdx !== null && hoverIdx === index && draggingIdx !== index;
-              const responder = createDragResponder(index);
+            {localBlocks.map((block, index) => {
+              const blockKey = getBlockKey(block, index);
+              const isDragging = draggingKey === blockKey;
+              const responder = getResponderForKey(blockKey);
 
               return (
-                <View
-                  key={block.id || index.toString()}
+                <Animated.View
+                  key={blockKey}
                   style={[
                     styles.blockRow,
                     {
                       backgroundColor: isDragging ? theme.surface : theme.cardBg,
-                      borderColor: isDragging || isDropTarget ? theme.accent : theme.border,
-                      borderWidth: isDragging || isDropTarget ? 2 : 1,
-                      transform: isDragging ? [{ translateY: dragDy }, { scale: 1.02 }] : [],
+                      borderColor: isDragging ? theme.accent : theme.border,
+                      borderWidth: isDragging ? 2 : 1,
+                      transform: isDragging ? [{ translateY: dragY }, { scale: 1.02 }] : [],
                       zIndex: isDragging ? 99 : 1,
                       elevation: isDragging ? 8 : 0,
+                      opacity: draggingKey !== null && !isDragging ? 0.85 : 1,
                     },
                   ]}
                 >
                   <View
                     {...responder.panHandlers}
                     style={styles.dragHandle}
-                    hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 10, right: 12 }}
                   >
-                    <GripVertical color={isDragging ? theme.accent : theme.textMuted} size={20} />
+                    <GripVertical color={isDragging ? theme.accent : theme.textMuted} size={22} />
                   </View>
 
                   <View style={styles.blockInfo}>
@@ -175,7 +233,7 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
                         { backgroundColor: theme.surface },
                         index === 0 && { opacity: 0.3 },
                       ]}
-                      disabled={index === 0}
+                      disabled={index === 0 || draggingKey !== null}
                       onPress={() => moveBlock(index, 'up')}
                     >
                       <ArrowUp color={theme.text} size={18} />
@@ -185,15 +243,15 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
                       style={[
                         styles.actionButton,
                         { backgroundColor: theme.surface },
-                        index === blocks.length - 1 && { opacity: 0.3 },
+                        index === localBlocks.length - 1 && { opacity: 0.3 },
                       ]}
-                      disabled={index === blocks.length - 1}
+                      disabled={index === localBlocks.length - 1 || draggingKey !== null}
                       onPress={() => moveBlock(index, 'down')}
                     >
                       <ArrowDown color={theme.text} size={18} />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </Animated.View>
               );
             })}
           </ScrollView>
@@ -214,7 +272,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    marginTop: Platform.OS === 'ios' ? 40 : 20,
+    marginTop: Platform.OS === 'ios' ? 40 : 28,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
@@ -254,7 +312,7 @@ const styles = StyleSheet.create({
   },
   dragHandle: {
     paddingRight: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -292,6 +350,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 20,
+    paddingBottom: Platform.OS === 'android' ? 36 : 24,
     borderTopWidth: 1,
   },
 });

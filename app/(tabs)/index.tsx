@@ -738,7 +738,7 @@ export default function WorkoutTab() {
               templates={data?.templates || []}
               weeklySchedule={data?.weeklySchedule || {}}
               onUpdateSchedule={updateWeeklySchedule}
-              onStartTemplate={(tpl) => startWorkout(tpl)}
+              onStartTemplate={(tpl) => handleStartTemplate(tpl.id)}
             />
           )}
 

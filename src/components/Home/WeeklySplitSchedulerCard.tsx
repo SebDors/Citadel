@@ -6,6 +6,7 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { CalendarDays, Play, X, Check, Coffee } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
@@ -127,6 +128,8 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
 
       {/* Modale d'assignation de séance à un jour */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={selectedDayIdx !== null}
         transparent
         animationType="slide"
@@ -270,7 +273,9 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
     borderTopWidth: 1,
   },
   modalHeader: {

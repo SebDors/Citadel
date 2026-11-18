@@ -1,22 +1,21 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, PanResponder } from 'react-native';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, PanResponder, ScrollView, Modal, Platform } from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
-import { BodyMeasurement } from '../../types';
+import { BodyMeasurement, MeasurementMetricKey } from '../../types';
+import { useWorkout } from '../../context/WorkoutContext';
 import { useTheme } from '../../context/ThemeContext';
 import { formatWeight } from '../../utils/numberUtils';
 import { buildSmoothBezierPath, findNearestChartPointIndex } from '../../utils/svgChartUtils';
 import { Card } from '../UI/Card';
-import { Activity, TrendingUp } from 'lucide-react-native';
+import { TrendingUp, SlidersHorizontal, X, Check } from 'lucide-react-native';
 import { calculateExponentialMovingAverage } from '../../services/analyticsService';
 
 interface ModularMeasurementChartCardProps {
   measurements: BodyMeasurement[];
 }
 
-type MetricKey = 'weight' | 'bodyFat' | 'waist' | 'chest' | 'thigh' | 'biceps';
-
 interface MetricConfig {
-  key: MetricKey;
+  key: MeasurementMetricKey;
   label: string;
   field: keyof BodyMeasurement;
   unit: string;
@@ -33,10 +32,38 @@ const METRIC_CONFIGS: MetricConfig[] = [
 
 export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardProps> = ({ measurements }) => {
   const { theme } = useTheme();
-  const [activeMetricKey, setActiveMetricKey] = useState<MetricKey>('weight');
-  const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
+  const { data, updateUserProfile } = useWorkout();
+  const hiddenMetrics = data?.profile?.hiddenMeasurementMetrics ?? [];
 
-  const activeConfig = METRIC_CONFIGS.find((c) => c.key === activeMetricKey) || METRIC_CONFIGS[0];
+  const visibleConfigs = useMemo(() => {
+    const filtered = METRIC_CONFIGS.filter((c) => !hiddenMetrics.includes(c.key));
+    return filtered.length > 0 ? filtered : [METRIC_CONFIGS[0]];
+  }, [hiddenMetrics]);
+
+  const [activeMetricKey, setActiveMetricKey] = useState<MeasurementMetricKey>(visibleConfigs[0].key);
+  const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  useEffect(() => {
+    if (!visibleConfigs.some((c) => c.key === activeMetricKey)) {
+      setActiveMetricKey(visibleConfigs[0].key);
+      setActivePointIndex(null);
+    }
+  }, [visibleConfigs, activeMetricKey]);
+
+  const toggleMetricVisibility = async (metricKey: MeasurementMetricKey) => {
+    const isCurrentlyHidden = hiddenMetrics.includes(metricKey);
+    if (!isCurrentlyHidden && visibleConfigs.length <= 1) {
+      return; // Conserver au moins une métrique visible
+    }
+    const nextHidden = isCurrentlyHidden
+      ? hiddenMetrics.filter((k) => k !== metricKey)
+      : [...hiddenMetrics, metricKey];
+    await updateUserProfile({ hiddenMeasurementMetrics: nextHidden });
+  };
+
+  const activeConfig =
+    visibleConfigs.find((c) => c.key === activeMetricKey) || visibleConfigs[0];
 
   // Sort measurements chronologically
   const sorted = useMemo(() => {
@@ -137,43 +164,60 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
 
   return (
     <Card style={styles.card}>
-      {/* Header with Title */}
+      {/* Header avec bouton paramètres de visibilité */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <TrendingUp size={18} color={theme.accent} />
           <Text style={[styles.title, { color: theme.text }]}>Graphique de Mensurations</Text>
         </View>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => setShowSettingsModal(true)}
+          style={[styles.settingsBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          accessibilityLabel="Personnaliser les mesures affichées"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <SlidersHorizontal size={14} color={theme.textMuted} />
+          <Text style={[styles.settingsBtnText, { color: theme.textMuted }]}>Gérer</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Metric Selector Buttons [Poids], [Poitrine], [Cuisse], [Bras] */}
-      <View style={[styles.buttonsRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        {METRIC_CONFIGS.map((config) => {
-          const isActive = config.key === activeMetricKey;
-          return (
-            <TouchableOpacity
-              key={config.key}
-              activeOpacity={0.8}
-              style={[
-                styles.metricBtn,
-                isActive && { backgroundColor: theme.accent },
-              ]}
-              onPress={() => {
-                setActiveMetricKey(config.key);
-                setActivePointIndex(null);
-              }}
-            >
-              <Text
+      {/* Pilules horizontales aérées sans retour à la ligne */}
+      <View style={[styles.buttonsWrapper, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.buttonsScrollContent}
+        >
+          {visibleConfigs.map((config) => {
+            const isActive = config.key === activeConfig.key;
+            return (
+              <TouchableOpacity
+                key={config.key}
+                activeOpacity={0.8}
                 style={[
-                  styles.metricBtnText,
-                  { color: isActive ? '#FFFFFF' : theme.text },
-                  isActive && { fontWeight: '900' },
+                  styles.metricBtn,
+                  isActive && { backgroundColor: theme.accent },
                 ]}
+                onPress={() => {
+                  setActiveMetricKey(config.key);
+                  setActivePointIndex(null);
+                }}
               >
-                {config.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.metricBtnText,
+                    { color: isActive ? '#FFFFFF' : theme.textMuted },
+                    isActive && { fontWeight: '800' },
+                  ]}
+                >
+                  {config.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Current Metric Value Callout */}
@@ -342,6 +386,78 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
           )}
         </View>
       )}
+
+      {/* Modale de sélection des mesures affichées */}
+      <Modal
+        visible={showSettingsModal}
+        transparent
+        statusBarTranslucent
+        navigationBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setShowSettingsModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.settingsOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSettingsModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.settingsSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          >
+            <View style={styles.settingsHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.settingsTitle, { color: theme.text }]}>
+                  Mesures affichées
+                </Text>
+                <Text style={[styles.settingsSubtitle, { color: theme.textMuted }]}>
+                  Masquez les mesures que vous ne suivez pas (graphique & saisie).
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSettingsModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {METRIC_CONFIGS.map((cfg) => {
+              const isEnabled = !hiddenMetrics.includes(cfg.key);
+              const isOnlyVisible = isEnabled && visibleConfigs.length <= 1;
+              return (
+                <TouchableOpacity
+                  key={cfg.key}
+                  activeOpacity={0.75}
+                  disabled={isOnlyVisible}
+                  onPress={() => toggleMetricVisibility(cfg.key)}
+                  style={[
+                    styles.settingOptionRow,
+                    { borderBottomColor: theme.border, opacity: isOnlyVisible ? 0.6 : 1 },
+                  ]}
+                >
+                  <View>
+                    <Text style={[styles.settingOptionLabel, { color: theme.text }]}>
+                      {cfg.label}
+                    </Text>
+                    <Text style={[styles.settingOptionUnit, { color: theme.textMuted }]}>
+                      Unité : {cfg.unit}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.settingToggleBox,
+                      {
+                        backgroundColor: isEnabled ? theme.accent : theme.surface,
+                        borderColor: isEnabled ? theme.accent : theme.border,
+                      },
+                    ]}
+                  >
+                    {isEnabled && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </Card>
   );
 };
@@ -353,33 +469,103 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   title: {
     fontSize: 15,
     fontWeight: '800',
     marginLeft: 6,
   },
-  buttonsRow: {
+  settingsBtn: {
     flexDirection: 'row',
-    padding: 3,
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  settingsBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  buttonsWrapper: {
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 12,
+    padding: 4,
+    marginBottom: 14,
+  },
+  buttonsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   metricBtn: {
-    flex: 1,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 9,
   },
   metricBtnText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  settingsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  settingsSheet: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    paddingTop: 18,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  settingsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  settingsSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  settingOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  settingOptionLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  settingOptionUnit: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  settingToggleBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   valueCalloutBox: {
     marginBottom: 8,

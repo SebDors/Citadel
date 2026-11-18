@@ -820,7 +820,7 @@ export default function LiveWorkoutScreen() {
     if (showCelebrationModal) {
       return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-          <Modal visible transparent animationType="fade">
+          <Modal statusBarTranslucent navigationBarTranslucent visible transparent animationType="fade">
             <View style={styles.celebrationOverlay}>
               <ConfettiEffect />
               <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
@@ -2065,6 +2065,8 @@ export default function LiveWorkoutScreen() {
 
       {/* Modal Ajout d'Exercice avec Barre de Recherche */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showAddExModal}
         transparent
         animationType="slide"
@@ -2330,7 +2332,7 @@ export default function LiveWorkoutScreen() {
       <RestTimerBar />
 
       {/* ---------------- MODALE FÉLICITATIONS 1ÈRE SÉANCE TERMINÉE ---------------- */}
-      <Modal visible={showCelebrationModal} transparent animationType="fade">
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showCelebrationModal} transparent animationType="fade">
         <View style={styles.celebrationOverlay}>
           <ConfettiEffect />
           <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
@@ -2414,6 +2416,8 @@ export default function LiveWorkoutScreen() {
 
       {/* Modal Menu d'actions de la séance (3 points) */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showSessionMenuModal}
         transparent
         animationType="fade"

@@ -2081,6 +2081,18 @@ export default function TemplateEditorScreen() {
 
               {/* Liste des Séries */}
               <View style={styles.setsContainer}>
+                {ex.sets.length > 0 && (
+                  <View style={styles.setsColumnsHeaderRow}>
+                    <Text style={[styles.setsHeaderText, { color: theme.textMuted, width: 48 }]}>
+                      SÉRIE
+                    </Text>
+                    <View style={styles.setsHeaderPills}>
+                      <Text style={[styles.setsHeaderText, { color: theme.textMuted }]}>TYPE</Text>
+                      <Text style={[styles.setsHeaderText, { color: theme.textMuted }]}>REPS</Text>
+                      <Text style={[styles.setsHeaderText, { color: theme.textMuted }]}>RIR</Text>
+                    </View>
+                  </View>
+                )}
 
                 {ex.sets.map((set, setIdx) => {
                   const setTypeInfo =
@@ -2161,7 +2173,7 @@ export default function TemplateEditorScreen() {
                               ? set.targetRepsMin && set.targetRepsMax && set.targetRepsMin !== set.targetRepsMax
                                 ? `${set.targetRepsMin}-${set.targetRepsMax} reps`
                                 : `${set.targetRepsMin ?? set.targetRepsMax} reps`
-                              : "Reps: Libre"}
+                              : "Libre"}
                           </Text>
                         </TouchableOpacity>
 
@@ -2204,7 +2216,7 @@ export default function TemplateEditorScreen() {
                             >
                               {set.targetRir !== undefined
                                 ? `RIR ${set.targetRir}`
-                                : "RIR: Libre"}
+                                : "Libre"}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -2321,6 +2333,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL / SHEET DES OPTIONS DE BLOC (...) --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeBlockOptions !== null}
         transparent
         animationType="fade"
@@ -2620,6 +2634,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL SÉLECTION DU CIRCUIT POUR "INCLURE DANS LE CIRCUIT" (si multi-circuits) --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={targetIncludeSingleBlockId !== null}
         transparent
         animationType="fade"
@@ -2674,6 +2690,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL DE SÉLECTION DU TYPE DE SÉRIE --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeSetTarget !== null}
         transparent
         animationType="slide"
@@ -2759,6 +2777,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL DE SÉLECTION DE FOURCHETTE DE RÉPÉTITIONS (AJ-02) --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeTargetRepsTarget !== null}
         transparent
         animationType="slide"
@@ -2920,6 +2940,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL DE SÉLECTION DU RIR CIBLE --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeTargetRirTarget !== null}
         transparent
         animationType="slide"
@@ -3040,6 +3062,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL DE SÉLECTION DU TYPE POUR UN EXERCICE DE CIRCUIT --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeCircuitSetTarget !== null}
         transparent
         animationType="slide"
@@ -3133,6 +3157,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL RÉORGANISATION DES EXERCICES D'UN CIRCUIT --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={reorderCircuitBlockId !== null}
         transparent
         animationType="slide"
@@ -3303,6 +3329,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL GROUPE SUPERSET --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={supersetModalBlockId !== null}
         transparent
         animationType="fade"
@@ -3395,6 +3423,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL BASE DE DONNÉES D'EXERCICES --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showPickerModal}
         transparent
         animationType="slide"
@@ -4005,15 +4035,34 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderBottomWidth: 0.5,
   },
+  setsColumnsHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 2,
+    marginBottom: 4,
+    gap: 8,
+  },
+  setsHeaderPills: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    marginLeft: 4,
+  },
+  setsHeaderText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    opacity: 0.75,
+  },
   setIndexText: {
     fontSize: 13,
     fontWeight: "600",
-    width: 60,
+    width: 48,
   },
   typeBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 8,
   },
@@ -4031,8 +4080,10 @@ const styles = StyleSheet.create({
   targetRirBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
+    justifyContent: "center",
+    paddingHorizontal: 7,
     paddingVertical: 5,
+    minWidth: 46,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -4138,7 +4189,9 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 18,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === "android" ? 42 : 34,
     borderTopWidth: 1,
   },
   modalHeader: {

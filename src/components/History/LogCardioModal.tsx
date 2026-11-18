@@ -262,7 +262,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
   const currentRpeInfo = RPE_LEVELS[rpe] || RPE_LEVELS[7];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <TouchableOpacity
           style={styles.backdrop}

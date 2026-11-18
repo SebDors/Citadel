@@ -17,13 +17,11 @@ import {
   FileJson,
   Upload,
   CloudDownload,
-  CloudUpload,
   HardDrive,
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { ExportService } from '../../services/exportService';
-import { BackupService, LocalBackupInfo } from '../../services/backupService';
 import { StorageService } from '../../services/storage';
 
 interface ExportDataModalProps {
@@ -39,7 +37,6 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
   const { data, importFullData } = useWorkout();
   const [loading, setLoading] = useState(false);
   const [storageUsage, setStorageUsage] = useState<string>('');
-  const [autoBackups, setAutoBackups] = useState<LocalBackupInfo[]>([]);
 
   useEffect(() => {
     if (visible) {
@@ -157,27 +154,7 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
     }
   };
 
-  const handleCloudSync = async () => {
-    if (!data) return;
-    setLoading(true);
-    try {
-      await BackupService.syncToCloudDrive(data);
-    } catch (error: any) {
-      Alert.alert('Synchronisation Cloud', error?.message || 'Impossible de partager la sauvegarde vers le Cloud.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const actions = [
-    {
-      id: 'cloud-sync',
-      title: 'Synchroniser vers Google Drive / iCloud',
-      description: autoBackups.length > 0 ? `Sauvegarde Cloud + ${autoBackups.length} backup(s) auto locaux disponibles` : 'Envoyer une archive de sécurité sur votre Cloud',
-      icon: CloudUpload,
-      onPress: handleCloudSync,
-      color: '#10B981',
-    },
     {
       id: 'export-full',
       title: 'Sauvegarder les données (JSON)',
@@ -222,6 +199,8 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
 
   return (
     <Modal
+      navigationBarTranslucent
+      statusBarTranslucent
       visible={visible}
       animationType="slide"
       transparent={true}
@@ -306,7 +285,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderWidth: 1,
     borderBottomWidth: 0,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
   },
   header: {
     flexDirection: 'row',
