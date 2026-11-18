@@ -127,6 +127,13 @@ export default function TemplateEditorScreen() {
   } | null>(null);
 
   // Target set pour modal de RIR cible: { blockId, setIdx }
+  const [activeTargetRepsTarget, setActiveTargetRepsTarget] = useState<{
+    blockId: string;
+    setIdx: number;
+  } | null>(null);
+  const [customRepsMin, setCustomRepsMin] = useState('');
+  const [customRepsMax, setCustomRepsMax] = useState('');
+
   const [activeTargetRirTarget, setActiveTargetRirTarget] = useState<{
     blockId: string;
     setIdx: number;
@@ -1024,6 +1031,24 @@ export default function TemplateEditorScreen() {
       }),
     );
     setActiveTargetRirTarget(null);
+  };
+
+  const handleUpdateTargetReps = (
+    blockId: string,
+    setIdx: number,
+    min?: number,
+    max?: number,
+  ) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id !== blockId || b.type !== "single") return b;
+        const nextSets = b.exercise.sets.map((s, idx) =>
+          idx === setIdx ? { ...s, targetRepsMin: min, targetRepsMax: max } : s,
+        );
+        return { ...b, exercise: { ...b.exercise, sets: nextSets } };
+      }),
+    );
+    setActiveTargetRepsTarget(null);
   };
 
   // Enregistrement du programme
@@ -2095,6 +2120,51 @@ export default function TemplateEditorScreen() {
                           </Text>
                         </TouchableOpacity>
 
+                        {/* Sélecteur de fourchette de répétitions cible (AJ-02) */}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          style={[
+                            styles.targetRirBadge,
+                            {
+                              borderColor:
+                                set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                  ? theme.accent
+                                  : theme.border,
+                              backgroundColor:
+                                set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                  ? `${theme.accent}18`
+                                  : theme.surface,
+                            },
+                          ]}
+                          onPress={() => {
+                            setCustomRepsMin(set.targetRepsMin ? String(set.targetRepsMin) : '');
+                            setCustomRepsMax(set.targetRepsMax ? String(set.targetRepsMax) : '');
+                            setActiveTargetRepsTarget({ blockId: block.id, setIdx });
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.targetRirBadgeText,
+                              {
+                                color:
+                                  set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                    ? theme.accent
+                                    : theme.textMuted,
+                                fontWeight:
+                                  set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                    ? "700"
+                                    : "500",
+                              },
+                            ]}
+                          >
+                            {set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                              ? set.targetRepsMin && set.targetRepsMax && set.targetRepsMin !== set.targetRepsMax
+                                ? `${set.targetRepsMin}-${set.targetRepsMax} reps`
+                                : `${set.targetRepsMin ?? set.targetRepsMax} reps`
+                              : "Reps: Libre"}
+                          </Text>
+                        </TouchableOpacity>
+
                         {/* Sélecteur tactile discret de RIR Cible */}
                         {enableRir && (
                           <TouchableOpacity
@@ -2683,6 +2753,167 @@ export default function TemplateEditorScreen() {
                   </TouchableOpacity>
                 );
               })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- MODAL DE SÉLECTION DE FOURCHETTE DE RÉPÉTITIONS (AJ-02) --- */}
+      <Modal
+        visible={activeTargetRepsTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActiveTargetRepsTarget(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActiveTargetRepsTarget(null)}
+        >
+          <View
+            style={[
+              styles.modalSheet,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  Objectif de répétitions (Rep Range)
+                </Text>
+                <Text style={[styles.modalSubHeader, { color: theme.textMuted }]}>
+                  Définissez une fourchette cible pour cette série
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setActiveTargetRepsTarget(null)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {activeTargetRepsTarget && (
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[
+                    { label: '3–5 (Force)', min: 3, max: 5 },
+                    { label: '6–8 (Force/Hyp)', min: 6, max: 8 },
+                    { label: '8–12 (Hypertrophie)', min: 8, max: 12 },
+                    { label: '12–15 (Endurance)', min: 12, max: 15 },
+                    { label: '15–20 (Métabolique)', min: 15, max: 20 },
+                  ].map((preset) => (
+                    <TouchableOpacity
+                      key={preset.label}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.targetRirBadge,
+                        {
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          backgroundColor: theme.surface,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() =>
+                        handleUpdateTargetReps(
+                          activeTargetRepsTarget.blockId,
+                          activeTargetRepsTarget.setIdx,
+                          preset.min,
+                          preset.max,
+                        )
+                      }
+                    >
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.targetRirBadge,
+                      {
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() =>
+                      handleUpdateTargetReps(
+                        activeTargetRepsTarget.blockId,
+                        activeTargetRepsTarget.setIdx,
+                        undefined,
+                        undefined,
+                      )
+                    }
+                  >
+                    <Text style={{ color: theme.textMuted, fontWeight: '700', fontSize: 13 }}>
+                      Libre (aucun)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      borderRadius: 10,
+                      padding: 10,
+                      color: theme.text,
+                      textAlign: 'center',
+                      fontWeight: '700',
+                    }}
+                    placeholder="Min (ex: 8)"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="numeric"
+                    value={customRepsMin}
+                    onChangeText={setCustomRepsMin}
+                  />
+                  <Text style={{ color: theme.textMuted, fontWeight: '800' }}>à</Text>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      borderRadius: 10,
+                      padding: 10,
+                      color: theme.text,
+                      textAlign: 'center',
+                      fontWeight: '700',
+                    }}
+                    placeholder="Max (ex: 12)"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="numeric"
+                    value={customRepsMax}
+                    onChangeText={setCustomRepsMax}
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{
+                      backgroundColor: theme.accent,
+                      paddingHorizontal: 16,
+                      paddingVertical: 11,
+                      borderRadius: 10,
+                    }}
+                    onPress={() => {
+                      const min = parseInt(customRepsMin, 10);
+                      const max = parseInt(customRepsMax, 10);
+                      handleUpdateTargetReps(
+                        activeTargetRepsTarget.blockId,
+                        activeTargetRepsTarget.setIdx,
+                        !isNaN(min) && min > 0 ? min : undefined,
+                        !isNaN(max) && max > 0 ? max : (!isNaN(min) && min > 0 ? min : undefined),
+                      );
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

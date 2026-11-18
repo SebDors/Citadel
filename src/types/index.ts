@@ -30,6 +30,8 @@ export interface WorkoutSet {
   reps?: number;     // Optionnel (champ vide si non renseigné)
   rir?: number;      // Reps In Reserve (0 à 5+)
   targetRir?: number;// Reps In Reserve Cible
+  targetRepsMin?: number;// Fourchette de reps min cible
+  targetRepsMax?: number;// Fourchette de reps max cible
   dropSteps?: DropStep[]; // Décharges (Drop Sets)
   durationSeconds?: number;
   previous?: string; // Ex: "100kg x 8" ou "45s"

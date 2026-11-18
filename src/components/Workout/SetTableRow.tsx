@@ -411,10 +411,11 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                     ? theme.accent
                     : (set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted),
                   fontWeight: isRepsActive || (isNextToFill && isRepsEmpty) ? '900' : '700',
+                  fontStyle: (set.reps === undefined || set.reps === null) && (set.targetRepsMin !== undefined || set.targetRepsMax !== undefined) ? 'italic' : 'normal',
                 },
               ]}
             >
-              {set.reps !== undefined && set.reps !== null ? String(set.reps) : '-'}
+              {set.reps !== undefined && set.reps !== null ? String(set.reps) : (set.targetRepsMin !== undefined || set.targetRepsMax !== undefined ? (set.targetRepsMin && set.targetRepsMax && set.targetRepsMin !== set.targetRepsMax ? `${set.targetRepsMin}-${set.targetRepsMax}` : String(set.targetRepsMin ?? set.targetRepsMax)) : '-')}
             </Text>
           </TouchableOpacity>
         </View>
