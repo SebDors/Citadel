@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, SafeAreaView } from 'react-native';
-import { X, Trophy, Activity, Calendar, Dumbbell, AlertTriangle } from 'lucide-react-native';
+import { X, Trophy, Activity, Calendar, Dumbbell, AlertTriangle, TrendingUp } from 'lucide-react-native';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
+import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
 import { WorkoutSession, getSessionBlocks, SessionNote, NOTE_TYPES_CONFIG, SessionExceptionReason } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateE1RM } from '../../services/analyticsService';
@@ -28,6 +30,9 @@ export default function ExerciseDetailModal({
   history,
 }: ExerciseDetailModalProps) {
   const { theme } = useTheme();
+  const oneRmFormula = useUserPreferencesStore((s) => s.oneRmFormula);
+  const [chartMetric, setChartMetric] = useState<'e1rm' | 'maxWeight'>('e1rm');
+  const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
 
   // Extract history and PRs for this specific exercise
   const { exerciseHistory, prs } = useMemo(() => {
@@ -118,13 +123,37 @@ export default function ExerciseDetailModal({
       });
     });
 
-    const e1RM = (bestWeight > 0 && bestReps > 0 && bestReps <= 12) ? calculateE1RM(bestWeight, bestReps) : null;
+    const e1RM = (bestWeight > 0 && bestReps > 0 && bestReps <= 12) ? calculateE1RM(bestWeight, bestReps, oneRmFormula) : null;
 
     return {
       exerciseHistory: historyItems,
       prs: { bestWeight, bestReps, e1RM, prDate }
     };
-  }, [history, exerciseName]);
+  }, [history, exerciseName, oneRmFormula]);
+
+
+  // Données chronologiques pour le graphique de surcharge progressive (AJ-09)
+  const chartPoints = useMemo(() => {
+    const asc = [...exerciseHistory].reverse();
+    return asc
+      .map((item) => {
+        let maxW = 0;
+        let maxE1rm = 0;
+        item.sets.forEach((s) => {
+          if (s.weightKg > maxW) maxW = s.weightKg;
+          const est = calculateE1RM(s.weightKg, s.reps, oneRmFormula);
+          if (est && est > maxE1rm) maxE1rm = est;
+        });
+        const d = new Date(item.date);
+        const shortDate = `${d.getDate()}/${d.getMonth() + 1}`;
+        return {
+          date: shortDate,
+          fullDate: item.dateFormatted,
+          value: chartMetric === 'e1rm' ? (maxE1rm || maxW) : maxW,
+        };
+      })
+      .filter((pt) => pt.value > 0);
+  }, [exerciseHistory, chartMetric, oneRmFormula]);
 
   return (
     <Modal
@@ -183,6 +212,99 @@ export default function ExerciseDetailModal({
                 </View>
               </View>
             </View>
+
+            {/* Progression Chart Section (AJ-09) */}
+            {chartPoints.length >= 2 && (
+              <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border, marginTop: 16 }]}>
+                <View style={[styles.cardHeader, { justifyContent: 'space-between' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TrendingUp size={20} color={theme.accent} />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>Progression</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <TouchableOpacity
+                      onPress={() => { setChartMetric('e1rm'); setSelectedPointIdx(null); }}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 8,
+                        backgroundColor: chartMetric === 'e1rm' ? theme.accent : theme.surface,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: chartMetric === 'e1rm' ? '#FFFFFF' : theme.textMuted }}>
+                        1RM Est.
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => { setChartMetric('maxWeight'); setSelectedPointIdx(null); }}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 8,
+                        backgroundColor: chartMetric === 'maxWeight' ? theme.accent : theme.surface,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: chartMetric === 'maxWeight' ? '#FFFFFF' : theme.textMuted }}>
+                        Charge Max
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {selectedPointIdx !== null && chartPoints[selectedPointIdx] && (
+                  <View style={{ backgroundColor: theme.surface, padding: 8, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: theme.textMuted, fontSize: 12 }}>{chartPoints[selectedPointIdx].fullDate}</Text>
+                    <Text style={{ color: theme.accent, fontSize: 13, fontWeight: '800' }}>{chartPoints[selectedPointIdx].value} kg</Text>
+                  </View>
+                )}
+
+                {(() => {
+                  const chartW = 290;
+                  const chartH = 120;
+                  const padX = 24;
+                  const padY = 16;
+                  const vals = chartPoints.map((p) => p.value);
+                  let minV = Math.min(...vals);
+                  let maxV = Math.max(...vals);
+                  if (minV === maxV) { minV = Math.max(0, minV - 5); maxV += 5; }
+                  const range = maxV - minV || 1;
+                  const coords = chartPoints.map((p, idx) => ({
+                    x: padX + (idx / (chartPoints.length - 1)) * (chartW - padX * 2),
+                    y: padY + (chartH - padY * 2) - ((p.value - minV) / range) * (chartH - padY * 2),
+                    val: p.value,
+                    date: p.date,
+                  }));
+                  const dPath = coords.reduce((acc, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`), '');
+                  return (
+                    <View style={{ alignItems: 'center' }}>
+                      <Svg width={chartW} height={chartH}>
+                        <Line x1={padX} y1={padY} x2={chartW - padX} y2={padY} stroke={theme.border} strokeDasharray="4,4" strokeWidth={1} />
+                        <Line x1={padX} y1={chartH - padY} x2={chartW - padX} y2={chartH - padY} stroke={theme.border} strokeDasharray="4,4" strokeWidth={1} />
+                        <Path d={dPath} fill="none" stroke={theme.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                        {coords.map((pt, i) => (
+                          <Circle
+                            key={i}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={selectedPointIdx === i ? 6 : 4}
+                            fill={selectedPointIdx === i ? theme.accent : theme.cardBg}
+                            stroke={theme.accent}
+                            strokeWidth={2}
+                            onPress={() => setSelectedPointIdx(i)}
+                          />
+                        ))}
+                      </Svg>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: chartW, paddingHorizontal: 10 }}>
+                        <Text style={{ fontSize: 10, color: theme.textMuted }}>{chartPoints[0].date} ({chartPoints[0].value} kg)</Text>
+                        <Text style={{ fontSize: 10, color: theme.accent, fontWeight: '700' }}>
+                          {chartPoints[chartPoints.length - 1].date} ({chartPoints[chartPoints.length - 1].value} kg)
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
 
             {/* History Section */}
             <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border, marginTop: 16 }]}>
