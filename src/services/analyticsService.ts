@@ -1,5 +1,5 @@
 import { getBodyweightFactor } from '../constants/exerciseDatabase';
-import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks, BodyMeasurement } from '../types';
+import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks, BodyMeasurement, OneRMFormula } from '../types';
 import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
 
 /**
@@ -7,12 +7,41 @@ import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
  * Si reps > 12, renvoie null (formule non fiable au-delà de 12 répétitions).
  * Si reps === 1, renvoie directement le poids.
  */
-export function calculateE1RM(weightKg: number, reps: number): number | null {
+export const ONE_RM_FORMULAS_CONFIG: Record<OneRMFormula, { label: string; subtitle: string }> = {
+  epley: { label: 'Epley', subtitle: 'Standard polyvalent : Poids × (1 + Reps / 30)' },
+  brzycki: { label: 'Brzycki', subtitle: 'Force maximale (1–5 reps) : Poids × 36 / (37 − Reps)' },
+  lander: { label: 'Lander', subtitle: 'Mouvements polyarticulaires : (100 × Poids) / (101.3 − 2.67 × Reps)' },
+  wathen: { label: 'Wathen', subtitle: 'Modèle exponentiel : (100 × Poids) / (48.8 + 53.8 × e^(-0.075 × Reps))' },
+};
+
+export function calculateE1RM(
+  weightKg: number,
+  reps: number,
+  formula: OneRMFormula = 'epley'
+): number | null {
   if (!weightKg || weightKg <= 0 || !reps || reps <= 0) return null;
   if (reps > 12) return null;
   if (reps === 1) return Math.round(weightKg * 10) / 10;
-  // Formule d'Epley : 1RM = Poids * (1 + Reps / 30)
-  return Math.round((weightKg * (1 + reps / 30)) * 10) / 10;
+
+  let raw = 0;
+  switch (formula) {
+    case 'brzycki':
+      raw = reps < 37 ? weightKg * (36 / (37 - reps)) : weightKg * (1 + reps / 30);
+      break;
+    case 'lander': {
+      const denom = 101.3 - 2.67123 * reps;
+      raw = denom > 0 ? (100 * weightKg) / denom : weightKg * (1 + reps / 30);
+      break;
+    }
+    case 'wathen':
+      raw = (100 * weightKg) / (48.8 + 53.8 * Math.exp(-0.075 * reps));
+      break;
+    case 'epley':
+    default:
+      raw = weightKg * (1 + reps / 30);
+      break;
+  }
+  return Math.round(raw * 10) / 10;
 }
 
 /**

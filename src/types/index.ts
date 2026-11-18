@@ -1,4 +1,5 @@
 export type SetType = 'normal' | 'warmup' | 'drop' | 'amrap' | 'failure';
+export type OneRMFormula = 'epley' | 'brzycki' | 'lander' | 'wathen';
 
 export interface SetTypeInfo {
   type: SetType;
@@ -190,7 +191,8 @@ export interface UserProfile {
   currentWeightKg: number;
   totalWorkouts: number;
   availablePlates?: number[];
-  dropSetReductionPercent?: number; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
+  dropSetReductionPercent?: number;
+  oneRmFormula?: OneRMFormula; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
   enableRir?: boolean; // Suivi du RIR (Reps in Reserve) actif par défaut si indéfini
   enableFatigueMarkers?: boolean; // Actif par défaut si indéfini
 }
