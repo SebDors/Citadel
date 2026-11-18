@@ -234,18 +234,21 @@ export function upsertSessionInDb(
     ]
   );
 
-  // Nettoyer les enfants existants (cascade) et réinsérer proprement
+  // Nettoyer les enfants existants explicitement et réinsérer proprement
+  db.runSync('DELETE FROM session_sets WHERE session_id = ?', [session.id]);
+  db.runSync('DELETE FROM session_exercises WHERE session_id = ?', [session.id]);
   db.runSync('DELETE FROM session_blocks WHERE session_id = ?', [session.id]);
 
   const blocks = getSessionBlocks(session);
   blocks.forEach((block, bIdx) => {
+    const blockDbId = `${session.id}::b_${bIdx}::${block.id || 'blk'}`;
     db.runSync(
-      `INSERT INTO session_blocks (
+      `INSERT OR REPLACE INTO session_blocks (
         id, session_id, block_type, order_index, rounds, title,
         circuit_type, amrap_duration_minutes, rest_between_rounds_seconds
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        block.id,
+        blockDbId,
         session.id,
         block.type,
         bIdx,
@@ -259,14 +262,15 @@ export function upsertSessionInDb(
 
     if (block.type === 'single') {
       const ex = (block as SingleExerciseBlock).exercise;
+      const exDbId = `${blockDbId}::e_0::${ex.id || 'ex'}`;
       db.runSync(
-        `INSERT INTO session_exercises (
+        `INSERT OR REPLACE INTO session_exercises (
           id, block_id, session_id, exercise_id, exercise_name,
           primary_muscle, sub_region, rest_seconds, order_index, is_bodyweight, raw_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          ex.id,
-          block.id,
+          exDbId,
+          blockDbId,
           session.id,
           ex.exerciseId || null,
           ex.exerciseName,
@@ -279,16 +283,17 @@ export function upsertSessionInDb(
         ]
       );
 
-      (ex.sets || []).forEach((s) => {
+      (ex.sets || []).forEach((s, sIdx) => {
+        const setDbId = `${exDbId}::s_${sIdx}::${s.id || 'set'}`;
         db.runSync(
-          `INSERT INTO session_sets (
+          `INSERT OR REPLACE INTO session_sets (
             id, exercise_id, session_id, set_number, type, weight_kg, reps,
             rir, target_rir, duration_seconds, completed, completed_at,
             is_bodyweight, bodyweight_used_kg, raw_json
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            s.id,
-            ex.id,
+            setDbId,
+            exDbId,
             session.id,
             s.setNumber,
             s.type,
@@ -307,14 +312,15 @@ export function upsertSessionInDb(
       });
     } else if (block.type === 'circuit') {
       block.exercises.forEach((item, eIdx) => {
+        const itemDbId = `${blockDbId}::ce_${eIdx}::${item.id || 'item'}`;
         db.runSync(
-          `INSERT INTO session_exercises (
+          `INSERT OR REPLACE INTO session_exercises (
             id, block_id, session_id, exercise_id, exercise_name,
             primary_muscle, sub_region, rest_seconds, order_index, is_bodyweight, raw_json
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            item.id,
-            block.id,
+            itemDbId,
+            blockDbId,
             session.id,
             item.exerciseId || null,
             item.exerciseName,
@@ -495,7 +501,7 @@ export function saveFullDataToDb(
     db.runSync('DELETE FROM templates');
     (data.templates || []).forEach((t, idx) => {
       db.runSync(
-        'INSERT INTO templates (id, title, folder_id, order_index, raw_json) VALUES (?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO templates (id, title, folder_id, order_index, raw_json) VALUES (?, ?, ?, ?, ?)',
         [t.id, t.title, null, idx, JSON.stringify(t)]
       );
     });
@@ -504,7 +510,7 @@ export function saveFullDataToDb(
     db.runSync('DELETE FROM folders');
     (data.folders || []).forEach((f, idx) => {
       db.runSync(
-        'INSERT INTO folders (id, name, is_collapsed, order_index, raw_json) VALUES (?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO folders (id, name, is_collapsed, order_index, raw_json) VALUES (?, ?, ?, ?, ?)',
         [f.id, f.name, f.isCollapsed ? 1 : 0, idx, JSON.stringify(f)]
       );
     });
@@ -513,7 +519,7 @@ export function saveFullDataToDb(
     db.runSync('DELETE FROM body_measurements');
     (data.measurements || []).forEach((m) => {
       db.runSync(
-        `INSERT INTO body_measurements (
+        `INSERT OR REPLACE INTO body_measurements (
           id, date, weight_kg, body_fat_percentage, chest_cm, waist_cm, thigh_cm, biceps_cm
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -533,7 +539,7 @@ export function saveFullDataToDb(
     db.runSync('DELETE FROM cardio_sessions');
     (data.cardioSessions || []).forEach((c) => {
       db.runSync(
-        `INSERT INTO cardio_sessions (
+        `INSERT OR REPLACE INTO cardio_sessions (
           id, date, activity, duration_minutes, rpe, notes, raw_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -552,12 +558,15 @@ export function saveFullDataToDb(
     db.runSync('DELETE FROM custom_exercises');
     (data.customExercises || []).forEach((ex) => {
       db.runSync(
-        'INSERT INTO custom_exercises (id, name, primary_muscle, category, raw_json) VALUES (?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO custom_exercises (id, name, primary_muscle, category, raw_json) VALUES (?, ?, ?, ?, ?)',
         [ex.id, ex.name, ex.primaryMuscle, ex.category, JSON.stringify(ex)]
       );
     });
 
     // 7. History + Active Workout
+    db.runSync('DELETE FROM session_sets');
+    db.runSync('DELETE FROM session_exercises');
+    db.runSync('DELETE FROM session_blocks');
     db.runSync('DELETE FROM sessions');
     (data.history || []).forEach((s) => {
       upsertSessionInDb(db, s, false);
