@@ -22,6 +22,7 @@ import {
   getSessionBlocks,
 } from '../types';
 import { StorageService } from '../services/storage';
+import { BackupService } from '../services/backupService';
 import { useUserPreferencesStore } from '../stores/useUserPreferencesStore';
 import { useWorkoutDataStore } from '../stores/useWorkoutDataStore';
 import { useActiveWorkoutStore } from '../stores/useActiveWorkoutStore';
@@ -339,6 +340,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Synchronisation atomique avec les stores Zustand (MO-03)
   useEffect(() => {
     useWorkoutDataStore.getState().setData(data);
+    if (data) {
+      BackupService.ensureDailyLocalBackup(data).catch(() => {});
+    }
     useUserPreferencesStore.getState().syncFromProfile(data?.profile);
     if (data) {
       StorageService.getExerciseRecords()
