@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, PanResponder } from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { BodyMeasurement } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { formatWeight } from '../../utils/numberUtils';
+import { buildSmoothBezierPath, findNearestChartPointIndex } from '../../utils/svgChartUtils';
 import { Card } from '../UI/Card';
 import { Activity, TrendingUp } from 'lucide-react-native';
 import { calculateExponentialMovingAverage } from '../../services/analyticsService';
@@ -104,23 +105,35 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
       return { x, y, val: p.value, date: p.date, trendVal: t };
     });
 
-    if (chartPoints.length === 1) {
-      pathData = `M ${chartPoints[0].x - 20} ${chartPoints[0].y} L ${chartPoints[0].x + 20} ${chartPoints[0].y}`;
-    } else {
-      pathData = chartPoints.reduce((acc, pt, idx) => {
-        return idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
-      }, '');
-
-      // Tracé de la courbe de tendance lissée si applicable
-      if (trendPoints.length > 1) {
-        trendPathData = trendPoints.reduce((acc, pt, idx) => {
-          const x = paddingX + (idx / (trendPoints.length - 1)) * innerWidth;
-          const y = paddingY + innerHeight - ((pt.trend - minVal) / valRange) * innerHeight;
-          return idx === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
-        }, '');
-      }
+    pathData = buildSmoothBezierPath(chartPoints);
+    if (trendPoints.length > 1) {
+      const trendCoords = trendPoints.map((pt, idx) => ({
+        x: paddingX + (idx / (trendPoints.length - 1)) * innerWidth,
+        y: paddingY + innerHeight - ((pt.trend - minVal) / valRange) * innerHeight,
+      }));
+      trendPathData = buildSmoothBezierPath(trendCoords);
     }
   }
+
+  const chartPointsRef = useRef(chartPoints);
+  chartPointsRef.current = chartPoints;
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          const nearest = findNearestChartPointIndex(evt.nativeEvent.locationX, chartPointsRef.current);
+          if (nearest !== null) setActivePointIndex(nearest);
+        },
+        onPanResponderMove: (evt) => {
+          const nearest = findNearestChartPointIndex(evt.nativeEvent.locationX, chartPointsRef.current);
+          if (nearest !== null) setActivePointIndex(nearest);
+        },
+      }),
+    []
+  );
 
   return (
     <Card style={styles.card}>
@@ -291,26 +304,11 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
             })}
           </Svg>
 
-          {/* Overlay React Native d'interactivité 100% Cliquable */}
-          <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-            {chartPoints.map((pt, idx) => (
-              <TouchableOpacity
-                key={idx}
-                activeOpacity={0.7}
-                style={{
-                  position: 'absolute',
-                  left: `${(pt.x / chartWidth) * 100}%`,
-                  top: pt.y - 20,
-                  transform: [{ translateX: -20 }],
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  zIndex: 20,
-                }}
-                onPress={() => setActivePointIndex(idx)}
-              />
-            ))}
-          </View>
+          {/* Détecteur de geste continu PanResponder pour scrubbing tactile (AM-06) */}
+          <View
+            style={StyleSheet.absoluteFillObject}
+            {...panResponder.panHandlers}
+          />
 
           {/* Tooltip de Détail au Clic sur un Point */}
           {activePointIndex !== null && chartPoints[activePointIndex] && (
