@@ -349,6 +349,36 @@ async function ensureSqliteInitialized(): Promise<ReturnType<typeof getDatabase>
         "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('sqlite_migrated_v1', 'true')"
       );
     }
+    // Backfill pour les utilisateurs déjà migrés avant l'ajout des flags d'onboarding dans app_meta
+    const onboardingMeta = db.getFirstSync<{ value: string }>(
+      "SELECT value FROM app_meta WHERE key = 'has_completed_onboarding'"
+    );
+    if (!onboardingMeta) {
+      let hasOnboarded = false;
+      let hasCreatedSession = false;
+      let hasCompletedWorkout = false;
+      try {
+        const rawJson = (await AsyncStorage.getItem(STORAGE_KEY)) || (await AsyncStorage.getItem(LEGACY_STORAGE_KEY));
+        if (rawJson) {
+          const parsed = JSON.parse(rawJson) as FitTrackerData;
+          hasOnboarded = Boolean(parsed.hasCompletedOnboarding || (parsed.history && parsed.history.length > 0));
+          hasCreatedSession = Boolean(parsed.hasCreatedFirstSession || (parsed.templates && parsed.templates.length > 0));
+          hasCompletedWorkout = Boolean(parsed.hasCompletedFirstWorkout || (parsed.history && parsed.history.length > 0));
+        } else {
+          const sessCount = db.getFirstSync<{ c: number }>('SELECT COUNT(*) as c FROM sessions');
+          if (sessCount && sessCount.c > 0) {
+            hasOnboarded = true;
+            hasCreatedSession = true;
+            hasCompletedWorkout = true;
+          }
+        }
+      } catch (_) {}
+
+      db.runSync("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_completed_onboarding', ?)", [hasOnboarded ? 'true' : 'false']);
+      db.runSync("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_created_first_session', ?)", [hasCreatedSession ? 'true' : 'false']);
+      db.runSync("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_completed_first_workout', ?)", [hasCompletedWorkout ? 'true' : 'false']);
+    }
+
     sqliteInitialized = true;
   }
 

@@ -578,6 +578,20 @@ export function saveFullDataToDb(
 
     // 8. Rebuild PR records
     rebuildAllExerciseRecordsInDb(db, data.history || []);
+
+    // 9. Persist onboarding & walkthrough flags in app_meta
+    db.runSync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_completed_onboarding', ?)",
+      [data.hasCompletedOnboarding ? 'true' : 'false']
+    );
+    db.runSync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_created_first_session', ?)",
+      [data.hasCreatedFirstSession ? 'true' : 'false']
+    );
+    db.runSync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_completed_first_workout', ?)",
+      [data.hasCompletedFirstWorkout ? 'true' : 'false']
+    );
   });
 }
 
@@ -643,6 +657,12 @@ export function loadFullDataFromDb(db: SQLite.SQLiteDatabase): FitTrackerData | 
     ? JSON.parse(activeRow.raw_json)
     : null;
 
+  const metaRows = db.getAllSync<{ key: string; value: string }>(
+    "SELECT key, value FROM app_meta WHERE key IN ('has_completed_onboarding', 'has_created_first_session', 'has_completed_first_workout')"
+  );
+  const metaMap: Record<string, string> = {};
+  metaRows.forEach((r) => { metaMap[r.key] = r.value; });
+
   return {
     profile,
     templates,
@@ -652,6 +672,9 @@ export function loadFullDataFromDb(db: SQLite.SQLiteDatabase): FitTrackerData | 
     cardioSessions,
     customExercises,
     currentWorkout,
+    hasCompletedOnboarding: metaMap['has_completed_onboarding'] === 'true',
+    hasCreatedFirstSession: metaMap['has_created_first_session'] === 'true',
+    hasCompletedFirstWorkout: metaMap['has_completed_first_workout'] === 'true',
   };
 }
 

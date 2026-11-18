@@ -1431,9 +1431,7 @@ export default function WorkoutTab() {
         <OnboardingModal
           visible={!loading && !!data && !data.hasCompletedOnboarding}
           onComplete={completeOnboarding}
-          onSkip={async () => {
-            await completeOnboarding({ name: 'Athlète' });
-          }}
+          onSkip={skipOnboarding}
         />
 
         {/* ---------------- MODALE DE MISE À JOUR DISPONIBLE ---------------- */}
