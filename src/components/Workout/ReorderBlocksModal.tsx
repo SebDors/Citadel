@@ -24,7 +24,9 @@ interface ReorderBlocksModalProps {
   onReorder: (newBlocks: WorkoutBlock[]) => void;
 }
 
-const ROW_HEIGHT = 68;
+const ROW_HEIGHT = 64;
+const ROW_MARGIN_BOTTOM = 10;
+const ITEM_STRIDE = ROW_HEIGHT + ROW_MARGIN_BOTTOM;
 
 const getBlockKey = (block: WorkoutBlock, fallbackIdx: number): string =>
   block.id || `block_${fallbackIdx}`;
@@ -41,17 +43,30 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
 
   const localBlocksRef = useRef<WorkoutBlock[]>(blocks);
   const draggingKeyRef = useRef<string | null>(null);
-  const accumulatedSwapOffsetRef = useRef(0);
+  const startIdxRef = useRef<number>(-1);
+  const targetIdxRef = useRef<number>(-1);
   const onReorderRef = useRef(onReorder);
   onReorderRef.current = onReorder;
 
   const dragY = useRef(new Animated.Value(0)).current;
+  const shiftAnimsRef = useRef<Record<string, Animated.Value>>({});
   const panRespondersRef = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
+
+  const getShiftAnim = (key: string): Animated.Value => {
+    if (!shiftAnimsRef.current[key]) {
+      shiftAnimsRef.current[key] = new Animated.Value(0);
+    }
+    return shiftAnimsRef.current[key];
+  };
 
   useEffect(() => {
     if (draggingKeyRef.current === null) {
       localBlocksRef.current = blocks;
       setLocalBlocks(blocks);
+      Object.values(shiftAnimsRef.current).forEach((anim) => {
+        anim.stopAnimation();
+        anim.setValue(0);
+      });
     }
   }, [blocks, visible]);
 
@@ -79,12 +94,61 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
     onReorderRef.current(newBlocks);
   };
 
+  const updateSiblingShifts = (startIdx: number, targetIdx: number) => {
+    const list = localBlocksRef.current;
+    list.forEach((b, i) => {
+      if (i === startIdx) return;
+      const key = getBlockKey(b, i);
+      const anim = getShiftAnim(key);
+      let toValue = 0;
+      if (startIdx < i && i <= targetIdx) {
+        toValue = -ITEM_STRIDE;
+      } else if (targetIdx <= i && i < startIdx) {
+        toValue = ITEM_STRIDE;
+      }
+      Animated.spring(anim, {
+        toValue,
+        useNativeDriver: true,
+        speed: 32,
+        bounciness: 0,
+      }).start();
+    });
+  };
+
   const finishDrag = () => {
-    draggingKeyRef.current = null;
-    accumulatedSwapOffsetRef.current = 0;
+    const from = startIdxRef.current;
+    const to = targetIdxRef.current;
+    const currentList = localBlocksRef.current;
+
+    let finalBlocks = currentList;
+    if (from !== -1 && to !== -1 && from !== to) {
+      const next = [...currentList];
+      const [moved] = next.splice(from, 1);
+      if (moved) {
+        next.splice(to, 0, moved);
+        finalBlocks = next;
+      }
+    }
+
+    // Reset all animated values synchronously before committing the final order
+    dragY.stopAnimation();
     dragY.setValue(0);
+    Object.values(shiftAnimsRef.current).forEach((anim) => {
+      anim.stopAnimation();
+      anim.setValue(0);
+    });
+
+    draggingKeyRef.current = null;
+    startIdxRef.current = -1;
+    targetIdxRef.current = -1;
+
+    localBlocksRef.current = finalBlocks;
+    setLocalBlocks(finalBlocks);
     setDraggingKey(null);
-    onReorderRef.current(localBlocksRef.current);
+
+    if (from !== to && from !== -1 && to !== -1) {
+      onReorderRef.current(finalBlocks);
+    }
     triggerHapticMedium();
   };
 
@@ -98,54 +162,44 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          const idx = localBlocksRef.current.findIndex(
+            (b, i) => getBlockKey(b, i) === blockKey
+          );
+          if (idx === -1) return;
+
           draggingKeyRef.current = blockKey;
-          accumulatedSwapOffsetRef.current = 0;
+          startIdxRef.current = idx;
+          targetIdxRef.current = idx;
           dragY.setValue(0);
+          Object.values(shiftAnimsRef.current).forEach((anim) => {
+            anim.stopAnimation();
+            anim.setValue(0);
+          });
           setDraggingKey(blockKey);
           triggerHapticMedium();
         },
         onPanResponderMove: (_, gestureState) => {
           if (draggingKeyRef.current !== blockKey) return;
+          const startIdx = startIdxRef.current;
+          const total = localBlocksRef.current.length;
+          if (startIdx === -1 || total <= 1) return;
 
-          let relDy = gestureState.dy - accumulatedSwapOffsetRef.current;
-          let curIdx = localBlocksRef.current.findIndex(
-            (b, i) => getBlockKey(b, i) === blockKey
+          // Keep dragged card strictly 1:1 with finger delta (clamp within list bounds)
+          const minDy = -startIdx * ITEM_STRIDE;
+          const maxDy = (total - 1 - startIdx) * ITEM_STRIDE;
+          const clampedDy = Math.max(minDy, Math.min(maxDy, gestureState.dy));
+          dragY.setValue(clampedDy);
+
+          const nextTarget = Math.max(
+            0,
+            Math.min(total - 1, Math.round(startIdx + clampedDy / ITEM_STRIDE))
           );
 
-          if (curIdx !== -1) {
-            let nextList: WorkoutBlock[] | null = null;
-            const threshold = ROW_HEIGHT * 0.55;
-
-            while (relDy > threshold && curIdx < (nextList || localBlocksRef.current).length - 1) {
-              const working: WorkoutBlock[] = nextList ? [...nextList] : [...localBlocksRef.current];
-              const temp = working[curIdx];
-              working[curIdx] = working[curIdx + 1];
-              working[curIdx + 1] = temp;
-              nextList = working;
-              accumulatedSwapOffsetRef.current += ROW_HEIGHT;
-              relDy -= ROW_HEIGHT;
-              curIdx += 1;
-            }
-
-            while (relDy < -threshold && curIdx > 0) {
-              const working: WorkoutBlock[] = nextList ? [...nextList] : [...localBlocksRef.current];
-              const temp = working[curIdx];
-              working[curIdx] = working[curIdx - 1];
-              working[curIdx - 1] = temp;
-              nextList = working;
-              accumulatedSwapOffsetRef.current -= ROW_HEIGHT;
-              relDy += ROW_HEIGHT;
-              curIdx -= 1;
-            }
-
-            if (nextList) {
-              localBlocksRef.current = nextList;
-              setLocalBlocks(nextList);
-              triggerHapticLight();
-            }
+          if (nextTarget !== targetIdxRef.current) {
+            targetIdxRef.current = nextTarget;
+            updateSiblingShifts(startIdx, nextTarget);
+            triggerHapticLight();
           }
-
-          dragY.setValue(gestureState.dy - accumulatedSwapOffsetRef.current);
         },
         onPanResponderRelease: () => {
           finishDrag();
@@ -192,6 +246,7 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
               const blockKey = getBlockKey(block, index);
               const isDragging = draggingKey === blockKey;
               const responder = getResponderForKey(blockKey);
+              const shiftAnim = getShiftAnim(blockKey);
 
               return (
                 <Animated.View
@@ -202,10 +257,12 @@ export const ReorderBlocksModal: React.FC<ReorderBlocksModalProps> = ({
                       backgroundColor: isDragging ? theme.surface : theme.cardBg,
                       borderColor: isDragging ? theme.accent : theme.border,
                       borderWidth: isDragging ? 2 : 1,
-                      transform: isDragging ? [{ translateY: dragY }, { scale: 1.02 }] : [],
+                      transform: isDragging
+                        ? [{ translateY: dragY }, { scale: 1.02 }]
+                        : [{ translateY: shiftAnim }],
                       zIndex: isDragging ? 99 : 1,
                       elevation: isDragging ? 8 : 0,
-                      opacity: draggingKey !== null && !isDragging ? 0.85 : 1,
+                      opacity: draggingKey !== null && !isDragging ? 0.9 : 1,
                     },
                   ]}
                 >
@@ -300,15 +357,17 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    gap: 10,
+    paddingBottom: 24,
   },
   blockRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 16,
-    minHeight: 58,
+    height: ROW_HEIGHT,
+    marginBottom: ROW_MARGIN_BOTTOM,
   },
   dragHandle: {
     paddingRight: 10,
@@ -333,7 +392,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   blockTitle: {
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: '700',
     flex: 1,
   },
