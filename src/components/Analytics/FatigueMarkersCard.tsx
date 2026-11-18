@@ -20,6 +20,7 @@ import {
 import {
   calculateWeeklyFatigueSnapshots,
   WeeklyFatigueSnapshot,
+  calculateACWR,
 } from '../../services/analyticsService';
 import { StorageService } from '../../services/storage';
 import { WorkoutSession, BodyMeasurement } from '../../types';
@@ -60,6 +61,8 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
   const snapshots: WeeklyFatigueSnapshot[] = useMemo(() => {
     return calculateWeeklyFatigueSnapshots(effectiveHistory, effectiveMeasurements);
   }, [effectiveHistory, effectiveMeasurements]);
+
+  const acwr = useMemo(() => calculateACWR(effectiveHistory), [effectiveHistory]);
 
   // Si aucun historique de séance, on n'affiche pas la carte
   if (effectiveHistory.length === 0 || snapshots.length === 0) {
@@ -334,6 +337,52 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
               </View>
               <Text style={[styles.metricSubtitle, { color: theme.textMuted }]}>
                 {currentSnapshot.totalSessions > 1 ? 'Entraînements faits' : 'Entraînement fait'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Jauge ACWR Anti-Blessure (AJ-13) */}
+          <View style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: theme.surface, borderColor: theme.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text }}>Ratio ACWR (Aiguë / Chronique)</Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '900',
+                  color:
+                    acwr.status === 'danger'
+                      ? '#EF4444'
+                      : acwr.status === 'caution'
+                      ? '#F59E0B'
+                      : acwr.status === 'undertraining'
+                      ? '#3B82F6'
+                      : '#10B981',
+                }}
+              >
+                {acwr.ratio.toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden', marginBottom: 6 }}>
+              <View
+                style={{
+                  height: '100%',
+                  width: `${Math.min(100, Math.max(8, (acwr.ratio / 2.0) * 100))}%`,
+                  borderRadius: 4,
+                  backgroundColor:
+                    acwr.status === 'danger'
+                      ? '#EF4444'
+                      : acwr.status === 'caution'
+                      ? '#F59E0B'
+                      : acwr.status === 'undertraining'
+                      ? '#3B82F6'
+                      : '#10B981',
+                }}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>{acwr.label}</Text>
+              <Text style={{ fontSize: 10, color: theme.textMuted }}>
+                7j: {acwr.acuteLoadKg.toLocaleString('fr-FR')} kg · Moy 28j: {acwr.chronicWeeklyLoadKg.toLocaleString('fr-FR')} kg
               </Text>
             </View>
           </View>

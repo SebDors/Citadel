@@ -651,3 +651,75 @@ export function calculateWeeklyFatigueSnapshots(
 
   return snapshots;
 }
+
+export interface ACWRResult {
+  acuteLoadKg: number;
+  chronicWeeklyLoadKg: number;
+  ratio: number;
+  status: 'undertraining' | 'optimal' | 'caution' | 'danger';
+  label: string;
+}
+
+/**
+ * Calcule le ratio de charge aiguë sur chronique (ACWR - Gabbett 2016) pour prévenir les blessures (AJ-13).
+ * - Charge aiguë : tonnage total des 7 derniers jours.
+ * - Charge chronique : moyenne hebdomadaire sur les 28 derniers jours.
+ */
+export function calculateACWR(history: WorkoutSession[]): ACWRResult {
+  const now = Date.now();
+  const ms7d = 7 * 24 * 60 * 60 * 1000;
+  const ms28d = 28 * 24 * 60 * 60 * 1000;
+
+  let acuteLoadKg = 0;
+  let total28dKg = 0;
+
+  (history || []).forEach((s) => {
+    if (s.status !== 'completed' || !s.startTime) return;
+    const t = new Date(s.startTime).getTime();
+    const diff = now - t;
+    if (diff < 0 || diff > ms28d) return;
+
+    const blocks = getSessionBlocks(s);
+    const vol = s.totalVolumeKg || calculateWorkoutTotalVolume(s.exercises, blocks, {
+      isCircuit: s.isCircuit,
+      circuitRounds: s.circuitRounds,
+      completedRoundsCount: s.completedRoundsCount,
+      circuitStates: s.circuitStates,
+    }).volume;
+
+    total28dKg += vol;
+    if (diff <= ms7d) {
+      acuteLoadKg += vol;
+    }
+  });
+
+  const chronicWeeklyLoadKg = Math.round((total28dKg / 4) * 10) / 10;
+  const ratio = chronicWeeklyLoadKg > 0 ? Math.round((acuteLoadKg / chronicWeeklyLoadKg) * 100) / 100 : 1.0;
+
+  let status: ACWRResult['status'] = 'optimal';
+  let label = 'Zone optimale (Sweet Spot)';
+  if (chronicWeeklyLoadKg === 0 && acuteLoadKg === 0) {
+    status = 'optimal';
+    label = 'Données insuffisantes';
+  } else if (ratio < 0.8) {
+    status = 'undertraining';
+    label = 'Sous-charge (< 0.8)';
+  } else if (ratio <= 1.3) {
+    status = 'optimal';
+    label = 'Zone optimale (0.8 – 1.3)';
+  } else if (ratio <= 1.5) {
+    status = 'caution';
+    label = 'Vigilance (1.3 – 1.5)';
+  } else {
+    status = 'danger';
+    label = 'Surcharge / Risque (> 1.5)';
+  }
+
+  return {
+    acuteLoadKg: Math.round(acuteLoadKg),
+    chronicWeeklyLoadKg: Math.round(chronicWeeklyLoadKg),
+    ratio,
+    status,
+    label,
+  };
+}

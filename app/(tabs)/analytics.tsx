@@ -5,6 +5,8 @@ import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 import { WeeklyMuscleVolumeCard } from '../../src/components/Analytics/WeeklyMuscleVolumeCard';
+import { MuscleBalanceRadarCard } from '../../src/components/Analytics/MuscleBalanceRadarCard';
+import { calculateWeeklyMuscleVolume } from '../../src/services/analyticsService';
 import { FatigueMarkersCard } from '../../src/components/Analytics/FatigueMarkersCard';
 import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { SlidersHorizontal } from 'lucide-react-native';
@@ -19,6 +21,8 @@ export default function AnalyticsTab() {
     if (!excludeExceptions) return raw;
     return raw.filter((s) => !s.isException);
   }, [data?.history, excludeExceptions]);
+
+  const weeklyVolume = useMemo(() => calculateWeeklyMuscleVolume(filteredHistory), [filteredHistory]);
 
   return (
     <TabSwipeWrapper tabIndex={2}>
@@ -60,6 +64,9 @@ export default function AnalyticsTab() {
 
           {/* 1. Volume musculaire hebdomadaire */}
           <WeeklyMuscleVolumeCard history={filteredHistory} />
+
+          {/* 1B. Graphique Radar d'Équilibre Musculaire (AJ-14) */}
+          <MuscleBalanceRadarCard volumeData={weeklyVolume} />
 
           {/* 2. Marqueurs de fatigue et récupération */}
           {data?.profile?.enableFatigueMarkers !== false && (
