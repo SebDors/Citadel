@@ -45,6 +45,7 @@ import {
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
+import { WeeklySplitSchedulerCard } from "../../src/components/Home/WeeklySplitSchedulerCard";
 import { UpdateModal } from "../../src/components/Profile/UpdateModal";
 import { UpdateService, UpdateInfo } from "../../src/services/updateService";
 import {
@@ -129,6 +130,7 @@ export default function WorkoutTab() {
     markFirstSessionCreated,
     completeOnboarding,
     skipOnboarding,
+    updateWeeklySchedule,
     allExercises,
   } = useWorkout();
   const { theme } = useTheme();
@@ -730,6 +732,16 @@ export default function WorkoutTab() {
           </View>
 
           {/* Section Header with "Importer" & "Nouveau dossier" buttons */}
+          {/* Planificateur hebdomadaire (AJ-03) */}
+          {data?.hasCompletedOnboarding && (
+            <WeeklySplitSchedulerCard
+              templates={data?.templates || []}
+              weeklySchedule={data?.weeklySchedule || {}}
+              onUpdateSchedule={updateWeeklySchedule}
+              onStartTemplate={(tpl) => startWorkout(tpl)}
+            />
+          )}
+
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
               MES DOSSIERS & SÉANCES

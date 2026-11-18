@@ -100,6 +100,7 @@ export interface WorkoutContextType {
   skipOnboarding: () => Promise<void>;
   markFirstSessionCreated: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
+  updateWeeklySchedule: (schedule: Record<number, string | null>) => Promise<void>;
   // Base d'exercices personnalisés
   customExercises: SharedExercise[];
   allExercises: SharedExercise[];
@@ -468,6 +469,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const markFirstSessionCreated = async () => {
     const updated = await StorageService.markFirstSessionCreated();
     setData(updated);
+  };
+
+  const updateWeeklySchedule = async (schedule: Record<number, string | null>) => {
+    if (!data) return;
+    const updatedData: FitTrackerData = {
+      ...data,
+      weeklySchedule: schedule,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
   };
 
   const resetOnboarding = async () => {
@@ -2162,6 +2173,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       skipOnboarding,
       markFirstSessionCreated,
       resetOnboarding,
+      updateWeeklySchedule,
       customExercises,
       allExercises,
       addCustomExercise,

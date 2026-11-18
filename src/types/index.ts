@@ -221,6 +221,7 @@ export interface FitTrackerData {
   hasCompletedOnboarding?: boolean;
   hasCreatedFirstSession?: boolean;
   hasCompletedFirstWorkout?: boolean;
+  weeklySchedule?: Record<number, string | null>;
 }
 
 /**

@@ -592,6 +592,12 @@ export function saveFullDataToDb(
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('has_completed_first_workout', ?)",
       [data.hasCompletedFirstWorkout ? 'true' : 'false']
     );
+    if (data.weeklySchedule) {
+      db.runSync(
+        "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('weekly_schedule', ?)",
+        [JSON.stringify(data.weeklySchedule)]
+      );
+    }
   });
 }
 
@@ -658,7 +664,7 @@ export function loadFullDataFromDb(db: SQLite.SQLiteDatabase): FitTrackerData | 
     : null;
 
   const metaRows = db.getAllSync<{ key: string; value: string }>(
-    "SELECT key, value FROM app_meta WHERE key IN ('has_completed_onboarding', 'has_created_first_session', 'has_completed_first_workout')"
+    "SELECT key, value FROM app_meta WHERE key IN ('has_completed_onboarding', 'has_created_first_session', 'has_completed_first_workout', 'weekly_schedule')"
   );
   const metaMap: Record<string, string> = {};
   metaRows.forEach((r) => { metaMap[r.key] = r.value; });
@@ -675,6 +681,7 @@ export function loadFullDataFromDb(db: SQLite.SQLiteDatabase): FitTrackerData | 
     hasCompletedOnboarding: metaMap['has_completed_onboarding'] === 'true',
     hasCreatedFirstSession: metaMap['has_created_first_session'] === 'true',
     hasCompletedFirstWorkout: metaMap['has_completed_first_workout'] === 'true',
+    weeklySchedule: metaMap['weekly_schedule'] ? JSON.parse(metaMap['weekly_schedule']) : undefined,
   };
 }
 
