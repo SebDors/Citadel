@@ -1,5 +1,6 @@
 import {
   calculateE1RM,
+  calculateMaxE1RM,
   calculateWorkoutTotalVolume,
   flagPossibleUnderRecovery,
   calculateWeeklyMuscleVolume,
@@ -20,6 +21,62 @@ describe('analyticsService', () => {
     it('returns null for invalid inputs', () => {
       expect(calculateE1RM(0, 10)).toBeNull();
       expect(calculateE1RM(100, 0)).toBeNull();
+    });
+
+    it('adjusts estimated 1RM when RIR is provided (MO-13)', () => {
+      // 100 kg * 5 reps @ RIR 2 => effectiveReps = 7 => 100 * (1 + 7/30) = 123.3
+      expect(calculateE1RM(100, 5, 'epley', 2)).toBe(123.3);
+      expect(calculateE1RM(100, 5, 'epley', 0)).toBe(116.7);
+    });
+  });
+
+  describe('calculateMaxE1RM - Bodyweight & RIR (AM-05 / MO-13)', () => {
+    it('detects bodyweight exercise PR using bodyweightUsedKg + added weight and RIR', () => {
+      const history: WorkoutSession[] = [
+        {
+          id: 'sess_bw',
+          title: 'Upper',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          status: 'completed',
+          durationSeconds: 1800,
+          completedSetsCount: 1,
+          totalSetsCount: 1,
+          totalVolumeKg: 900,
+          blocks: [
+            {
+              id: 'b1',
+              type: 'single',
+              exercise: {
+                id: 'ex1',
+                exerciseId: 'pullups',
+                exerciseName: 'Tractions Prise Pronation',
+                primaryMuscle: 'Grand Dorsal',
+                targetMuscles: [],
+                restSeconds: 90,
+                sets: [
+                  {
+                    id: 's1',
+                    setNumber: 1,
+                    type: 'normal',
+                    isBodyweight: true,
+                    bodyweightUsedKg: 80,
+                    weightKg: 10,
+                    reps: 5,
+                    rir: 2,
+                    completed: true,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ];
+
+      const pr = calculateMaxE1RM(history, 'Tractions Prise Pronation');
+      expect(pr).not.toBeNull();
+      expect(pr?.weightKg).toBe(90);
+      expect(pr?.e1RM).toBe(111); // 90 * (1 + 7/30) = 111.0
     });
   });
 

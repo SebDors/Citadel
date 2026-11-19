@@ -360,12 +360,12 @@ export function updateIncrementalRecordsForSession(
 
     (ex.sets || []).forEach((s) => {
       if (!s.completed || s.type === 'warmup') return;
-      const effWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0);
+      const effWeight = Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0));
       const reps = s.reps || 0;
       if (effWeight > sessionMaxWeight) sessionMaxWeight = effWeight;
       if (reps > sessionMaxReps) sessionMaxReps = reps;
       if (effWeight > 0 && reps > 0) {
-        const e1rm = calculateE1RM(effWeight, reps) || 0;
+        const e1rm = calculateE1RM(effWeight, reps, 'epley', s.rir) || 0;
         if (e1rm > sessionMaxE1RM) sessionMaxE1RM = e1rm;
       }
     });

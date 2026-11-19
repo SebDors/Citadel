@@ -7,6 +7,8 @@ import { Trophy, Dumbbell, ChevronDown, ChevronUp, Search, ChevronRight, X } fro
 import { getSessionBlocks, WorkoutSession } from '../../types';
 import { formatWeight } from '../../utils/numberUtils';
 import { calculateE1RM } from '../../services/analyticsService';
+import { getBodyweightFactor } from '../../constants/exerciseDatabase';
+import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
 import { StorageService } from '../../services/storage';
 import ExerciseDetailModal from '../Analytics/ExerciseDetailModal';
 
@@ -19,6 +21,7 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
 }) => {
   const { theme } = useTheme();
   const { data, allExercises } = useWorkout();
+  const oneRmFormula = useUserPreferencesStore((s) => s.oneRmFormula);
 
   const [isCardCollapsed, setIsCardCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,9 +53,20 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
       (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
 
+    const fallbackBw = data?.profile?.currentWeightKg || 0;
     const prMap = new Map<
       string,
-      { name: string; weightKg: number; reps: number; e1RM: number; date: string }
+      {
+        name: string;
+        weightKg: number;
+        addedWeightKg: number;
+        isBodyweight: boolean;
+        reps: number;
+        rir?: number;
+        e1RM: number;
+        isRepsOnlyPR: boolean;
+        date: string;
+      }
     >();
 
     sortedHistory.forEach((session) => {
@@ -61,17 +75,48 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
 
       blocks.forEach((block) => {
         if (block.type === 'single') {
-          (block.exercise.sets || []).forEach((set) => {
-            if (set.completed && set.weightKg && set.weightKg > 0 && set.reps && set.reps > 0) {
-              const currentE1RM = calculateE1RM(set.weightKg, set.reps);
-              const existing = prMap.get(block.exercise.exerciseName);
+          const ex = block.exercise;
+          const bwFactor = getBodyweightFactor(ex.exerciseId, ex.exerciseName);
 
-              if (currentE1RM !== null && (!existing || currentE1RM > existing.e1RM)) {
-                prMap.set(block.exercise.exerciseName, {
-                  name: block.exercise.exerciseName,
-                  weightKg: set.weightKg,
+          (ex.sets || []).forEach((set) => {
+            if (!set.completed || set.type === 'warmup' || !set.reps || set.reps <= 0) return;
+
+            const isBw = Boolean(set.isBodyweight);
+            const addedWeight = set.weightKg || 0;
+            const bwUsed = set.bodyweightUsedKg || fallbackBw;
+            const effectiveWeight = Math.max(0, (isBw ? bwUsed * bwFactor : 0) + addedWeight);
+
+            const currentE1RM = effectiveWeight > 0
+              ? calculateE1RM(effectiveWeight, set.reps, oneRmFormula, set.rir)
+              : null;
+
+            const existing = prMap.get(ex.exerciseName);
+
+            if (currentE1RM !== null) {
+              if (!existing || existing.isRepsOnlyPR || currentE1RM > existing.e1RM) {
+                prMap.set(ex.exerciseName, {
+                  name: ex.exerciseName,
+                  weightKg: effectiveWeight,
+                  addedWeightKg: addedWeight,
+                  isBodyweight: isBw,
                   reps: set.reps,
+                  rir: set.rir,
                   e1RM: currentE1RM,
+                  isRepsOnlyPR: false,
+                  date: sessionDate,
+                });
+              }
+            } else if (isBw) {
+              if (!existing || (existing.isRepsOnlyPR && set.reps > existing.reps)) {
+                prMap.set(ex.exerciseName, {
+                  name: ex.exerciseName,
+                  weightKg: effectiveWeight,
+                  addedWeightKg: addedWeight,
+                  isBodyweight: true,
+                  reps: set.reps,
+                  rir: set.rir,
+                  e1RM: 0,
+                  isRepsOnlyPR: true,
                   date: sessionDate,
                 });
               }
@@ -83,7 +128,7 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
 
     return Array.from(prMap.values())
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [history]);
+  }, [history, oneRmFormula, data?.profile?.currentWeightKg]);
 
   const filteredPRs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -179,10 +224,18 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
 
                     <View style={styles.itemRight}>
                       <Text style={[styles.prValue, { color: theme.accent }]}>
-                        {formatWeight(item.weightKg)} kg
+                        {item.isBodyweight
+                          ? item.addedWeightKg > 0
+                            ? `PDC +${formatWeight(item.addedWeightKg)} kg`
+                            : item.addedWeightKg < 0
+                            ? `PDC ${formatWeight(item.addedWeightKg)} kg`
+                            : 'PDC'
+                          : `${formatWeight(item.weightKg)} kg`}
                       </Text>
                       <Text style={[styles.prSub, { color: theme.textMuted }]}>
-                        {item.reps} rep{item.reps > 1 ? 's' : ''} · 1RM ~{Math.round(item.e1RM)} kg
+                        {item.reps} rep{item.reps > 1 ? 's' : ''}
+                        {item.rir !== undefined ? ` · RIR ${item.rir}` : ''}
+                        {item.isRepsOnlyPR ? ' · Record reps' : ` · 1RM ~${Math.round(item.e1RM)} kg`}
                       </Text>
                     </View>
 

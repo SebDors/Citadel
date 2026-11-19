@@ -6,6 +6,7 @@ import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
 import { WorkoutSession, getSessionBlocks, SessionNote, NOTE_TYPES_CONFIG, SessionExceptionReason } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateE1RM } from '../../services/analyticsService';
+import { getBodyweightFactor } from '../../constants/exerciseDatabase';
 import {
   hasExercisePainAlert,
   getExercisePainSeverity,
@@ -38,11 +39,12 @@ export default function ExerciseDetailModal({
   const { exerciseHistory, prs } = useMemo(() => {
     let bestWeight = 0;
     let bestReps = 0;
+    let bestRir: number | undefined = undefined;
     let prDate = '';
     const historyItems: {
       date: string;
       dateFormatted: string;
-      sets: { weightKg: number; reps: number; isPr?: boolean }[];
+      sets: { weightKg: number; reps: number; rir?: number; isPr?: boolean }[];
       isException?: boolean;
       exceptionReason?: SessionExceptionReason;
       sessionNotes?: SessionNote[];
@@ -56,7 +58,7 @@ export default function ExerciseDetailModal({
     );
 
     sortedHistory.forEach(session => {
-      const foundSets: { weightKg: number; reps: number; isPr?: boolean }[] = [];
+      const foundSets: { weightKg: number; reps: number; rir?: number; isPr?: boolean }[] = [];
       const sessionDate = new Date(session.startTime);
       const timeFormatted = sessionDate.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
@@ -82,16 +84,18 @@ export default function ExerciseDetailModal({
             painAlert = hasExercisePainAlert(block.exercise);
             const sev = getExercisePainSeverity(block.exercise);
             painSeverity = sev !== null ? sev : undefined;
+            const bwFactor = getBodyweightFactor(block.exercise.exerciseId, block.exercise.exerciseName);
             block.exercise.sets.forEach(set => {
-              if (set.completed) {
-                const w = set.weightKg || 0;
+              if (set.completed && set.type !== 'warmup') {
+                const w = Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0));
                 const r = set.reps || 0;
                 if (w > bestWeight || (w === bestWeight && r > bestReps)) {
                   bestWeight = w;
                   bestReps = r;
+                  bestRir = set.rir;
                   prDate = dateFormatted;
                 }
-                foundSets.push({ weightKg: w, reps: r });
+                foundSets.push({ weightKg: w, reps: r, rir: set.rir });
               }
             });
           }
@@ -123,7 +127,7 @@ export default function ExerciseDetailModal({
       });
     });
 
-    const e1RM = (bestWeight > 0 && bestReps > 0 && bestReps <= 12) ? calculateE1RM(bestWeight, bestReps, oneRmFormula) : null;
+    const e1RM = (bestWeight > 0 && bestReps > 0 && bestReps <= 12) ? calculateE1RM(bestWeight, bestReps, oneRmFormula, bestRir) : null;
 
     return {
       exerciseHistory: historyItems,
@@ -141,7 +145,7 @@ export default function ExerciseDetailModal({
         let maxE1rm = 0;
         item.sets.forEach((s) => {
           if (s.weightKg > maxW) maxW = s.weightKg;
-          const est = calculateE1RM(s.weightKg, s.reps, oneRmFormula);
+          const est = calculateE1RM(s.weightKg, s.reps, oneRmFormula, s.rir);
           if (est && est > maxE1rm) maxE1rm = est;
         });
         const d = new Date(item.date);

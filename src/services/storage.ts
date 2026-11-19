@@ -1036,9 +1036,7 @@ export const StorageService = {
   async resetAllData(): Promise<FitTrackerData> {
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
-      await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
       await AsyncStorage.removeItem(COLLAPSED_CARDS_KEY);
-      await AsyncStorage.removeItem(LEGACY_COLLAPSED_CARDS_KEY);
       await AsyncStorage.removeItem(CURRENT_WORKOUT_KEY);
     } catch (e) {
       console.error('Erreur lors de la réinitialisation des données:', e);

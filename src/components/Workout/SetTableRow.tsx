@@ -420,7 +420,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Saisie RIR : Affichée UNIQUEMENT si isRirEnabled et si la série est de type "normal" */}
+        {/* Colonne RIR : Saisie sur série normale, indicateur clair 0 / — pour séries spéciales (AM-08) */}
         {isRirEnabled && (
           <View style={styles.colInput}>
             {set.type === 'normal' ? (
@@ -456,7 +456,22 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                     : '-'}
                 </Text>
               </TouchableOpacity>
-            ) : null}
+            ) : (
+              <View
+                style={[
+                  styles.cellBtn,
+                  {
+                    borderColor: theme.border,
+                    backgroundColor: 'transparent',
+                    opacity: set.type === 'failure' || set.type === 'amrap' ? 0.75 : 0.45,
+                  },
+                ]}
+              >
+                <Text style={[styles.cellText, { color: theme.textMuted, fontWeight: '700' }]}>
+                  {set.type === 'failure' || set.type === 'amrap' ? '0' : '—'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 

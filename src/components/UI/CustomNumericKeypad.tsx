@@ -543,6 +543,33 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               <View style={styles.quickChipsBar}>
                 {activeField === 'weightKg' ? (
                   <>
+                    {localIsBodyweight && (
+                      <Pressable
+                        unstable_pressDelay={0}
+                        onPress={() => {
+                          triggerHapticLight();
+                          handleKeyPress('+/-');
+                        }}
+                        style={({ pressed }) => [
+                          styles.chipBtn,
+                          {
+                            backgroundColor: localValue.startsWith('-')
+                              ? theme.accent
+                              : (pressed ? `${theme.accent}35` : theme.surface),
+                            borderColor: localValue.startsWith('-') || pressed ? theme.accent : theme.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: localValue.startsWith('-') ? '#FFFFFF' : theme.accent },
+                          ]}
+                        >
+                          +/-
+                        </Text>
+                      </Pressable>
+                    )}
                     <Pressable
                       unstable_pressDelay={0}
                       onPress={() => handleQuickIncrement(-2.5)}

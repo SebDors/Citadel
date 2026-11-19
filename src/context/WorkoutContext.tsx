@@ -53,6 +53,7 @@ export interface WorkoutContextType {
   updateSet: (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => void;
   toggleSetComplete: (exerciseId: string, setId: string) => void;
   addSet: (exerciseId: string) => void;
+  prependWarmupSets: (exerciseId: string, warmups: Array<{ weightKg: number; reps: number }>) => void;
   removeSet: (exerciseId: string, setId: string) => void;
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number, exerciseId?: string, isBodyweight?: boolean) => void;
   addBatchExercisesToActiveWorkout: (items: Array<{ exerciseId?: string; exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number; isBodyweight?: boolean }>) => void;
@@ -948,6 +949,65 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           ...block,
           exercise: { ...block.exercise, sets: [...block.exercise.sets, newSet] },
+        };
+      }
+      return block;
+    });
+
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
+
+    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+      updatedExercises,
+      updatedBlocks
+    );
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+      exercises: updatedExercises,
+      totalVolumeKg: volume,
+      completedSetsCount: completedCount,
+      totalSetsCount: totalCount,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const prependWarmupSets = (
+    exerciseId: string,
+    warmups: Array<{ weightKg: number; reps: number }>
+  ) => {
+    if (!activeSession || !warmups || warmups.length === 0) return;
+
+    const currentBlocks = getSessionBlocks(activeSession);
+    const baseTs = Date.now();
+    const updatedBlocks = currentBlocks.map((block) => {
+      if (block.type === 'single' && block.exercise.id === exerciseId) {
+        const warmupSets: WorkoutSet[] = warmups.map((w, idx) => ({
+          id: `set_w_${baseTs}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+          setNumber: idx + 1,
+          type: 'warmup',
+          weightKg: w.weightKg,
+          reps: w.reps,
+          rir: undefined,
+          completed: false,
+          isBodyweight: false,
+        }));
+
+        const combinedSets = [...warmupSets, ...block.exercise.sets].map((st, idx) => ({
+          ...st,
+          setNumber: idx + 1,
+        }));
+
+        return {
+          ...block,
+          exercise: { ...block.exercise, sets: combinedSets },
         };
       }
       return block;
@@ -2129,6 +2189,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateSet,
       toggleSetComplete,
       addSet,
+      prependWarmupSets,
       removeSet,
       addExerciseToActiveWorkout,
       addBatchExercisesToActiveWorkout,

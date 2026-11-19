@@ -256,6 +256,7 @@ export default function LiveWorkoutScreen() {
     updateSet,
     toggleSetComplete,
     addSet,
+    prependWarmupSets,
     removeSet,
     addExerciseToActiveWorkout,
     addBatchExercisesToActiveWorkout,
@@ -1247,7 +1248,10 @@ export default function LiveWorkoutScreen() {
       <ScrollView
         ref={scrollViewRef}
         stickyHeaderIndices={[0]}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: restTimer.active ? 190 : 110 },
+        ]}
         onScroll={(e) => {
           scrollYRef.current = e.nativeEvent.contentOffset.y;
         }}
@@ -1348,6 +1352,7 @@ export default function LiveWorkoutScreen() {
                   }
                   onToggleSetComplete={(setId) => handleToggleSetComplete(ex.id, setId)}
                   onAddSet={() => addSet(ex.id)}
+                  onGenerateWarmup={(warmups) => prependWarmupSets(ex.id, warmups)}
                   onRemoveSet={(setId) => removeSet(ex.id, setId)}
                   onDuplicateExercise={() => duplicateExercise(ex.id)}
                   onRemoveExercise={() => removeExercise(ex.id)}

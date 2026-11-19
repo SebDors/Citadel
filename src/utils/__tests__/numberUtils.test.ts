@@ -12,6 +12,11 @@ describe('numberUtils', () => {
       expect(parseFloatFrench('60')).toBe(60);
     });
 
+    it('parses negative values for bodyweight assistance properly (AJ-16)', () => {
+      expect(parseFloatFrench('-15')).toBe(-15);
+      expect(parseFloatFrench('-12,5')).toBe(-12.5);
+    });
+
     it('handles empty, null, undefined or invalid inputs cleanly', () => {
       expect(parseFloatFrench('')).toBeUndefined();
       expect(parseFloatFrench(null)).toBeUndefined();

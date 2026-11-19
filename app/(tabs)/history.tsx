@@ -381,6 +381,38 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontSize: 11,
   },
+  searchSection: {
+    marginBottom: 12,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    paddingVertical: 0,
+  },
+  suggestionsRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 8,
+  },
+  suggestionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  suggestionChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
   emptyText: {
     fontSize: 14,
     fontStyle: "italic",

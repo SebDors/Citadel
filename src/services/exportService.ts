@@ -1,5 +1,5 @@
 import { calculateE1RM } from './analyticsService';
-import { EXERCISE_DATABASE } from '../constants/exerciseDatabase';
+import { EXERCISE_DATABASE, getBodyweightFactor } from '../constants/exerciseDatabase';
 import { SingleExerciseBlock, WorkoutSet } from '../types';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -35,7 +35,11 @@ export const ExportService = {
               set.weightKg || '',
               set.reps || '',
               set.rir || '',
-              (set.weightKg && set.reps ? (calculateE1RM(set.weightKg, set.reps) ?? '') : ''),
+              (() => {
+                const bwFactor = set.isBodyweight ? getBodyweightFactor(ex.exerciseId, ex.exerciseName) : 0;
+                const effW = Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0));
+                return effW > 0 && set.reps ? (calculateE1RM(effW, set.reps, 'epley', set.rir) ?? '') : '';
+              })(),
               ex.restSeconds || '',
               set.completed ? 'Terminée' : 'Ignorée',
             ];
@@ -77,7 +81,7 @@ export const ExportService = {
   },
 
   exportMeasurementsToCSV(data: FitTrackerData): string {
-    let csv = '\uFEFFDate;Heure;Poids (kg);Poitrine (cm);Bras (cm);Taille (cm);Hanches (cm);Cuisses (cm);Mollets (cm);Notes\n';
+    let csv = '\uFEFFDate;Heure;Poids (kg);Masse Grasse (%);Poitrine (cm);Bras (cm);Taille (cm);Cuisses (cm)\n';
 
     data.measurements.forEach((m: BodyMeasurement) => {
       let date = m.date;
@@ -87,23 +91,21 @@ export const ExportService = {
         date = d.toLocaleDateString('fr-FR');
         heure = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
       } else {
-         const parts = m.date.split('-');
-         if (parts.length === 3) {
-            date = `${parts[2]}/${parts[1]}/${parts[0]}`;
-         }
+        const parts = m.date.split('-');
+        if (parts.length === 3) {
+          date = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
       }
 
       const row = [
         date,
         heure,
-        m.weightKg || '',
-        m.chestCm || '',
-        m.bicepsCm || '',
-        m.waistCm || '',
-        '', // Hanches (not in BodyMeasurement currently but in columns)
-        m.thighCm || '',
-        '', // Mollets
-        '', // Notes
+        m.weightKg ?? '',
+        m.bodyFatPercentage ?? '',
+        m.chestCm ?? '',
+        m.bicepsCm ?? '',
+        m.waistCm ?? '',
+        m.thighCm ?? '',
       ];
       csv += row.join(';') + '\n';
     });

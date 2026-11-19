@@ -1,66 +1,93 @@
 import React from "react";
 import { Platform } from "react-native";
-import { Tabs } from "expo-router";
+import { withLayoutContext } from "expo-router";
+import {
+  createMaterialTopTabNavigator,
+  MaterialTopTabNavigationOptions,
+  MaterialTopTabNavigationEventMap,
+} from "@react-navigation/material-top-tabs";
+import { ParamListBase, TabNavigationState } from "@react-navigation/native";
 import { useTheme } from "../../src/context/ThemeContext";
+import { useWorkout } from "../../src/context/WorkoutContext";
 import { Dumbbell, Calendar, TrendingUp, User } from "lucide-react-native";
 
+const { Navigator } = createMaterialTopTabNavigator();
+
+export const MaterialTopTabs = withLayoutContext<
+  MaterialTopTabNavigationOptions,
+  typeof Navigator,
+  TabNavigationState<ParamListBase>,
+  MaterialTopTabNavigationEventMap
+>(Navigator);
+
 export default function TabLayout() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
+  const { data, loading } = useWorkout();
+  const isOnboarding = !loading && !!data && !data.hasCompletedOnboarding;
 
   return (
-    <Tabs
+    <MaterialTopTabs
+      tabBarPosition="bottom"
       screenOptions={{
-        headerShown: false,
+        swipeEnabled: !isOnboarding,
+        animationEnabled: true,
+        tabBarShowIcon: true,
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textMuted,
+        tabBarIndicatorStyle: {
+          backgroundColor: theme.accent,
+          height: 2.5,
+          top: 0,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 2,
+        },
         tabBarStyle: {
           backgroundColor: theme.background,
           borderTopColor: theme.border,
           borderTopWidth: 1,
-          height: Platform.OS === "android" ? 76 : 68,
-          paddingBottom: Platform.OS === "android" ? 18 : 12,
-          paddingTop: Platform.OS === "android" ? 8 : 6,
+          height: Platform.OS === "android" ? 78 : 70,
+          paddingBottom: Platform.OS === "android" ? 16 : 12,
+          paddingTop: 4,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "700",
+          textTransform: "none",
+          marginTop: 2,
         },
       }}
     >
-      <Tabs.Screen
+      <MaterialTopTabs.Screen
         name="index"
         options={{
           title: "Entraînement",
-          tabBarIcon: ({ color, size }) => (
-            <Dumbbell size={size} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Dumbbell size={22} color={color} />,
         }}
       />
-      <Tabs.Screen
+      <MaterialTopTabs.Screen
         name="history"
         options={{
           title: "Historique",
-          tabBarIcon: ({ color, size }) => (
-            <Calendar size={size} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Calendar size={22} color={color} />,
         }}
       />
-      <Tabs.Screen
+      <MaterialTopTabs.Screen
         name="analytics"
         options={{
           title: "Analyse",
-          tabBarIcon: ({ color, size }) => (
-            <TrendingUp size={size} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <TrendingUp size={22} color={color} />,
         }}
       />
-      <Tabs.Screen
+      <MaterialTopTabs.Screen
         name="profile"
         options={{
           title: "Profil",
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color }) => <User size={22} color={color} />,
         }}
       />
-    </Tabs>
+    </MaterialTopTabs>
   );
 }
