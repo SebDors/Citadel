@@ -7,10 +7,10 @@ import {
   Modal,
   Platform,
   ScrollView,
-  SafeAreaView,
   PanResponder,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { WorkoutBlock, CircuitBlock, SingleExerciseBlock } from '../../types';
 import { X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react-native';

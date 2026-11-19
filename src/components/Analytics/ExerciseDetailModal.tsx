@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Trophy, Activity, Calendar, Dumbbell, AlertTriangle, TrendingUp } from 'lucide-react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
