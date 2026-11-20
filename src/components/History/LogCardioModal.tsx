@@ -34,6 +34,7 @@ interface LogCardioModalProps {
   onClose: () => void;
   onSave?: (session: CardioSession) => void;
   initialDate?: string;
+  initialActivity?: string;
   sessionToEdit?: CardioSession | null;
 }
 
@@ -65,6 +66,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
   onClose,
   onSave,
   initialDate,
+  initialActivity,
   sessionToEdit,
 }) => {
   const { theme } = useTheme();
@@ -153,9 +155,24 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
         setNotes(sessionToEdit.notes || '');
       } else {
         setDateStr(formatISOToFrench(initialDate) || todayFrenchStr);
-        setActivity('Boxe');
-        setIsCustomActivity(false);
-        setCustomActivityText('');
+        if (initialActivity && initialActivity.toLowerCase() !== 'cardio') {
+          const matchedPreset = PRESET_ACTIVITIES.find(
+            (p) => p.label.toLowerCase() === initialActivity.trim().toLowerCase()
+          );
+          if (matchedPreset) {
+            setActivity(matchedPreset.label);
+            setIsCustomActivity(false);
+            setCustomActivityText('');
+          } else {
+            setIsCustomActivity(true);
+            setActivity('');
+            setCustomActivityText(initialActivity.trim());
+          }
+        } else {
+          setActivity('Boxe');
+          setIsCustomActivity(false);
+          setCustomActivityText('');
+        }
         setDurationMinutes(45);
         setRpe(7);
         const d = new Date();
@@ -163,7 +180,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
         setNotes('');
       }
     }
-  }, [visible, initialDate, sessionToEdit, translateY]);
+  }, [visible, initialDate, initialActivity, sessionToEdit, translateY]);
 
   const panResponder = useMemo(
     () =>

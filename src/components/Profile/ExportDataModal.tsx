@@ -154,7 +154,7 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
     }
   };
 
-  const actions = [
+  const backupActions = [
     {
       id: 'export-full',
       title: 'Sauvegarder les données (JSON)',
@@ -164,14 +164,6 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
       color: theme.accent,
     },
     {
-      id: 'import-csv',
-      title: 'Importer Historique CSV (Strong / Hevy)',
-      description: 'Importer vos anciennes séances depuis Strong, Hevy ou Citadel (.csv)',
-      icon: Upload,
-      onPress: handleImportCSV,
-      color: '#3B82F6',
-    },
-    {
       id: 'import-backup',
       title: 'Restaurer une Sauvegarde (.json)',
       description: 'Importer un fichier de sauvegarde (.json) pour restaurer vos données',
@@ -179,6 +171,9 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
       onPress: handleImportBackup,
       color: '#34A853',
     },
+  ];
+
+  const exportActions = [
     {
       id: 'export-workouts',
       title: 'Télécharger les Séances (CSV)',
@@ -195,7 +190,36 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
       onPress: handleExportMeasurements,
       color: theme.secondary || theme.accent,
     },
+    {
+      id: 'import-csv',
+      title: 'Importer Historique CSV (Strong / Hevy)',
+      description: 'Importer vos anciennes séances depuis Strong, Hevy ou Citadel (.csv)',
+      icon: Upload,
+      onPress: handleImportCSV,
+      color: '#3B82F6',
+    },
   ];
+
+  const renderActionCard = (action: typeof backupActions[number]) => (
+    <TouchableOpacity
+      key={action.id}
+      style={[styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      onPress={action.onPress}
+      disabled={loading}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: action.color + '20' }]}>
+        <action.icon size={18} color={action.color} />
+      </View>
+      <View style={styles.actionTexts}>
+        <Text style={[styles.actionTitle, { color: theme.text }]}>
+          {action.title}
+        </Text>
+        <Text style={[styles.actionDescription, { color: theme.textMuted }]}>
+          {action.description}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <Modal
@@ -240,26 +264,13 @@ export const ExportDataModal: React.FC<ExportDataModalProps> = ({
               </Text>
             </View>
 
-            {actions.map((action) => (
-              <TouchableOpacity
-                key={action.id}
-                style={[styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={action.onPress}
-                disabled={loading}
-              >
-                <View style={[styles.iconContainer, { backgroundColor: action.color + '20' }]}>
-                  <action.icon size={18} color={action.color} />
-                </View>
-                <View style={styles.actionTexts}>
-                  <Text style={[styles.actionTitle, { color: theme.text }]}>
-                    {action.title}
-                  </Text>
-                  <Text style={[styles.actionDescription, { color: theme.textMuted }]}>
-                    {action.description}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>SAUVEGARDE</Text>
+            {backupActions.map(renderActionCard)}
+
+            <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+
+            <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>EXPORTATION & IMPORT CSV</Text>
+            {exportActions.map(renderActionCard)}
           </ScrollView>
 
           {loading && (
@@ -303,10 +314,22 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   content: {
-    maxHeight: 420,
+    maxHeight: 480,
   },
   contentContainer: {
     padding: 16,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  sectionDivider: {
+    height: 1,
+    marginTop: 4,
+    marginBottom: 14,
   },
   storageBanner: {
     padding: 12,

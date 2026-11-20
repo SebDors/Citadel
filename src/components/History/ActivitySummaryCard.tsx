@@ -283,46 +283,48 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   const totalSeconds = currentWeekSessions.reduce((acc, s) => acc + s.durationSeconds, 0) + cardioSeconds;
 
   return (
-    <Card style={styles.cardMargin}>
+    <Card style={[styles.cardMargin, styles.weeklyCardCompact]}>
       <View style={styles.cardHeaderRow}>
         <Text style={[styles.cardTitle, { color: theme.text }]}>Activité de la Semaine</Text>
-        <Text style={[styles.cardSubTitle, { color: theme.textMuted }]}>Lun. - Dim.</Text>
+        <Text style={[styles.cardSubTitle, { color: theme.textMuted }]} numberOfLines={1}>
+          {currentWeekCardios.length > 0
+            ? `Lun. - Dim. · ${currentWeekSessions.length} muscu · ${currentWeekCardios.length} cardio`
+            : 'Lun. - Dim.'}
+        </Text>
       </View>
 
       <View style={styles.metricsGrid}>
         <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Award size={18} color={theme.accent} />
-          <Text style={[styles.value, { color: theme.text }]}>{totalSessionsCount}</Text>
+          <View style={styles.metricValueRow}>
+            <Award size={14} color={theme.accent} />
+            <Text style={[styles.value, { color: theme.text }]}>{totalSessionsCount}</Text>
+          </View>
           <Text style={[styles.label, { color: theme.textMuted }]}>Séances</Text>
-          {currentWeekCardios.length > 0 && (
+        </View>
+
+        <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.metricValueRow}>
+            <Dumbbell size={14} color={theme.secondary} />
+            <Text style={[styles.value, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              {totalVolume} kg
+            </Text>
+          </View>
+          <Text style={[styles.label, { color: theme.textMuted }]}>Volume</Text>
+        </View>
+
+        <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.metricValueRow}>
+            <Clock size={14} color={theme.primary} />
             <Text
-              style={[styles.subDetail, { color: theme.textMuted }]}
+              style={[styles.value, { color: theme.text }]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.7}
+              minimumFontScale={0.75}
             >
-              {currentWeekSessions.length} muscu · {currentWeekCardios.length} cardio
+              {formatCumulativeTime(totalSeconds)}
             </Text>
-          )}
-        </View>
-
-        <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Dumbbell size={18} color={theme.secondary} />
-          <Text style={[styles.value, { color: theme.text }]}>{totalVolume} kg</Text>
-          <Text style={[styles.label, { color: theme.textMuted }]}>Volume Total</Text>
-        </View>
-
-        <View style={[styles.metricBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Clock size={18} color={theme.primary} />
-          <Text
-            style={[styles.value, { color: theme.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-          >
-            {formatCumulativeTime(totalSeconds)}
-          </Text>
-          <Text style={[styles.label, { color: theme.textMuted }]}>Temps Cumulé</Text>
+          </View>
+          <Text style={[styles.label, { color: theme.textMuted }]}>Durée</Text>
         </View>
       </View>
     </Card>
@@ -333,19 +335,26 @@ const styles = StyleSheet.create({
   cardMargin: {
     marginBottom: 10,
   },
+  weeklyCardCompact: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
+    gap: 8,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
   },
   cardSubTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -355,27 +364,26 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 10,
     borderWidth: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 3,
+  },
+  metricValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   value: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
-    marginTop: 4,
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     marginTop: 2,
-  },
-  subDetail: {
-    fontSize: 9,
-    fontWeight: '500',
-    marginTop: 2,
-    textAlign: 'center',
   },
   sessionHeaderRow: {
     flexDirection: 'row',

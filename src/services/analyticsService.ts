@@ -8,7 +8,7 @@ import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
  * Si reps === 1, renvoie directement le poids.
  */
 export const ONE_RM_FORMULAS_CONFIG: Record<OneRMFormula, { label: string; subtitle: string }> = {
-  epley: { label: 'Epley', subtitle: 'Standard polyvalent : Poids × (1 + Reps / 30)' },
+  epley: { label: 'Epley (Par défaut)', subtitle: 'Standard polyvalent : Poids × (1 + Reps / 30)' },
   brzycki: { label: 'Brzycki', subtitle: 'Force maximale (1–5 reps) : Poids × 36 / (37 − Reps)' },
   lander: { label: 'Lander', subtitle: 'Mouvements polyarticulaires : (100 × Poids) / (101.3 − 2.67 × Reps)' },
   wathen: { label: 'Wathen', subtitle: 'Modèle exponentiel : (100 × Poids) / (48.8 + 53.8 × e^(-0.075 × Reps))' },

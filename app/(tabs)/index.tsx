@@ -44,6 +44,7 @@ import {
   ArrowUpCircle,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
+import { LogCardioModal } from "../../src/components/History/LogCardioModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
 import { WeeklySplitSchedulerCard } from "../../src/components/Home/WeeklySplitSchedulerCard";
 import { UpdateModal } from "../../src/components/Profile/UpdateModal";
@@ -142,6 +143,7 @@ export default function WorkoutTab() {
     useState<WorkoutTemplate | null>(null);
   const [showTemplateMenuModal, setShowTemplateMenuModal] = useState(false);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [scheduledCardioActivity, setScheduledCardioActivity] = useState<string | null>(null);
   const [showMoveFolderModal, setShowMoveFolderModal] = useState(false);
 
   const [showRenameTemplateModal, setShowRenameTemplateModal] = useState(false);
@@ -745,6 +747,7 @@ export default function WorkoutTab() {
               weeklySchedule={data?.weeklySchedule || {}}
               onUpdateSchedule={updateWeeklySchedule}
               onStartTemplate={(tpl) => handleStartTemplate(tpl.id)}
+              onStartCardio={(activity) => setScheduledCardioActivity(activity)}
             />
           )}
 
@@ -972,6 +975,13 @@ export default function WorkoutTab() {
         <ExerciseLibraryModal
           visible={showLibraryModal}
           onClose={() => setShowLibraryModal(false)}
+        />
+
+        {/* Modale Enregistrement Cardio depuis le Planning */}
+        <LogCardioModal
+          visible={scheduledCardioActivity !== null}
+          initialActivity={scheduledCardioActivity || undefined}
+          onClose={() => setScheduledCardioActivity(null)}
         />
 
         {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}

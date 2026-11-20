@@ -7,17 +7,32 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { CalendarDays, Play, X, Check, Coffee } from 'lucide-react-native';
+import { CalendarDays, Play, X, Check, Coffee, Flame, Dumbbell } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { WorkoutTemplate } from '../../types';
 import { Card } from '../UI/Card';
+
+export const CARDIO_SCHEDULE_PREFIX = 'cardio:';
+const CARDIO_SCHEDULE_PRESETS = ['Cardio', 'Course', 'Boxe', 'Vélo', 'Natation', 'Corde à sauter'];
+
+export function isCardioScheduleValue(val?: string | null): boolean {
+  return typeof val === 'string' && val.startsWith(CARDIO_SCHEDULE_PREFIX);
+}
+
+export function getCardioActivityFromSchedule(val?: string | null): string | null {
+  if (!isCardioScheduleValue(val)) return null;
+  return val!.slice(CARDIO_SCHEDULE_PREFIX.length).trim() || 'Cardio';
+}
 
 interface WeeklySplitSchedulerCardProps {
   templates: WorkoutTemplate[];
   weeklySchedule: Record<number, string | null>;
   onUpdateSchedule: (nextSchedule: Record<number, string | null>) => void;
   onStartTemplate: (template: WorkoutTemplate) => void;
+  onStartCardio?: (activityName: string) => void;
 }
 
 const DAYS_ORDER = [
@@ -35,14 +50,32 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
   weeklySchedule,
   onUpdateSchedule,
   onStartTemplate,
+  onStartCardio,
 }) => {
   const { theme } = useTheme();
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
+  const [customCardioName, setCustomCardioName] = useState('');
 
   const todayDayIdx = new Date().getDay();
-  const todayTemplateId = weeklySchedule?.[todayDayIdx];
-  const todayTemplate = templates.find((t) => t.id === todayTemplateId);
+  const todayValue = weeklySchedule?.[todayDayIdx];
+  const todayCardio = getCardioActivityFromSchedule(todayValue);
+  const todayTemplate = !todayCardio ? templates.find((t) => t.id === todayValue) : undefined;
   const selectedDayInfo = DAYS_ORDER.find((d) => d.dayIndex === selectedDayIdx);
+
+  const selectedDayValue = selectedDayIdx !== null ? weeklySchedule?.[selectedDayIdx] : null;
+  const selectedCustomCardio =
+    selectedDayValue &&
+    isCardioScheduleValue(selectedDayValue) &&
+    !CARDIO_SCHEDULE_PRESETS.some(
+      (p) => `${CARDIO_SCHEDULE_PREFIX}${p}`.toLowerCase() === selectedDayValue.toLowerCase()
+    )
+      ? getCardioActivityFromSchedule(selectedDayValue)
+      : null;
+
+  const handleCloseModal = () => {
+    setSelectedDayIdx(null);
+    setCustomCardioName('');
+  };
 
   const handleAssignTemplate = (templateId: string | null) => {
     if (selectedDayIdx === null) return;
@@ -50,7 +83,13 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
       ...weeklySchedule,
       [selectedDayIdx]: templateId,
     });
-    setSelectedDayIdx(null);
+    handleCloseModal();
+  };
+
+  const handleAssignCustomCardio = () => {
+    const trimmed = customCardioName.trim();
+    if (!trimmed) return;
+    handleAssignTemplate(`${CARDIO_SCHEDULE_PREFIX}${trimmed}`);
   };
 
   return (
@@ -60,7 +99,7 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
           <CalendarDays size={18} color={theme.accent} />
           <Text style={[styles.title, { color: theme.text }]}>Planning Hebdomadaire</Text>
         </View>
-        {todayTemplate && (
+        {todayTemplate ? (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => onStartTemplate(todayTemplate)}
@@ -71,20 +110,36 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
               {todayTemplate.title}
             </Text>
           </TouchableOpacity>
-        )}
+        ) : todayCardio ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => onStartCardio?.(todayCardio)}
+            style={[styles.quickStartPill, { backgroundColor: '#F97316' }]}
+          >
+            <Flame size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+            <Text style={styles.quickStartText} numberOfLines={1}>
+              {todayCardio}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View style={styles.daysRow}>
         {DAYS_ORDER.map((day) => {
           const isToday = day.dayIndex === todayDayIdx;
           const assignedId = weeklySchedule?.[day.dayIndex];
-          const assignedTemplate = templates.find((t) => t.id === assignedId);
+          const assignedCardio = getCardioActivityFromSchedule(assignedId);
+          const assignedTemplate = !assignedCardio ? templates.find((t) => t.id === assignedId) : undefined;
+          const hasActivity = Boolean(assignedCardio || assignedTemplate);
 
           return (
             <TouchableOpacity
               key={day.dayIndex}
               activeOpacity={0.7}
-              onPress={() => setSelectedDayIdx(day.dayIndex)}
+              onPress={() => {
+                setCustomCardioName('');
+                setSelectedDayIdx(day.dayIndex);
+              }}
               style={[
                 styles.dayChip,
                 {
@@ -106,7 +161,9 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
                 style={[
                   styles.dayDot,
                   {
-                    backgroundColor: assignedTemplate
+                    backgroundColor: assignedCardio
+                      ? '#F97316'
+                      : assignedTemplate
                       ? theme.accent
                       : theme.border,
                   },
@@ -115,11 +172,15 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
               <Text
                 style={[
                   styles.dayLabel,
-                  { color: assignedTemplate ? theme.text : theme.textMuted },
+                  { color: hasActivity ? theme.text : theme.textMuted },
                 ]}
                 numberOfLines={1}
               >
-                {assignedTemplate ? assignedTemplate.title.slice(0, 5) : 'Repos'}
+                {assignedCardio
+                  ? assignedCardio.slice(0, 5)
+                  : assignedTemplate
+                  ? assignedTemplate.title.slice(0, 5)
+                  : 'Repos'}
               </Text>
             </TouchableOpacity>
           );
@@ -133,78 +194,184 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
         visible={selectedDayIdx !== null}
         transparent
         animationType="slide"
-        onRequestClose={() => setSelectedDayIdx(null)}
+        onRequestClose={handleCloseModal}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setSelectedDayIdx(null)}
+          onPress={handleCloseModal}
         >
-          <View
-            style={[
-              styles.modalSheet,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-            onStartShouldSetResponder={() => true}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Programme du {selectedDayInfo?.full}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedDayIdx(null)}>
-                <X size={20} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 340 }}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => handleAssignTemplate(null)}
-                style={[
-                  styles.optionRow,
-                  { borderBottomColor: theme.border },
-                  selectedDayIdx !== null && !weeklySchedule?.[selectedDayIdx] && {
-                    backgroundColor: `${theme.accent}15`,
-                  },
-                ]}
-              >
-                <Coffee size={18} color={theme.textMuted} style={{ marginRight: 10 }} />
-                <Text style={[styles.optionText, { color: theme.text, flex: 1 }]}>
-                  Jour de repos
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View
+              style={[
+                styles.modalSheet,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  Programme du {selectedDayInfo?.full}
                 </Text>
-                {selectedDayIdx !== null && !weeklySchedule?.[selectedDayIdx] && (
-                  <Check size={18} color={theme.accent} />
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity onPress={handleCloseModal}>
+                  <X size={20} color={theme.text} />
+                </TouchableOpacity>
+              </View>
 
-              {templates.map((tpl) => {
-                const isSelected =
-                  selectedDayIdx !== null && weeklySchedule?.[selectedDayIdx] === tpl.id;
-                return (
+              <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleAssignTemplate(null)}
+                  style={[
+                    styles.optionRow,
+                    { borderBottomColor: theme.border },
+                    selectedDayIdx !== null && !selectedDayValue && {
+                      backgroundColor: `${theme.accent}15`,
+                    },
+                  ]}
+                >
+                  <Coffee size={18} color={theme.textMuted} style={{ marginRight: 10 }} />
+                  <Text style={[styles.optionText, { color: theme.text, flex: 1 }]}>
+                    Jour de repos
+                  </Text>
+                  {selectedDayIdx !== null && !selectedDayValue && (
+                    <Check size={18} color={theme.accent} />
+                  )}
+                </TouchableOpacity>
+
+                {templates.length > 0 && (
+                  <>
+                    <Text style={[styles.modalSectionLabel, { color: theme.textMuted }]}>
+                      MUSCULATION
+                    </Text>
+                    {templates.map((tpl) => {
+                      const isSelected =
+                        selectedDayIdx !== null && selectedDayValue === tpl.id;
+                      return (
+                        <TouchableOpacity
+                          key={tpl.id}
+                          activeOpacity={0.7}
+                          onPress={() => handleAssignTemplate(tpl.id)}
+                          style={[
+                            styles.optionRow,
+                            { borderBottomColor: theme.border },
+                            isSelected && { backgroundColor: `${theme.accent}15` },
+                          ]}
+                        >
+                          <Dumbbell
+                            size={16}
+                            color={isSelected ? theme.accent : theme.textMuted}
+                            style={{ marginRight: 10 }}
+                          />
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: isSelected ? theme.accent : theme.text, flex: 1 },
+                            ]}
+                          >
+                            {tpl.title}
+                          </Text>
+                          {isSelected && <Check size={18} color={theme.accent} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                )}
+
+                <Text style={[styles.modalSectionLabel, { color: '#F97316' }]}>
+                  CARDIO
+                </Text>
+
+                {CARDIO_SCHEDULE_PRESETS.map((preset) => {
+                  const valueKey = `${CARDIO_SCHEDULE_PREFIX}${preset}`;
+                  const isSelected =
+                    selectedDayIdx !== null &&
+                    selectedDayValue?.toLowerCase() === valueKey.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={preset}
+                      activeOpacity={0.7}
+                      onPress={() => handleAssignTemplate(valueKey)}
+                      style={[
+                        styles.optionRow,
+                        { borderBottomColor: theme.border },
+                        isSelected && { backgroundColor: '#F9731618' },
+                      ]}
+                    >
+                      <Flame size={16} color="#F97316" style={{ marginRight: 10 }} />
+                      <Text
+                        style={[
+                          styles.optionText,
+                          { color: isSelected ? '#F97316' : theme.text, flex: 1 },
+                        ]}
+                      >
+                        {preset}
+                      </Text>
+                      {isSelected && <Check size={18} color="#F97316" />}
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {selectedCustomCardio && (
                   <TouchableOpacity
-                    key={tpl.id}
                     activeOpacity={0.7}
-                    onPress={() => handleAssignTemplate(tpl.id)}
+                    onPress={() => handleAssignTemplate(`${CARDIO_SCHEDULE_PREFIX}${selectedCustomCardio}`)}
                     style={[
                       styles.optionRow,
-                      { borderBottomColor: theme.border },
-                      isSelected && { backgroundColor: `${theme.accent}15` },
+                      { borderBottomColor: theme.border, backgroundColor: '#F9731618' },
+                    ]}
+                  >
+                    <Flame size={16} color="#F97316" style={{ marginRight: 10 }} />
+                    <Text style={[styles.optionText, { color: '#F97316', flex: 1 }]}>
+                      {selectedCustomCardio}
+                    </Text>
+                    <Check size={18} color="#F97316" />
+                  </TouchableOpacity>
+                )}
+
+                <View style={styles.customCardioRow}>
+                  <TextInput
+                    style={[
+                      styles.customCardioInput,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                    ]}
+                    placeholder="Autre activité cardio (ex: HIIT, Rameur)..."
+                    placeholderTextColor={theme.textMuted}
+                    value={customCardioName}
+                    onChangeText={setCustomCardioName}
+                    onSubmitEditing={handleAssignCustomCardio}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={!customCardioName.trim()}
+                    onPress={handleAssignCustomCardio}
+                    style={[
+                      styles.customCardioBtn,
+                      {
+                        backgroundColor: customCardioName.trim() ? '#F97316' : theme.surface,
+                        borderColor: customCardioName.trim() ? '#F97316' : theme.border,
+                      },
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.optionText,
-                        { color: isSelected ? theme.accent : theme.text, flex: 1 },
-                      ]}
+                      style={{
+                        color: customCardioName.trim() ? '#FFFFFF' : theme.textMuted,
+                        fontSize: 13,
+                        fontWeight: '800',
+                      }}
                     >
-                      {tpl.title}
+                      OK
                     </Text>
-                    {isSelected && <Check size={18} color={theme.accent} />}
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </Card>
@@ -298,5 +465,38 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalSectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    marginTop: 14,
+    marginBottom: 4,
+    marginLeft: 8,
+  },
+  customCardioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  customCardioInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  customCardioBtn: {
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

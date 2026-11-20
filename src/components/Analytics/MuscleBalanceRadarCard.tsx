@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Polygon, Line, Circle } from 'react-native-svg';
-import { Compass, X } from 'lucide-react-native';
+import { Compass, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { Card } from '../UI/Card';
 import { useTheme } from '../../context/ThemeContext';
 import { MuscleVolumeBreakdown } from '../../services/analyticsService';
+import { StorageService } from '../../services/storage';
 import { triggerHapticLight } from '../../utils/haptics';
 
 interface MuscleBalanceRadarCardProps {
@@ -46,6 +47,22 @@ const AXIS_BUTTON_POSITIONS = [
 export const MuscleBalanceRadarCard: React.FC<MuscleBalanceRadarCardProps> = ({ volumeData }) => {
   const { theme } = useTheme();
   const [selectedTarget, setSelectedTarget] = useState<SelectedRadarTarget>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    StorageService.loadCollapsedCards().then((saved) => {
+      if (saved && typeof saved['muscle_balance_radar'] === 'boolean') {
+        setIsCollapsed(saved['muscle_balance_radar']);
+      }
+    });
+  }, []);
+
+  const toggleCollapsed = async () => {
+    const nextVal = !isCollapsed;
+    setIsCollapsed(nextVal);
+    const saved = await StorageService.loadCollapsedCards();
+    await StorageService.saveCollapsedCards({ ...saved, muscle_balance_radar: nextVal });
+  };
 
   const {
     axisValues,
@@ -144,15 +161,29 @@ export const MuscleBalanceRadarCard: React.FC<MuscleBalanceRadarCardProps> = ({ 
 
   return (
     <Card>
-      <View style={styles.header}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={toggleCollapsed}
+        style={[styles.header, isCollapsed && { marginBottom: 0 }]}
+      >
         <View style={styles.headerLeft}>
           <Compass size={18} color={theme.accent} />
-          <Text style={[styles.title, { color: theme.text }]}>Équilibre Musculaire (Radar)</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Équilibre Musculaire</Text>
         </View>
-        <Text style={[styles.hintText, { color: theme.textMuted }]}>Toucher pour détailler</Text>
-      </View>
+        {isCollapsed ? (
+          <ChevronDown size={18} color={theme.textMuted} />
+        ) : (
+          <ChevronUp size={18} color={theme.textMuted} />
+        )}
+      </TouchableOpacity>
 
-      <View style={styles.radarWrapper}>
+      {isCollapsed ? (
+        <Text style={[styles.collapsedSummary, { color: theme.textMuted }]} numberOfLines={1}>
+          Poussée/Tirage : {pushPullRatio !== null ? `${pushPullRatio} : 1` : '—'} · Quad/Post. : {quadHamRatio !== null ? `${quadHamRatio} : 1` : '—'}
+        </Text>
+      ) : (
+        <>
+          <View style={styles.radarWrapper}>
         <View style={styles.radarStage}>
           <View style={styles.svgCenterBox}>
             <Svg width={SVG_SIZE} height={SVG_SIZE}>
@@ -428,6 +459,8 @@ export const MuscleBalanceRadarCard: React.FC<MuscleBalanceRadarCardProps> = ({ 
           </Text>
         </TouchableOpacity>
       </View>
+        </>
+      )}
     </Card>
   );
 };
@@ -448,9 +481,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  hintText: {
-    fontSize: 10,
-    fontWeight: '600',
+  collapsedSummary: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 6,
   },
   radarWrapper: {
     alignItems: 'center',
