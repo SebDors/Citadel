@@ -4,7 +4,11 @@ import { useWorkout } from '../../context/WorkoutContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Plus, Minus, X } from 'lucide-react-native';
 
-export const RestTimerBar: React.FC = () => {
+interface RestTimerBarProps {
+  bottomOffset?: number;
+}
+
+export const RestTimerBar: React.FC<RestTimerBarProps> = ({ bottomOffset = 12 }) => {
   const { restTimer, dismissRestTimer, adjustRestTimer } = useWorkout();
   const { theme } = useTheme();
 
@@ -55,7 +59,7 @@ export const RestTimerBar: React.FC = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: barColor }]}>
+    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: barColor, bottom: bottomOffset }]}>
       <View style={styles.left}>
         <View style={{ flex: 1, marginRight: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>

@@ -17,7 +17,7 @@ import { useWorkout } from "../../src/context/WorkoutContext";
 import { useTheme } from "../../src/context/ThemeContext";
 import { Button } from "../../src/components/UI/Button";
 import { Card } from "../../src/components/UI/Card";
-import { RestTimerBar } from "../../src/components/Workout/RestTimerBar";
+
 import { useRouter } from "expo-router";
 import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import {
@@ -132,6 +132,7 @@ export default function WorkoutTab() {
     skipOnboarding,
     updateWeeklySchedule,
     allExercises,
+    restTimer,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -514,7 +515,12 @@ export default function WorkoutTab() {
         edges={["top", "left", "right"]}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            restTimer.active && { paddingBottom: 100 },
+          ]}
+        >
           {/* Header Title */}
           <View style={styles.pageHeader}>
             <Text style={[styles.appTitle, { color: theme.text }]}>
@@ -959,8 +965,8 @@ export default function WorkoutTab() {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Floating Rest Timer Bar */}
-        <RestTimerBar />
+
+        {/* Barre du minuteur déplacée dans app/(tabs)/_layout.tsx */}
 
         {/* Modale Bibliothèque d'Exercices */}
         <ExerciseLibraryModal

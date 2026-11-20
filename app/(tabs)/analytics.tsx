@@ -12,7 +12,7 @@ import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
 import { SlidersHorizontal, ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
 
 export default function AnalyticsTab() {
-  const { data } = useWorkout();
+  const { data, restTimer } = useWorkout();
   const { theme } = useTheme();
   const [excludeExceptions, setExcludeExceptions] = useState(false);
   const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0);
@@ -52,7 +52,12 @@ export default function AnalyticsTab() {
         edges={['top', 'left', 'right']}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            restTimer.active && { paddingBottom: 110 },
+          ]}
+        >
           {/* En-tête de page moderne */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.text }]}>

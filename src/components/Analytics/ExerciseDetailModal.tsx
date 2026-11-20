@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, PanResponder } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Trophy, Activity, Calendar, Dumbbell, AlertTriangle, TrendingUp } from 'lucide-react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
@@ -61,8 +61,9 @@ export default function ExerciseDetailModal({
   history,
 }: ExerciseDetailModalProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const oneRmFormula = useUserPreferencesStore((s) => s.oneRmFormula);
-  const [chartMetric, setChartMetric] = useState<'e1rm' | 'maxWeight'>('e1rm');
+  const [chartMetric, setChartMetric] = useState<'e1rm' | 'maxWeight'>('maxWeight');
   const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(290);
 
@@ -262,11 +263,21 @@ export default function ExerciseDetailModal({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      statusBarTranslucent
+      navigationBarTranslucent
+      transparent={Platform.OS === 'android'}
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <SafeAreaView style={{ flex: 1 }}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            paddingTop: Platform.OS === 'android' ? insets.top : 0,
+          },
+        ]}
+      >
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
@@ -285,7 +296,13 @@ export default function ExerciseDetailModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(40, insets.bottom + 24) },
+            ]}
+          >
             
             {/* PRs Section */}
             <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
@@ -334,19 +351,6 @@ export default function ExerciseDetailModal({
                   </View>
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     <TouchableOpacity
-                      onPress={() => { setChartMetric('e1rm'); setSelectedPointIdx(null); }}
-                      style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                        backgroundColor: chartMetric === 'e1rm' ? theme.accent : theme.surface,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: chartMetric === 'e1rm' ? '#FFFFFF' : theme.textMuted }}>
-                        1RM Est.
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
                       onPress={() => { setChartMetric('maxWeight'); setSelectedPointIdx(null); }}
                       style={{
                         paddingHorizontal: 8,
@@ -359,11 +363,24 @@ export default function ExerciseDetailModal({
                         Charge Max
                       </Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => { setChartMetric('e1rm'); setSelectedPointIdx(null); }}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 8,
+                        backgroundColor: chartMetric === 'e1rm' ? theme.accent : theme.surface,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: chartMetric === 'e1rm' ? '#FFFFFF' : theme.textMuted }}>
+                        1RM Est.
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
 
                 <View style={{ paddingHorizontal: 12, paddingBottom: 14 }}>
-                  {selectedPointIdx !== null && chartPoints[selectedPointIdx] ? (
+                  {selectedPointIdx !== null && chartPoints[selectedPointIdx] && (
                     <View
                       style={{
                         backgroundColor: theme.surface,
@@ -396,12 +413,6 @@ export default function ExerciseDetailModal({
                           {formatWeight(chartPoints[selectedPointIdx].value)} kg
                         </Text>
                       </View>
-                    </View>
-                  ) : (
-                    <View style={{ paddingVertical: 4, marginBottom: 4, alignItems: 'center' }}>
-                      <Text style={{ color: theme.textMuted, fontSize: 11, fontStyle: 'italic' }}>
-                        Touchez ou glissez sur la courbe pour voir le détail d'une séance
-                      </Text>
                     </View>
                   )}
 
@@ -570,7 +581,6 @@ export default function ExerciseDetailModal({
               )}
             </View>
           </ScrollView>
-        </SafeAreaView>
       </View>
     </Modal>
   );

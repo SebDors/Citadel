@@ -29,7 +29,7 @@ type CombinedHistoryItem =
   | { type: 'cardio'; id: string; date: Date; session: CardioSession };
 
 export default function HistoryTab() {
-  const { data, deleteWorkoutSession, deleteCardioSession } = useWorkout();
+  const { data, deleteWorkoutSession, deleteCardioSession, restTimer } = useWorkout();
   const { theme } = useTheme();
   const [logModalVisible, setLogModalVisible] = React.useState(false);
   const [cardioModalVisible, setCardioModalVisible] = React.useState(false);
@@ -378,7 +378,10 @@ export default function HistoryTab() {
               </Text>
             ) : null
           }
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            restTimer.active && { paddingBottom: 100 },
+          ]}
           initialNumToRender={15}
           maxToRenderPerBatch={10}
           windowSize={7}
