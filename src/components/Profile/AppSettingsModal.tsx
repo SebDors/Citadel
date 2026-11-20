@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserProfile } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
+import { OneRMFormula } from '../../types';
+import { ONE_RM_FORMULAS_CONFIG } from '../../services/analyticsService';
 import {
   Settings,
   X,
@@ -54,7 +56,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   onUpdateProfile,
 }) => {
   const { theme } = useTheme();
-  const { resetAllData, resetOnboarding } = useWorkout();
+  const { data, updateUserProfile, resetAllData, resetOnboarding } = useWorkout();
 
   const [availablePlates, setAvailablePlates] = useState<number[]>(
     profile.availablePlates || DEFAULT_PLATES,
@@ -448,6 +450,78 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
               </View>
               <ChevronRight size={18} color={theme.textMuted} />
             </TouchableOpacity>
+          </View>
+
+          {/* SECTION 2B : FORMULE DE CALCUL 1RM (AJ-08) */}
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+            CALCUL DU 1RM ESTIMÉ
+          </Text>
+
+          <View
+            style={[
+              styles.cardSection,
+              { backgroundColor: theme.cardBg, borderColor: theme.border, padding: 12 },
+            ]}
+          >
+            {(Object.keys(ONE_RM_FORMULAS_CONFIG) as OneRMFormula[]).map((fKey) => {
+              const cfg = ONE_RM_FORMULAS_CONFIG[fKey];
+              const currentFormula = data?.profile?.oneRmFormula || 'epley';
+              const isSelected = currentFormula === fKey;
+              return (
+                <TouchableOpacity
+                  key={fKey}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (data?.profile) {
+                      updateUserProfile({ oneRmFormula: fKey });
+                    }
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 10,
+                    paddingHorizontal: 10,
+                    borderRadius: 10,
+                    marginBottom: 4,
+                    backgroundColor: isSelected ? `${theme.accent}18` : 'transparent',
+                    borderWidth: 1,
+                    borderColor: isSelected ? theme.accent : 'transparent',
+                  }}
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={{ color: isSelected ? theme.accent : theme.text, fontWeight: '800', fontSize: 14 }}>
+                      {cfg.label}
+                    </Text>
+                    <Text style={{ color: theme.textMuted, fontSize: 11, marginTop: 2 }}>
+                      {cfg.subtitle}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      borderWidth: 2,
+                      borderColor: isSelected ? theme.accent : theme.border,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {isSelected && (
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: theme.accent,
+                        }}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* SECTION 3 : APPLICATION & MISES À JOUR */}

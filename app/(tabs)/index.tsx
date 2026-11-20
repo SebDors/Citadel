@@ -17,7 +17,7 @@ import { useWorkout } from "../../src/context/WorkoutContext";
 import { useTheme } from "../../src/context/ThemeContext";
 import { Button } from "../../src/components/UI/Button";
 import { Card } from "../../src/components/UI/Card";
-import { RestTimerBar } from "../../src/components/Workout/RestTimerBar";
+
 import { useRouter } from "expo-router";
 import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import {
@@ -45,6 +45,7 @@ import {
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
+import { WeeklySplitSchedulerCard } from "../../src/components/Home/WeeklySplitSchedulerCard";
 import { UpdateModal } from "../../src/components/Profile/UpdateModal";
 import { UpdateService, UpdateInfo } from "../../src/services/updateService";
 import {
@@ -129,7 +130,9 @@ export default function WorkoutTab() {
     markFirstSessionCreated,
     completeOnboarding,
     skipOnboarding,
+    updateWeeklySchedule,
     allExercises,
+    restTimer,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -512,7 +515,12 @@ export default function WorkoutTab() {
         edges={["top", "left", "right"]}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            restTimer.active && { paddingBottom: 100 },
+          ]}
+        >
           {/* Header Title */}
           <View style={styles.pageHeader}>
             <Text style={[styles.appTitle, { color: theme.text }]}>
@@ -730,6 +738,16 @@ export default function WorkoutTab() {
           </View>
 
           {/* Section Header with "Importer" & "Nouveau dossier" buttons */}
+          {/* Planificateur hebdomadaire (AJ-03) */}
+          {data?.hasCompletedOnboarding && (
+            <WeeklySplitSchedulerCard
+              templates={data?.templates || []}
+              weeklySchedule={data?.weeklySchedule || {}}
+              onUpdateSchedule={updateWeeklySchedule}
+              onStartTemplate={(tpl) => handleStartTemplate(tpl.id)}
+            />
+          )}
+
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
               MES DOSSIERS & SÉANCES
@@ -947,8 +965,8 @@ export default function WorkoutTab() {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Floating Rest Timer Bar */}
-        <RestTimerBar />
+
+        {/* Barre du minuteur déplacée dans app/(tabs)/_layout.tsx */}
 
         {/* Modale Bibliothèque d'Exercices */}
         <ExerciseLibraryModal
@@ -1431,9 +1449,7 @@ export default function WorkoutTab() {
         <OnboardingModal
           visible={!loading && !!data && !data.hasCompletedOnboarding}
           onComplete={completeOnboarding}
-          onSkip={async () => {
-            await completeOnboarding({ name: 'Athlète' });
-          }}
+          onSkip={skipOnboarding}
         />
 
         {/* ---------------- MODALE DE MISE À JOUR DISPONIBLE ---------------- */}

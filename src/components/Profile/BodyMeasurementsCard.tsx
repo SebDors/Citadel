@@ -11,8 +11,9 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { BodyMeasurement } from '../../types';
+import { BodyMeasurement, MeasurementMetricKey } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 import { parseFloatFrench } from '../../utils/numberUtils';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
@@ -59,6 +60,9 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
   onDeleteMeasurement,
 }) => {
   const { theme } = useTheme();
+  const { data } = useWorkout();
+  const hiddenMetrics = data?.profile?.hiddenMeasurementMetrics ?? [];
+  const isMetricVisible = (metricKey: MeasurementMetricKey) => !hiddenMetrics.includes(metricKey);
 
   // Collapsible state with persistence
   const [isCardCollapsed, setIsCardCollapsed] = useState(false);
@@ -98,6 +102,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
   // Measurement Inputs state
   const [weight, setWeight] = useState('');
+  const [bodyFat, setBodyFat] = useState('');
   const [chest, setChest] = useState('');
   const [waist, setWaist] = useState('');
   const [thigh, setThigh] = useState('');
@@ -112,6 +117,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     if (existing) {
       setEditingMeasurementId(existing.id);
       setWeight(existing.weightKg ? String(existing.weightKg) : '');
+      setBodyFat(existing.bodyFatPercentage !== undefined ? String(existing.bodyFatPercentage) : '');
       setChest(existing.chestCm !== undefined ? String(existing.chestCm) : '');
       setWaist(existing.waistCm !== undefined ? String(existing.waistCm) : '');
       setThigh(existing.thighCm !== undefined ? String(existing.thighCm) : '');
@@ -119,6 +125,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     } else {
       setEditingMeasurementId(null);
       setWeight('');
+      setBodyFat('');
       setChest('');
       setWaist('');
       setThigh('');
@@ -148,6 +155,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
     }
     setIsCalendarOpen(false);
     setWeight(m.weightKg ? String(m.weightKg) : '');
+    setBodyFat(m.bodyFatPercentage !== undefined ? String(m.bodyFatPercentage) : '');
     setChest(m.chestCm !== undefined ? String(m.chestCm) : '');
     setWaist(m.waistCm !== undefined ? String(m.waistCm) : '');
     setThigh(m.thighCm !== undefined ? String(m.thighCm) : '');
@@ -181,6 +189,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
   const handleSave = () => {
     const w = parseFloatFrench(weight);
+    const bf = parseFloatFrench(bodyFat);
     const c = parseFloatFrench(chest);
     const wa = parseFloatFrench(waist);
     const t = parseFloatFrench(thigh);
@@ -188,6 +197,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
     const hasAnyValue =
       (w !== undefined && w > 0) ||
+      (bf !== undefined && bf > 0) ||
       (c !== undefined && c > 0) ||
       (wa !== undefined && wa > 0) ||
       (t !== undefined && t > 0) ||
@@ -205,6 +215,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       id: editingMeasurementId || `m_${Date.now()}`,
       date: selectedDateStr,
       weightKg: w !== undefined && w > 0 ? w : undefined,
+      bodyFatPercentage: bf !== undefined && bf > 0 ? bf : undefined,
       chestCm: c !== undefined && c > 0 ? c : undefined,
       waistCm: wa !== undefined && wa > 0 ? wa : undefined,
       thighCm: t !== undefined && t > 0 ? t : undefined,
@@ -330,10 +341,11 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
         ) : (
         sortedMeasurements.map((m) => {
           const secondaryParts: string[] = [];
-          if (m.chestCm !== undefined) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
-          if (m.waistCm !== undefined) secondaryParts.push(`T ${formatFixedMeasurement(m.waistCm)}`);
-          if (m.thighCm !== undefined) secondaryParts.push(`C ${formatFixedMeasurement(m.thighCm)}`);
-          if (m.bicepsCm !== undefined) secondaryParts.push(`B ${formatFixedMeasurement(m.bicepsCm)}`);
+          if (m.bodyFatPercentage !== undefined && isMetricVisible('bodyFat')) secondaryParts.push(`MG ${formatFixedMeasurement(m.bodyFatPercentage)}%`);
+          if (m.chestCm !== undefined && isMetricVisible('chest')) secondaryParts.push(`P ${formatFixedMeasurement(m.chestCm)}`);
+          if (m.waistCm !== undefined && isMetricVisible('waist')) secondaryParts.push(`T ${formatFixedMeasurement(m.waistCm)}`);
+          if (m.thighCm !== undefined && isMetricVisible('thigh')) secondaryParts.push(`C ${formatFixedMeasurement(m.thighCm)}`);
+          if (m.bicepsCm !== undefined && isMetricVisible('biceps')) secondaryParts.push(`B ${formatFixedMeasurement(m.bicepsCm)}`);
           const secondarySummary = secondaryParts.join(' · ');
 
           return (
@@ -349,7 +361,7 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
                   {formatDateToListDisplay(m.date)}
                 </Text>
 
-                {m.weightKg !== undefined && (
+                {m.weightKg !== undefined && isMetricVisible('weight') && (
                   <Text style={[styles.mWeight, { color: theme.text }]}>
                     {formatFixedWeight(m.weightKg)}
                     <Text style={[styles.mUnit, { color: theme.textMuted }]}> kg</Text>
@@ -397,6 +409,8 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
       <Modal
         visible={modalVisible}
         transparent
+        statusBarTranslucent
+        navigationBarTranslucent
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
@@ -549,54 +563,37 @@ export const BodyMeasurementsCard: React.FC<BodyMeasurementsCardProps> = ({
 
                 {/* Champs de Saisie de Poids & Mensurations */}
                 <View style={styles.inputsSection}>
-                  <View style={styles.inputRow}>
-                    <TextInput
-                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Poids (kg)"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="numeric"
-                      value={weight}
-                      onChangeText={setWeight}
-                    />
-                    <TextInput
-                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Tour de taille (cm)"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="numeric"
-                      value={waist}
-                      onChangeText={setWaist}
-                    />
-                  </View>
+                  {(() => {
+                    const inputFields = [
+                      { key: 'weight' as MeasurementMetricKey, placeholder: 'Poids (kg)', value: weight, onChangeText: setWeight },
+                      { key: 'waist' as MeasurementMetricKey, placeholder: 'Tour de taille (cm)', value: waist, onChangeText: setWaist },
+                      { key: 'chest' as MeasurementMetricKey, placeholder: 'Poitrine (cm)', value: chest, onChangeText: setChest },
+                      { key: 'biceps' as MeasurementMetricKey, placeholder: 'Bras (cm)', value: biceps, onChangeText: setBiceps },
+                      { key: 'thigh' as MeasurementMetricKey, placeholder: 'Cuisse (cm)', value: thigh, onChangeText: setThigh },
+                      { key: 'bodyFat' as MeasurementMetricKey, placeholder: 'Masse grasse (%)', value: bodyFat, onChangeText: setBodyFat },
+                    ].filter((f) => isMetricVisible(f.key));
 
-                  <View style={styles.inputRow}>
-                    <TextInput
-                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Poitrine (cm)"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="numeric"
-                      value={chest}
-                      onChangeText={setChest}
-                    />
-                    <TextInput
-                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Bras (cm)"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="numeric"
-                      value={biceps}
-                      onChangeText={setBiceps}
-                    />
-                  </View>
+                    const rows: Array<typeof inputFields> = [];
+                    for (let i = 0; i < inputFields.length; i += 2) {
+                      rows.push(inputFields.slice(i, i + 2));
+                    }
 
-                  <View style={styles.inputRow}>
-                    <TextInput
-                      style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                      placeholder="Cuisse (cm)"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="numeric"
-                      value={thigh}
-                      onChangeText={setThigh}
-                    />
-                  </View>
+                    return rows.map((row, rowIdx) => (
+                      <View key={rowIdx} style={styles.inputRow}>
+                        {row.map((field) => (
+                          <TextInput
+                            key={field.key}
+                            style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                            placeholder={field.placeholder}
+                            placeholderTextColor={theme.textMuted}
+                            keyboardType="numeric"
+                            value={field.value}
+                            onChangeText={field.onChangeText}
+                          />
+                        ))}
+                      </View>
+                    ));
+                  })()}
                 </View>
 
                 {/* Boutons d'Action Modale */}

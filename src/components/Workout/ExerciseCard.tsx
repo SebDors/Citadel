@@ -7,10 +7,13 @@ import { Card } from '../UI/Card';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { SetTableRow } from './SetTableRow';
-import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw } from 'lucide-react-native';
+import { MoreVertical, Plus, Clock, Dumbbell, Copy, Trash2, Layers, Check, RotateCcw, FileText, RefreshCw, Flame, X } from 'lucide-react-native';
 import { TermInfoTooltip } from '../UI/TermInfoTooltip';
 import { WorkoutNoteModal } from './WorkoutNoteModal';
 import { hasExercisePainAlert } from '../../utils/sessionNoteUtils';
+import { generateWarmupSets } from '../../utils/warmupCalculator';
+import { parseFloatFrench, formatWeight } from '../../utils/numberUtils';
+import { triggerHapticLight, triggerHapticSuccess } from '../../utils/haptics';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -18,6 +21,7 @@ interface ExerciseCardProps {
   onUpdateSet: (setId: string, field: keyof WorkoutSet, value: any) => void;
   onToggleSetComplete: (setId: string) => void;
   onAddSet: () => void;
+  onGenerateWarmup?: (warmups: Array<{ weightKg: number; reps: number }>) => void;
   onRemoveSet: (setId: string) => void;
   onDuplicateExercise: () => void;
   onRemoveExercise: () => void;
@@ -35,6 +39,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   onUpdateSet,
   onToggleSetComplete,
   onAddSet,
+  onGenerateWarmup,
   onRemoveSet,
   onDuplicateExercise,
   onRemoveExercise,
@@ -52,7 +57,28 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
   const [showRestModal, setShowRestModal] = useState(false);
   const [showSupersetModal, setShowSupersetModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [tempRestSeconds, setTempRestSeconds] = useState(String(exercise.restSeconds || 75));
+  const [showWarmupModal, setShowWarmupModal] = useState(false);
+  const [warmupTargetWeight, setWarmupTargetWeight] = useState('60');
+
+  const warmupSuggestions = useMemo(() => {
+    const parsed = parseFloatFrench(warmupTargetWeight);
+    if (!parsed || parsed <= 0) return [];
+    return generateWarmupSets(parsed);
+  }, [warmupTargetWeight]);
+
+  const handleOpenWarmupModal = () => {
+    const firstWorkingSet = exercise.sets.find((st) => st.type !== 'warmup') || exercise.sets[0];
+    let defaultWeight = '';
+    if (firstWorkingSet?.weightKg && firstWorkingSet.weightKg > 0) {
+      defaultWeight = String(firstWorkingSet.weightKg);
+    } else if (firstWorkingSet?.previous) {
+      const m = firstWorkingSet.previous.match(/([0-9]+(?:[.,][0-9]+)?)\s*kg/i);
+      if (m) defaultWeight = m[1].replace(',', '.');
+    }
+    setWarmupTargetWeight(defaultWeight || '60');
+    setShowWarmupModal(true);
+  };
+
 
   const hasPain = useMemo(() => hasExercisePainAlert(exercise), [exercise]);
   const sessionNotesCount = exercise.sessionNotes?.length || 0;
@@ -73,13 +99,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
     return list.filter((m) => !primaryMusclesList.includes(m));
   }, [exercise.targetMuscles, primaryMusclesList]);
 
-  const handleSaveRestTime = () => {
-    const val = parseInt(tempRestSeconds, 10);
-    if (!isNaN(val) && val >= 0) {
-      onUpdateRestTime(val);
-    }
-    setShowRestModal(false);
-  };
+
 
   return (
     <Card
@@ -324,7 +344,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       </TouchableOpacity>
 
       {/* Modal Édition Temps de Repos (Steppers +/- 15s et Reset à gauche) */}
-      <Modal visible={showRestModal} transparent animationType="fade" onRequestClose={() => setShowRestModal(false)}>
+      <Modal visible={showRestModal} transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => setShowRestModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRestModal(false)}>
           <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, alignItems: 'center' }]}>
             <Text style={[styles.menuTitle, { color: theme.text }]}>Temps de repos exercice</Text>
@@ -370,10 +390,25 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       </Modal>
 
       {/* Options Menu Modal */}
-      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+      <Modal visible={showMenu} transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <Text style={[styles.menuTitle, { color: theme.text }]}>{exercise.exerciseName}</Text>
+
+            {onGenerateWarmup && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  handleOpenWarmupModal();
+                }}
+              >
+                <Flame size={16} color="#F59E0B" />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>
+                  Générer l'échauffement
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.menuItem}
@@ -442,7 +477,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
       </Modal>
 
       {/* Modal Superset Group Selector */}
-      <Modal visible={showSupersetModal} transparent animationType="fade" onRequestClose={() => setShowSupersetModal(false)}>
+      <Modal visible={showSupersetModal} transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => setShowSupersetModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSupersetModal(false)}>
           <View style={[styles.menuContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -475,6 +510,140 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({
               </TouchableOpacity>
             )}
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modal Générateur d'échauffement progressif (AJ-15) */}
+      <Modal
+        visible={showWarmupModal}
+        transparent
+        statusBarTranslucent
+        navigationBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowWarmupModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowWarmupModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.warmupCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          >
+            <View style={styles.warmupHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <Flame size={18} color="#F59E0B" style={{ marginRight: 8 }} />
+                <Text style={[styles.warmupTitle, { color: theme.text }]} numberOfLines={1}>
+                  Générateur d'échauffement
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowWarmupModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.warmupSubtitle, { color: theme.textMuted }]}>
+              Charge de travail cible (kg) pour {exercise.exerciseName}
+            </Text>
+
+            <View style={styles.warmupInputRow}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => {
+                  triggerHapticLight();
+                  const curr = parseFloatFrench(warmupTargetWeight) || 20;
+                  setWarmupTargetWeight(String(Math.max(5, Math.round((curr - 5) * 2) / 2)));
+                }}
+                style={[styles.warmupStepBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              >
+                <Text style={[styles.warmupStepText, { color: theme.text }]}>-5</Text>
+              </TouchableOpacity>
+
+              <TextInput
+                style={[styles.modalInput, styles.warmupInput, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border }]}
+                value={warmupTargetWeight}
+                onChangeText={setWarmupTargetWeight}
+                keyboardType="numeric"
+                placeholder="ex: 80"
+                placeholderTextColor={theme.textMuted}
+              />
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => {
+                  triggerHapticLight();
+                  const curr = parseFloatFrench(warmupTargetWeight) || 20;
+                  setWarmupTargetWeight(String(Math.round((curr + 5) * 2) / 2));
+                }}
+                style={[styles.warmupStepBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              >
+                <Text style={[styles.warmupStepText, { color: theme.accent }]}>+5</Text>
+              </TouchableOpacity>
+            </View>
+
+            {warmupSuggestions.length > 0 ? (
+              <View style={[styles.warmupPreviewList, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                {warmupSuggestions.map((item, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.warmupPreviewRow,
+                      idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                    ]}
+                  >
+                    <View style={styles.warmupBadge}>
+                      <Text style={styles.warmupBadgeText}>W{idx + 1}</Text>
+                    </View>
+                    <Text style={[styles.warmupPreviewLabel, { color: theme.textMuted }]}>
+                      {item.label}
+                    </Text>
+                    <Text style={[styles.warmupPreviewValue, { color: theme.text }]}>
+                      {formatWeight(item.weightKg)} kg × {item.reps}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.warmupEmptyText, { color: theme.textMuted }]}>
+                Entrez une charge cible supérieure à 2 kg pour calculer une gamme d'échauffement.
+              </Text>
+            )}
+
+            <View style={styles.warmupActions}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setShowWarmupModal(false)}
+                style={[styles.modalBtn, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}
+              >
+                <Text style={[styles.modalBtnText, { color: theme.text }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={warmupSuggestions.length === 0}
+                onPress={() => {
+                  if (onGenerateWarmup && warmupSuggestions.length > 0) {
+                    onGenerateWarmup(
+                      warmupSuggestions.map((s) => ({ weightKg: s.weightKg, reps: s.reps }))
+                    );
+                    triggerHapticSuccess();
+                    setShowWarmupModal(false);
+                  }
+                }}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: theme.accent,
+                    opacity: warmupSuggestions.length === 0 ? 0.4 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>
+                  Insérer ({warmupSuggestions.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -648,6 +817,91 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  warmupCard: {
+    width: '88%',
+    maxWidth: 400,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+  },
+  warmupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  warmupTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  warmupSubtitle: {
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  warmupInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  warmupStepBtn: {
+    width: 48,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  warmupStepText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  warmupInput: {
+    flex: 1,
+  },
+  warmupPreviewList: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  warmupPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+  },
+  warmupBadge: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 10,
+  },
+  warmupBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  warmupPreviewLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  warmupPreviewValue: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  warmupEmptyText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  warmupActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
   menuItem: {
     flexDirection: 'row',

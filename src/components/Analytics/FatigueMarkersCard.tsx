@@ -20,6 +20,7 @@ import {
 import {
   calculateWeeklyFatigueSnapshots,
   WeeklyFatigueSnapshot,
+  calculateACWR,
 } from '../../services/analyticsService';
 import { StorageService } from '../../services/storage';
 import { WorkoutSession, BodyMeasurement } from '../../types';
@@ -27,17 +28,22 @@ import { WorkoutSession, BodyMeasurement } from '../../types';
 interface FatigueMarkersCardProps {
   history?: WorkoutSession[];
   measurements?: BodyMeasurement[];
+  weekOffset?: number;
+  hideWeekSelector?: boolean;
 }
 
 export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
   history: propHistory,
   measurements: propMeasurements,
+  weekOffset: propWeekOffset,
+  hideWeekSelector = false,
 }) => {
   const { theme } = useTheme();
   const { data } = useWorkout();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [internalWeekOffset, setWeekOffset] = useState<number>(0);
+  const weekOffset = propWeekOffset !== undefined ? propWeekOffset : internalWeekOffset;
 
   useEffect(() => {
     StorageService.loadCollapsedCards().then((saved) => {
@@ -60,6 +66,8 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
   const snapshots: WeeklyFatigueSnapshot[] = useMemo(() => {
     return calculateWeeklyFatigueSnapshots(effectiveHistory, effectiveMeasurements);
   }, [effectiveHistory, effectiveMeasurements]);
+
+  const acwr = useMemo(() => calculateACWR(effectiveHistory), [effectiveHistory]);
 
   // Si aucun historique de séance, on n'affiche pas la carte
   if (effectiveHistory.length === 0 || snapshots.length === 0) {
@@ -95,7 +103,7 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
     statusBg = 'rgba(245, 158, 11, 0.14)';
     statusBorder = 'rgba(245, 158, 11, 0.35)';
     statusTitle = 'Signes de fatigue / Sous-récupération';
-    statusDesc = `Le RIR moyen (${currentSnapshot.avgRir}) dépasse de plus d'1 point votre référence sur 4 semaines (${currentSnapshot.avgRir4wRollingAvg}), associé à un poids stable ou baissier${
+    statusDesc = `Le RIR moyen (${currentSnapshot.avgRir}) a chuté de plus d'1 point sous votre référence sur 4 semaines (${currentSnapshot.avgRir4wRollingAvg}), signe d'un épuisement plus précoce avec un poids stable ou baissier${
       currentSnapshot.bodyweightKg !== null ? ` (${currentSnapshot.bodyweightKg} kg)` : ''
     }. Envisagez d'espacer les séances ou d'alléger le volume (deload).`;
   } else if (!hasSessions) {
@@ -150,46 +158,48 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
       </View>
 
       {/* Navigation semaine */}
-      <View style={[styles.weekNavRow, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setWeekOffset((prev) => Math.max(minOffset, prev - 1))}
-          disabled={safeOffset <= minOffset}
-          style={[
-            styles.weekNavBtn,
-            { backgroundColor: theme.surface, opacity: safeOffset <= minOffset ? 0.3 : 1 },
-          ]}
-        >
-          <ChevronLeft size={16} color={theme.text} />
-        </TouchableOpacity>
-
-        <View style={{ alignItems: 'center' }}>
-          <Text style={[styles.weekNavLabel, { color: theme.text }]}>
-            {currentSnapshot.weekLabel}
-          </Text>
-          {safeOffset !== 0 && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setWeekOffset(0)}
-              style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
-            >
-              <Text style={[styles.todayBtnText, { color: theme.accent }]}>Revenir à cette semaine</Text>
-            </TouchableOpacity>
-          )}
+      {!hideWeekSelector && (
+        <View style={[styles.weekNavRow, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setWeekOffset((prev) => Math.max(minOffset, prev - 1))}
+            disabled={safeOffset <= minOffset}
+            style={[
+              styles.weekNavBtn,
+              { backgroundColor: theme.surface, opacity: safeOffset <= minOffset ? 0.3 : 1 },
+            ]}
+          >
+            <ChevronLeft size={16} color={theme.text} />
+          </TouchableOpacity>
+  
+          <View style={{ alignItems: 'center' }}>
+            <Text style={[styles.weekNavLabel, { color: theme.text }]}>
+              {currentSnapshot.weekLabel}
+            </Text>
+            {safeOffset !== 0 && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setWeekOffset(0)}
+                style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
+              >
+                <Text style={[styles.todayBtnText, { color: theme.accent }]}>Revenir à cette semaine</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+  
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))}
+            disabled={safeOffset >= 0}
+            style={[
+              styles.weekNavBtn,
+              { backgroundColor: theme.surface, opacity: safeOffset >= 0 ? 0.3 : 1 },
+            ]}
+          >
+            <ChevronRight size={16} color={theme.text} />
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))}
-          disabled={safeOffset >= 0}
-          style={[
-            styles.weekNavBtn,
-            { backgroundColor: theme.surface, opacity: safeOffset >= 0 ? 0.3 : 1 },
-          ]}
-        >
-          <ChevronRight size={16} color={theme.text} />
-        </TouchableOpacity>
-      </View>
+      )}
 
       {/* Résumé compact quand replié */}
       {isCollapsed ? (
@@ -334,6 +344,52 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
               </View>
               <Text style={[styles.metricSubtitle, { color: theme.textMuted }]}>
                 {currentSnapshot.totalSessions > 1 ? 'Entraînements faits' : 'Entraînement fait'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Jauge ACWR Anti-Blessure (AJ-13) */}
+          <View style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: theme.surface, borderColor: theme.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text }}>Ratio ACWR (Aiguë / Chronique)</Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '900',
+                  color:
+                    acwr.status === 'danger'
+                      ? '#EF4444'
+                      : acwr.status === 'caution'
+                      ? '#F59E0B'
+                      : acwr.status === 'undertraining'
+                      ? '#3B82F6'
+                      : '#10B981',
+                }}
+              >
+                {acwr.ratio.toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden', marginBottom: 6 }}>
+              <View
+                style={{
+                  height: '100%',
+                  width: `${Math.min(100, Math.max(8, (acwr.ratio / 2.0) * 100))}%`,
+                  borderRadius: 4,
+                  backgroundColor:
+                    acwr.status === 'danger'
+                      ? '#EF4444'
+                      : acwr.status === 'caution'
+                      ? '#F59E0B'
+                      : acwr.status === 'undertraining'
+                      ? '#3B82F6'
+                      : '#10B981',
+                }}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>{acwr.label}</Text>
+              <Text style={{ fontSize: 10, color: theme.textMuted }}>
+                7j: {acwr.acuteLoadKg.toLocaleString('fr-FR')} kg · Moy 28j: {acwr.chronicWeeklyLoadKg.toLocaleString('fr-FR')} kg
               </Text>
             </View>
           </View>

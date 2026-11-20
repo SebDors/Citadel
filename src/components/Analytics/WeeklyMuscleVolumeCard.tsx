@@ -11,15 +11,20 @@ import { WorkoutSession } from '../../types';
 
 interface WeeklyMuscleVolumeCardProps {
   history?: WorkoutSession[];
+  weekOffset?: number;
+  hideWeekSelector?: boolean;
 }
 
 export const WeeklyMuscleVolumeCard: React.FC<WeeklyMuscleVolumeCardProps> = ({
   history: propHistory,
+  weekOffset: propWeekOffset,
+  hideWeekSelector = false,
 }) => {
   const { theme } = useTheme();
   const { data } = useWorkout();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [internalWeekOffset, setWeekOffset] = useState<number>(0);
+  const weekOffset = propWeekOffset !== undefined ? propWeekOffset : internalWeekOffset;
 
   React.useEffect(() => {
     StorageService.loadCollapsedCards().then((saved) => {
@@ -125,42 +130,44 @@ export const WeeklyMuscleVolumeCard: React.FC<WeeklyMuscleVolumeCardProps> = ({
       </View>
 
       {/* Barre de navigation entre les semaines avec bouton retour semaine actuelle */}
-      <View style={[styles.weekNavRow, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setWeekOffset((prev) => prev - 1)}
-          style={[styles.weekNavBtn, { backgroundColor: theme.surface }]}
-        >
-          <ChevronLeft size={16} color={theme.text} />
-        </TouchableOpacity>
+      {!hideWeekSelector && (
+        <View style={[styles.weekNavRow, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setWeekOffset((prev) => prev - 1)}
+            style={[styles.weekNavBtn, { backgroundColor: theme.surface }]}
+          >
+            <ChevronLeft size={16} color={theme.text} />
+          </TouchableOpacity>
 
-        <View style={{ alignItems: 'center' }}>
-          <Text style={[styles.weekNavLabel, { color: theme.text }]}>
-            {weekLabel}
-          </Text>
-          {weekOffset !== 0 && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setWeekOffset(0)}
-              style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
-            >
-              <Text style={[styles.todayBtnText, { color: theme.accent }]}>Revenir à cette semaine</Text>
-            </TouchableOpacity>
-          )}
+          <View style={{ alignItems: 'center' }}>
+            <Text style={[styles.weekNavLabel, { color: theme.text }]}>
+              {weekLabel}
+            </Text>
+            {weekOffset !== 0 && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setWeekOffset(0)}
+                style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
+              >
+                <Text style={[styles.todayBtnText, { color: theme.accent }]}>Revenir à cette semaine</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))}
+            disabled={weekOffset >= 0}
+            style={[
+              styles.weekNavBtn,
+              { backgroundColor: theme.surface, opacity: weekOffset >= 0 ? 0.3 : 1 },
+            ]}
+          >
+            <ChevronRight size={16} color={theme.text} />
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))}
-          disabled={weekOffset >= 0}
-          style={[
-            styles.weekNavBtn,
-            { backgroundColor: theme.surface, opacity: weekOffset >= 0 ? 0.3 : 1 },
-          ]}
-        >
-          <ChevronRight size={16} color={theme.text} />
-        </TouchableOpacity>
-      </View>
+      )}
 
       {/* Résumé compact quand la carte est réduite */}
       {isCollapsed ? (

@@ -79,6 +79,9 @@ import {
   MoreVertical,
 } from "lucide-react-native";
 import { ReorderBlocksModal } from "../src/components/Workout/ReorderBlocksModal";
+import { WorkoutAbandonModal } from "../src/components/Workout/WorkoutAbandonModal";
+import { WorkoutFinishModal } from "../src/components/Workout/WorkoutFinishModal";
+import { triggerHapticLight, triggerHapticMedium, triggerHapticSuccess, triggerHapticTimerAlarm } from "../src/utils/haptics";
 import { WorkoutToolsModal } from "../src/components/Workout/WorkoutToolsModal";
 import { WorkoutNoteModal } from "../src/components/Workout/WorkoutNoteModal";
 import { TermInfoTooltip } from "../src/components/UI/TermInfoTooltip";
@@ -241,6 +244,7 @@ interface CircuitState {
   expandedMap: Record<string, boolean>;
   customValues: Record<string, number>;
   amrapSecondsLeft?: number;
+  amrapEndTime?: number;
   completedRoundsCount?: number;
 }
 
@@ -252,6 +256,7 @@ export default function LiveWorkoutScreen() {
     updateSet,
     toggleSetComplete,
     addSet,
+    prependWarmupSets,
     removeSet,
     addExerciseToActiveWorkout,
     addBatchExercisesToActiveWorkout,
@@ -320,7 +325,7 @@ export default function LiveWorkoutScreen() {
   
   const { reorderActiveSessionBlocks } = useWorkout();
 
-  const isInitialMount = useRef(true);
+
 
   // Local state per CircuitBlock ID
   const [circuitStates, setCircuitStates] = useState<
@@ -337,15 +342,7 @@ export default function LiveWorkoutScreen() {
     }
   }, [activeSession?.id]);
 
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (circuitStates && Object.keys(circuitStates).length > 0) {
-      updateActiveSessionCircuitStates(circuitStates);
-    }
-  }, [circuitStates]);
+
 
   // Extract blocks sequentially (mixed single exercises & circuits)
   const blocks = useMemo(() => {
@@ -593,8 +590,17 @@ export default function LiveWorkoutScreen() {
   // Helper to get state of a specific CircuitBlock
   const getCircuitState = (block: CircuitBlock): CircuitState => {
     const existing = circuitStates[block.id];
-    if (existing) return existing;
+    if (existing) {
+      if (existing.started && existing.amrapEndTime && block.circuitType === "amrap") {
+        return {
+          ...existing,
+          amrapSecondsLeft: Math.max(0, Math.ceil((existing.amrapEndTime - Date.now()) / 1000)),
+        };
+      }
+      return existing;
+    }
 
+    const durationSec = (block.amrapDurationMinutes || 12) * 60;
     return {
       started: false,
       currentRound: 0,
@@ -602,7 +608,7 @@ export default function LiveWorkoutScreen() {
       roundStatusMap: {},
       expandedMap: {},
       customValues: {},
-      amrapSecondsLeft: (block.amrapDurationMinutes || 12) * 60,
+      amrapSecondsLeft: durationSec,
       completedRoundsCount: 0,
     };
   };
@@ -621,27 +627,34 @@ export default function LiveWorkoutScreen() {
         customValues: {},
         completedRoundsCount: 0,
       };
-      return {
+      const next = {
         ...prev,
         [blockId]: updater(current),
       };
+      // Synchronisation sur action utilisateur uniquement
+      updateActiveSessionCircuitStates(next);
+      return next;
     });
   };
 
   const handleStartCircuit = (block: CircuitBlock) => {
+    triggerHapticMedium();
+    const durationSec = (block.amrapDurationMinutes || 12) * 60;
     updateCircuitState(block.id, (prev) => ({
       ...prev,
       started: true,
       currentRound: 1,
-      amrapSecondsLeft: (block.amrapDurationMinutes || 12) * 60,
+      amrapSecondsLeft: durationSec,
+      amrapEndTime: Date.now() + durationSec * 1000,
     }));
   };
 
-  // Timer dégressif AMRAP
+  // Timer dégressif AMRAP (découplé des I/O disque)
   useEffect(() => {
     const interval = setInterval(() => {
       setCircuitStates((prevStates) => {
         let hasChanges = false;
+        let amrapFinishedState: Record<string, CircuitState> | null = null;
         const nextStates = { ...prevStates };
 
         Object.keys(nextStates).forEach((blockId) => {
@@ -657,12 +670,25 @@ export default function LiveWorkoutScreen() {
             (state.amrapSecondsLeft ?? 0) > 0
           ) {
             hasChanges = true;
+            const newSeconds = state.amrapEndTime
+              ? Math.max(0, Math.ceil((state.amrapEndTime - Date.now()) / 1000))
+              : Math.max(0, (state.amrapSecondsLeft ?? 0) - 1);
+
+            if (newSeconds === 0 && (state.amrapSecondsLeft ?? 0) > 0) {
+              amrapFinishedState = nextStates;
+            }
+
             nextStates[blockId] = {
               ...state,
-              amrapSecondsLeft: Math.max(0, (state.amrapSecondsLeft ?? 0) - 1),
+              amrapSecondsLeft: newSeconds,
             };
           }
         });
+
+        if (amrapFinishedState) {
+          triggerHapticTimerAlarm();
+          updateActiveSessionCircuitStates(amrapFinishedState);
+        }
 
         return hasChanges ? nextStates : prevStates;
       });
@@ -795,7 +821,7 @@ export default function LiveWorkoutScreen() {
     if (showCelebrationModal) {
       return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-          <Modal visible transparent animationType="fade">
+          <Modal statusBarTranslucent navigationBarTranslucent visible transparent animationType="fade">
             <View style={styles.celebrationOverlay}>
               <ConfettiEffect />
               <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
@@ -1054,6 +1080,7 @@ export default function LiveWorkoutScreen() {
   };
 
   const handleValidateCircuitExercise = (block: CircuitBlock, exId: string) => {
+    triggerHapticSuccess();
     const currentState = getCircuitState(block);
     if (!currentState.started) return;
     const nextStatus = {
@@ -1064,6 +1091,7 @@ export default function LiveWorkoutScreen() {
   };
 
   const handlePassCircuitExercise = (block: CircuitBlock, exId: string) => {
+    triggerHapticLight();
     const currentState = getCircuitState(block);
     if (!currentState.started) return;
     const nextStatus = {
@@ -1078,6 +1106,7 @@ export default function LiveWorkoutScreen() {
     exId: string,
     idx: number,
   ) => {
+    triggerHapticLight();
     updateCircuitState(block.id, (prev) => ({
       ...prev,
       activeExerciseIdx: idx,
@@ -1091,6 +1120,7 @@ export default function LiveWorkoutScreen() {
     exId: string,
     idx: number,
   ) => {
+    triggerHapticLight();
     updateCircuitState(block.id, (prev) => ({
       ...prev,
       activeExerciseIdx: idx,
@@ -1319,6 +1349,7 @@ export default function LiveWorkoutScreen() {
                   }
                   onToggleSetComplete={(setId) => handleToggleSetComplete(ex.id, setId)}
                   onAddSet={() => addSet(ex.id)}
+                  onGenerateWarmup={(warmups) => prependWarmupSets(ex.id, warmups)}
                   onRemoveSet={(setId) => removeSet(ex.id, setId)}
                   onDuplicateExercise={() => duplicateExercise(ex.id)}
                   onRemoveExercise={() => removeExercise(ex.id)}
@@ -1557,12 +1588,12 @@ export default function LiveWorkoutScreen() {
                               {idx + 1}
                             </Text>
                           </View>
-                          <View style={{ marginLeft: 10, flex: 1 }}>
+                          <View style={{ marginLeft: 10, flex: 1, flexShrink: 1, marginRight: 8 }}>
                             <View style={{ flexDirection: "row", alignItems: "center" }}>
                               <Text
                                 style={[
                                   styles.collapsedExName,
-                                  { color: theme.text },
+                                  { color: theme.text, flexShrink: 1 },
                                 ]}
                                 numberOfLines={1}
                               >
@@ -1571,22 +1602,38 @@ export default function LiveWorkoutScreen() {
                               {(() => {
                                 const currentSetType = ex.setType || 'normal';
                                 const cfg = SET_TYPES_CONFIG[currentSetType] || SET_TYPES_CONFIG.normal;
+                                const isNormal = currentSetType === 'normal';
                                 return (
                                   <TouchableOpacity
                                     activeOpacity={0.7}
                                     onPress={(e) => {
                                       e.stopPropagation();
-                                      handleCycleCircuitSetType(block.id, ex.id, ex.setType);
+                                      triggerHapticLight(); handleCycleCircuitSetType(block.id, ex.id, ex.setType);
                                     }}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     style={{
-                                      backgroundColor: currentSetType === 'normal' ? `${theme.border}90` : cfg.color,
-                                      paddingHorizontal: 6,
-                                      paddingVertical: 1,
-                                      borderRadius: 4,
+                                      backgroundColor: isNormal ? theme.surface : cfg.color,
+                                      borderColor: isNormal ? theme.border : cfg.color,
+                                      borderWidth: 1,
+                                      minWidth: 20,
+                                      height: 20,
+                                      paddingHorizontal: 5,
+                                      borderRadius: 6,
                                       marginLeft: 6,
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
                                     }}
                                   >
-                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.code} · {cfg.label}</Text>
+                                    <Text
+                                      style={{
+                                        color: isNormal ? theme.textMuted : '#FFFFFF',
+                                        fontSize: 10,
+                                        fontWeight: '800',
+                                      }}
+                                    >
+                                      {cfg.code}
+                                    </Text>
                                   </TouchableOpacity>
                                 );
                               })()}
@@ -1678,12 +1725,12 @@ export default function LiveWorkoutScreen() {
                           </Text>
                         </View>
 
-                        <View style={{ flex: 1, marginLeft: 10 }}>
+                        <View style={{ flex: 1, flexShrink: 1, marginLeft: 10, marginRight: 8 }}>
                           <View style={{ flexDirection: "row", alignItems: "center" }}>
                             <Text
                               style={[
                                 styles.circuitExName,
-                                { color: theme.text },
+                                { color: theme.text, flexShrink: 1 },
                               ]}
                             >
                               {ex.exerciseName}
@@ -1691,19 +1738,35 @@ export default function LiveWorkoutScreen() {
                             {(() => {
                               const currentSetType = ex.setType || 'normal';
                               const cfg = SET_TYPES_CONFIG[currentSetType] || SET_TYPES_CONFIG.normal;
+                              const isNormal = currentSetType === 'normal';
                               return (
                                 <TouchableOpacity
                                   activeOpacity={0.7}
-                                  onPress={() => handleCycleCircuitSetType(block.id, ex.id, ex.setType)}
+                                  onPress={() => { triggerHapticLight(); handleCycleCircuitSetType(block.id, ex.id, ex.setType); }}
+                                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                   style={{
-                                    backgroundColor: currentSetType === 'normal' ? `${theme.border}90` : cfg.color,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 1,
-                                    borderRadius: 4,
+                                    backgroundColor: isNormal ? theme.surface : cfg.color,
+                                    borderColor: isNormal ? theme.border : cfg.color,
+                                    borderWidth: 1,
+                                    minWidth: 20,
+                                    height: 20,
+                                    paddingHorizontal: 5,
+                                    borderRadius: 6,
                                     marginLeft: 6,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
                                   }}
                                 >
-                                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{cfg.code} · {cfg.label}</Text>
+                                  <Text
+                                    style={{
+                                      color: isNormal ? theme.textMuted : '#FFFFFF',
+                                      fontSize: 10,
+                                      fontWeight: '800',
+                                    }}
+                                  >
+                                    {cfg.code}
+                                  </Text>
                                 </TouchableOpacity>
                               );
                             })()}
@@ -2004,6 +2067,8 @@ export default function LiveWorkoutScreen() {
 
       {/* Modal Ajout d'Exercice avec Barre de Recherche */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showAddExModal}
         transparent
         animationType="slide"
@@ -2269,7 +2334,7 @@ export default function LiveWorkoutScreen() {
       <RestTimerBar />
 
       {/* ---------------- MODALE FÉLICITATIONS 1ÈRE SÉANCE TERMINÉE ---------------- */}
-      <Modal visible={showCelebrationModal} transparent animationType="fade">
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showCelebrationModal} transparent animationType="fade">
         <View style={styles.celebrationOverlay}>
           <ConfettiEffect />
           <View style={[styles.celebrationCard, { backgroundColor: theme.cardBg, borderColor: theme.accent }]}>
@@ -2306,282 +2371,24 @@ export default function LiveWorkoutScreen() {
         </View>
       </Modal>
 
-      {/* ---------------- MODALE DE CONFIRMATION D'ABANDON ---------------- */}
-      <Modal
+      <WorkoutAbandonModal
         visible={showAbandonModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAbandonModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.abandonOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAbandonModal(false)}
-        >
-          <View
-            style={[
-              styles.abandonCard,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-          >
-            <View
-              style={[
-                styles.abandonIconCircle,
-                { backgroundColor: `${theme.danger}20` },
-              ]}
-            >
-              <AlertTriangle size={36} color={theme.danger} />
-            </View>
+        onClose={() => setShowAbandonModal(false)}
+        onConfirmAbandon={handleConfirmAbandon}
+      />
 
-            <Text style={[styles.abandonTitle, { color: theme.text }]}>
-              Abandonner la séance ?
-            </Text>
-
-            <Text style={[styles.abandonDesc, { color: theme.textMuted }]}>
-              Toute votre progression actuelle sera perdue et cette séance ne sera pas enregistrée dans votre historique.
-            </Text>
-
-            <View style={styles.abandonActions}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setShowAbandonModal(false)}
-                style={[
-                  styles.abandonKeepBtn,
-                  { backgroundColor: theme.accent },
-                ]}
-              >
-                <Text style={styles.abandonKeepBtnText}>
-                  Continuer la séance
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleConfirmAbandon}
-                style={styles.abandonConfirmBtn}
-              >
-                <Text
-                  style={[
-                    styles.abandonConfirmBtnText,
-                    { color: theme.danger },
-                  ]}
-                >
-                  Abandonner définitivement
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ---------------- MODALE DE CONFIRMATION TERMINER LA SÉANCE ---------------- */}
-      <Modal
+      <WorkoutFinishModal
         visible={showFinishConfirmModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFinishConfirmModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.finishModalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowFinishConfirmModal(false)}
-        >
-          <View
-            style={[
-              styles.finishModalCard,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-            onStartShouldSetResponder={() => true}
-          >
-            <View
-              style={[
-                styles.finishModalIconCircle,
-                { backgroundColor: `${theme.accent}18` },
-              ]}
-            >
-              <CheckCircle size={36} color={theme.accent} />
-            </View>
-
-            <Text style={[styles.finishModalTitle, { color: theme.text }]}>
-              Terminer la séance ?
-            </Text>
-
-            <Text style={[styles.finishModalDesc, { color: theme.textMuted }]}>
-              Récapitulatif de votre progression avant enregistrement :
-            </Text>
-
-            <View
-              style={[
-                styles.finishStatsGrid,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
-              {/* Durée de la séance */}
-              <View style={styles.finishStatRow}>
-                <View style={styles.finishStatLabelContainer}>
-                  <Clock size={16} color={theme.accent} />
-                  <Text style={[styles.finishStatLabelText, { color: theme.textMuted }]}>
-                    Durée de la séance
-                  </Text>
-                </View>
-                <Text style={[styles.finishStatValueText, { color: theme.text }]}>
-                  {workoutSummaryStats.durationFormatted}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.finishStatDivider,
-                  { backgroundColor: theme.border },
-                ]}
-              />
-
-              {/* Volume total */}
-              <View style={styles.finishStatRow}>
-                <View style={styles.finishStatLabelContainer}>
-                  <Zap size={16} color={theme.accent} />
-                  <Text style={[styles.finishStatLabelText, { color: theme.textMuted }]}>
-                    Volume total
-                  </Text>
-                </View>
-                <Text style={[styles.finishStatValueText, { color: theme.text }]}>
-                  {workoutSummaryStats.totalVolumeKg.toLocaleString("fr-FR")} kg
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.finishStatDivider,
-                  { backgroundColor: theme.border },
-                ]}
-              />
-
-              {/* Séries validées */}
-              <View style={styles.finishStatRow}>
-                <View style={styles.finishStatLabelContainer}>
-                  <Check size={16} color={theme.accent} />
-                  <Text style={[styles.finishStatLabelText, { color: theme.textMuted }]}>
-                    Séries validées
-                  </Text>
-                </View>
-                <Text style={[styles.finishStatValueText, { color: theme.text }]}>
-                  {workoutSummaryStats.completedSetsCount}/{workoutSummaryStats.totalSetsCount}
-                </Text>
-              </View>
-            </View>
-
-            {/* Toggle Séance Exceptionnelle */}
-            <View
-              style={[
-                styles.exceptionToggleCard,
-                {
-                  backgroundColor: isExceptionActive ? '#F59E0B12' : theme.surface,
-                  borderColor: isExceptionActive ? '#F59E0B50' : theme.border,
-                },
-              ]}
-            >
-              <View style={styles.exceptionToggleHeader}>
-                <View style={{ flex: 1, marginRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <AlertTriangle
-                      size={15}
-                      color={isExceptionActive ? '#F59E0B' : theme.textMuted}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      style={[
-                        styles.exceptionToggleTitle,
-                        { color: isExceptionActive ? '#F59E0B' : theme.text },
-                      ]}
-                    >
-                      Séance exceptionnelle ?
-                    </Text>
-                  </View>
-                  <Text style={[styles.exceptionToggleSubtitle, { color: theme.textMuted }]}>
-                    Écarte cette séance de la référence pour le calcul du previous
-                  </Text>
-                </View>
-                <Switch
-                  value={isExceptionActive}
-                  onValueChange={setIsExceptionActive}
-                  trackColor={{ false: theme.border, true: '#F59E0B' }}
-                  thumbColor={Platform.OS === 'android' ? (isExceptionActive ? '#FFFFFF' : '#888888') : undefined}
-                />
-              </View>
-
-              {isExceptionActive && (
-                <View style={styles.exceptionDetailsBox}>
-                  <Text style={[styles.exceptionReasonLabel, { color: theme.textMuted }]}>
-                    Raison de l'écart :
-                  </Text>
-                  <View style={styles.exceptionChipsGrid}>
-                    {(Object.keys(EXCEPTION_REASONS_CONFIG) as SessionExceptionReason[]).map((rKey) => {
-                      const cfg = EXCEPTION_REASONS_CONFIG[rKey];
-                      const isSelected = selectedExceptionReason === rKey;
-                      return (
-                        <TouchableOpacity
-                          key={rKey}
-                          activeOpacity={0.7}
-                          style={[
-                            styles.exceptionReasonChip,
-                            {
-                              backgroundColor: isSelected ? '#F59E0B25' : theme.cardBg,
-                              borderColor: isSelected ? '#F59E0B' : theme.border,
-                            },
-                          ]}
-                          onPress={() => setSelectedExceptionReason(rKey)}
-                        >
-                          <Text
-                            style={[
-                              styles.exceptionReasonChipText,
-                              {
-                                color: isSelected ? '#F59E0B' : theme.text,
-                                fontWeight: isSelected ? '800' : '600',
-                              },
-                            ]}
-                          >
-                            {cfg.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <TextInput
-                    style={[
-                      styles.exceptionNoteInput,
-                      {
-                        backgroundColor: theme.cardBg,
-                        borderColor: theme.border,
-                        color: theme.text,
-                      },
-                    ]}
-                    placeholder="Précisez la contrainte (optionnel : appareil en panne, séance partagée...)"
-                    placeholderTextColor={theme.textMuted}
-                    value={exceptionNoteText}
-                    onChangeText={setExceptionNoteText}
-                    multiline
-                    numberOfLines={2}
-                  />
-                </View>
-              )}
-            </View>
-
-            <View style={styles.finishModalActions}>
-              <Button
-                title="Confirmer & Terminer"
-                variant="primary"
-                onPress={handleConfirmFinish}
-              />
-              <Button
-                title="Reprendre l'entraînement"
-                variant="outline"
-                onPress={() => setShowFinishConfirmModal(false)}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        onClose={() => setShowFinishConfirmModal(false)}
+        onConfirmFinish={handleConfirmFinish}
+        workoutSummaryStats={workoutSummaryStats}
+        isExceptionActive={isExceptionActive}
+        onToggleException={setIsExceptionActive}
+        selectedExceptionReason={selectedExceptionReason}
+        onSelectExceptionReason={setSelectedExceptionReason}
+        exceptionNoteText={exceptionNoteText}
+        onChangeExceptionNoteText={setExceptionNoteText}
+      />
 
       <ReorderBlocksModal
         visible={showReorderModal}
@@ -2611,6 +2418,8 @@ export default function LiveWorkoutScreen() {
 
       {/* Modal Menu d'actions de la séance (3 points) */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showSessionMenuModal}
         transparent
         animationType="fade"

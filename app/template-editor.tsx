@@ -127,6 +127,13 @@ export default function TemplateEditorScreen() {
   } | null>(null);
 
   // Target set pour modal de RIR cible: { blockId, setIdx }
+  const [activeTargetRepsTarget, setActiveTargetRepsTarget] = useState<{
+    blockId: string;
+    setIdx: number;
+  } | null>(null);
+  const [customRepsMin, setCustomRepsMin] = useState('');
+  const [customRepsMax, setCustomRepsMax] = useState('');
+
   const [activeTargetRirTarget, setActiveTargetRirTarget] = useState<{
     blockId: string;
     setIdx: number;
@@ -1024,6 +1031,24 @@ export default function TemplateEditorScreen() {
       }),
     );
     setActiveTargetRirTarget(null);
+  };
+
+  const handleUpdateTargetReps = (
+    blockId: string,
+    setIdx: number,
+    min?: number,
+    max?: number,
+  ) => {
+    setSelectedBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id !== blockId || b.type !== "single") return b;
+        const nextSets = b.exercise.sets.map((s, idx) =>
+          idx === setIdx ? { ...s, targetRepsMin: min, targetRepsMax: max } : s,
+        );
+        return { ...b, exercise: { ...b.exercise, sets: nextSets } };
+      }),
+    );
+    setActiveTargetRepsTarget(null);
   };
 
   // Enregistrement du programme
@@ -2056,6 +2081,40 @@ export default function TemplateEditorScreen() {
 
               {/* Liste des Séries */}
               <View style={styles.setsContainer}>
+                {ex.sets.length > 0 && (
+                  <View style={styles.setsColumnsHeaderRow}>
+                    <Text style={[styles.setsHeaderText, { color: theme.textMuted, width: 50 }]}>
+                      SÉRIE
+                    </Text>
+                    <Text
+                      style={[
+                        styles.setsHeaderText,
+                        { color: theme.textMuted, flex: 1.55, textAlign: "center" },
+                      ]}
+                    >
+                      TYPE
+                    </Text>
+                    <Text
+                      style={[
+                        styles.setsHeaderText,
+                        { color: theme.textMuted, flex: 1, textAlign: "center" },
+                      ]}
+                    >
+                      REPS
+                    </Text>
+                    {enableRir && (
+                      <Text
+                        style={[
+                          styles.setsHeaderText,
+                          { color: theme.textMuted, width: 54, textAlign: "center" },
+                        ]}
+                      >
+                        RIR
+                      </Text>
+                    )}
+                    <View style={{ width: 24 }} />
+                  </View>
+                )}
 
                 {ex.sets.map((set, setIdx) => {
                   const setTypeInfo =
@@ -2070,75 +2129,124 @@ export default function TemplateEditorScreen() {
                     >
                       <Text
                         style={[styles.setIndexText, { color: theme.text }]}
+                        numberOfLines={1}
                       >
                         Série {set.setNumber}
                       </Text>
 
-                      {/* Actions de Série : Type & RIR Cible */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        {/* Badge / Sélecteur de Type de Série */}
+                      {/* Badge / Sélecteur de Type de Série */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={[
+                          styles.typeBadge,
+                          { backgroundColor: setTypeInfo.color, flex: 1.55, justifyContent: "center" },
+                        ]}
+                        onPress={() =>
+                          setActiveSetTarget({ blockId: block.id, setIdx })
+                        }
+                      >
+                        <Text style={styles.typeBadgeCode}>
+                          {setTypeInfo.code}
+                        </Text>
+                        <Text style={styles.typeBadgeLabel} numberOfLines={1}>
+                          {setTypeInfo.label}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Sélecteur de fourchette de répétitions cible (AJ-02) */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={[
+                          styles.targetRirBadge,
+                          {
+                            flex: 1,
+                            justifyContent: "center",
+                            borderColor:
+                              set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                ? theme.accent
+                                : theme.border,
+                            backgroundColor:
+                              set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                ? `${theme.accent}18`
+                                : theme.surface,
+                          },
+                        ]}
+                        onPress={() => {
+                          setCustomRepsMin(set.targetRepsMin ? String(set.targetRepsMin) : '');
+                          setCustomRepsMax(set.targetRepsMax ? String(set.targetRepsMax) : '');
+                          setActiveTargetRepsTarget({ blockId: block.id, setIdx });
+                        }}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.targetRirBadgeText,
+                            {
+                              color:
+                                set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                  ? theme.accent
+                                  : theme.textMuted,
+                              fontWeight:
+                                set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                                  ? "700"
+                                  : "500",
+                            },
+                          ]}
+                        >
+                          {set.targetRepsMin !== undefined || set.targetRepsMax !== undefined
+                            ? set.targetRepsMin && set.targetRepsMax && set.targetRepsMin !== set.targetRepsMax
+                              ? `${set.targetRepsMin}-${set.targetRepsMax} reps`
+                              : `${set.targetRepsMin ?? set.targetRepsMax} reps`
+                            : "Libre"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Sélecteur tactile discret de RIR Cible */}
+                      {enableRir && (
                         <TouchableOpacity
                           activeOpacity={0.7}
                           style={[
-                            styles.typeBadge,
-                            { backgroundColor: setTypeInfo.color },
+                            styles.targetRirBadge,
+                            {
+                              width: 54,
+                              justifyContent: "center",
+                              borderColor:
+                                set.targetRir !== undefined
+                                  ? theme.accent
+                                  : theme.border,
+                              backgroundColor:
+                                set.targetRir !== undefined
+                                  ? `${theme.accent}18`
+                                  : theme.surface,
+                            },
                           ]}
                           onPress={() =>
-                            setActiveSetTarget({ blockId: block.id, setIdx })
+                            setActiveTargetRirTarget({
+                              blockId: block.id,
+                              setIdx,
+                            })
                           }
                         >
-                          <Text style={styles.typeBadgeCode}>
-                            {setTypeInfo.code}
-                          </Text>
-                          <Text style={styles.typeBadgeLabel}>
-                            {setTypeInfo.label}
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Sélecteur tactile discret de RIR Cible */}
-                        {enableRir && (
-                          <TouchableOpacity
-                            activeOpacity={0.7}
+                          <Text
+                            numberOfLines={1}
                             style={[
-                              styles.targetRirBadge,
+                              styles.targetRirBadgeText,
                               {
-                                borderColor:
+                                color:
                                   set.targetRir !== undefined
                                     ? theme.accent
-                                    : theme.border,
-                                backgroundColor:
-                                  set.targetRir !== undefined
-                                    ? `${theme.accent}18`
-                                    : theme.surface,
+                                    : theme.textMuted,
+                                fontWeight:
+                                  set.targetRir !== undefined ? "700" : "500",
                               },
                             ]}
-                            onPress={() =>
-                              setActiveTargetRirTarget({
-                                blockId: block.id,
-                                setIdx,
-                              })
-                            }
                           >
-                            <Text
-                              style={[
-                                styles.targetRirBadgeText,
-                                {
-                                  color:
-                                    set.targetRir !== undefined
-                                      ? theme.accent
-                                      : theme.textMuted,
-                                  fontWeight:
-                                    set.targetRir !== undefined ? "700" : "500",
-                                },
-                              ]}
-                            >
-                              {set.targetRir !== undefined
-                                ? `RIR ${set.targetRir}`
-                                : "RIR: Libre"}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                            {set.targetRir !== undefined
+                              ? `RIR ${set.targetRir}`
+                              : "Libre"}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
 
                       {/* Supprimer une série */}
                       {ex.sets.length > 1 ? (
@@ -2251,6 +2359,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL / SHEET DES OPTIONS DE BLOC (...) --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeBlockOptions !== null}
         transparent
         animationType="fade"
@@ -2550,6 +2660,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL SÉLECTION DU CIRCUIT POUR "INCLURE DANS LE CIRCUIT" (si multi-circuits) --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={targetIncludeSingleBlockId !== null}
         transparent
         animationType="fade"
@@ -2604,6 +2716,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL DE SÉLECTION DU TYPE DE SÉRIE --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeSetTarget !== null}
         transparent
         animationType="slide"
@@ -2687,8 +2801,173 @@ export default function TemplateEditorScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* --- MODAL DE SÉLECTION DE FOURCHETTE DE RÉPÉTITIONS (AJ-02) --- */}
+      <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
+        visible={activeTargetRepsTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActiveTargetRepsTarget(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActiveTargetRepsTarget(null)}
+        >
+          <View
+            style={[
+              styles.modalSheet,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  Objectif de répétitions (Rep Range)
+                </Text>
+                <Text style={[styles.modalSubHeader, { color: theme.textMuted }]}>
+                  Définissez une fourchette cible pour cette série
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setActiveTargetRepsTarget(null)}>
+                <X size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {activeTargetRepsTarget && (
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[
+                    { label: '3–5 (Force)', min: 3, max: 5 },
+                    { label: '6–8 (Force/Hyp)', min: 6, max: 8 },
+                    { label: '8–12 (Hypertrophie)', min: 8, max: 12 },
+                    { label: '12–15 (Endurance)', min: 12, max: 15 },
+                    { label: '15–20 (Métabolique)', min: 15, max: 20 },
+                  ].map((preset) => (
+                    <TouchableOpacity
+                      key={preset.label}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.targetRirBadge,
+                        {
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          backgroundColor: theme.surface,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() =>
+                        handleUpdateTargetReps(
+                          activeTargetRepsTarget.blockId,
+                          activeTargetRepsTarget.setIdx,
+                          preset.min,
+                          preset.max,
+                        )
+                      }
+                    >
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.targetRirBadge,
+                      {
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() =>
+                      handleUpdateTargetReps(
+                        activeTargetRepsTarget.blockId,
+                        activeTargetRepsTarget.setIdx,
+                        undefined,
+                        undefined,
+                      )
+                    }
+                  >
+                    <Text style={{ color: theme.textMuted, fontWeight: '700', fontSize: 13 }}>
+                      Libre (aucun)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      borderRadius: 10,
+                      padding: 10,
+                      color: theme.text,
+                      textAlign: 'center',
+                      fontWeight: '700',
+                    }}
+                    placeholder="Min (ex: 8)"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="numeric"
+                    value={customRepsMin}
+                    onChangeText={setCustomRepsMin}
+                  />
+                  <Text style={{ color: theme.textMuted, fontWeight: '800' }}>à</Text>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      borderRadius: 10,
+                      padding: 10,
+                      color: theme.text,
+                      textAlign: 'center',
+                      fontWeight: '700',
+                    }}
+                    placeholder="Max (ex: 12)"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="numeric"
+                    value={customRepsMax}
+                    onChangeText={setCustomRepsMax}
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{
+                      backgroundColor: theme.accent,
+                      paddingHorizontal: 16,
+                      paddingVertical: 11,
+                      borderRadius: 10,
+                    }}
+                    onPress={() => {
+                      const min = parseInt(customRepsMin, 10);
+                      const max = parseInt(customRepsMax, 10);
+                      handleUpdateTargetReps(
+                        activeTargetRepsTarget.blockId,
+                        activeTargetRepsTarget.setIdx,
+                        !isNaN(min) && min > 0 ? min : undefined,
+                        !isNaN(max) && max > 0 ? max : (!isNaN(min) && min > 0 ? min : undefined),
+                      );
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* --- MODAL DE SÉLECTION DU RIR CIBLE --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeTargetRirTarget !== null}
         transparent
         animationType="slide"
@@ -2809,6 +3088,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL DE SÉLECTION DU TYPE POUR UN EXERCICE DE CIRCUIT --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={activeCircuitSetTarget !== null}
         transparent
         animationType="slide"
@@ -2902,6 +3183,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL RÉORGANISATION DES EXERCICES D'UN CIRCUIT --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={reorderCircuitBlockId !== null}
         transparent
         animationType="slide"
@@ -3072,6 +3355,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL GROUPE SUPERSET --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={supersetModalBlockId !== null}
         transparent
         animationType="fade"
@@ -3164,6 +3449,8 @@ export default function TemplateEditorScreen() {
 
       {/* --- MODAL BASE DE DONNÉES D'EXERCICES --- */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showPickerModal}
         transparent
         animationType="slide"
@@ -3770,19 +4057,31 @@ const styles = StyleSheet.create({
   setDetailRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 6,
     paddingVertical: 6,
     borderBottomWidth: 0.5,
+  },
+  setsColumnsHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  setsHeaderText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    opacity: 0.75,
   },
   setIndexText: {
     fontSize: 13,
     fontWeight: "600",
-    width: 60,
+    width: 50,
   },
   typeBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     paddingVertical: 5,
     borderRadius: 8,
   },
@@ -3790,26 +4089,31 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "900",
     fontSize: 12,
-    marginRight: 6,
+    marginRight: 4,
   },
   typeBadgeLabel: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 12,
+    fontSize: 11.5,
+    flexShrink: 1,
   },
   targetRirBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
+    justifyContent: "center",
+    paddingHorizontal: 5,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
   },
   targetRirBadgeText: {
-    fontSize: 12,
+    fontSize: 11.5,
   },
   deleteSetBtn: {
-    padding: 4,
+    width: 24,
+    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   addSetBtn: {
     flexDirection: "row",
@@ -3907,7 +4211,9 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 18,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === "android" ? 42 : 34,
     borderTopWidth: 1,
   },
   modalHeader: {

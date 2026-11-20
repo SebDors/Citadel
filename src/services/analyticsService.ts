@@ -1,4 +1,5 @@
-import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks, BodyMeasurement } from '../types';
+import { getBodyweightFactor } from '../constants/exerciseDatabase';
+import { WorkoutSession, WorkoutBlock, WorkoutSet, WorkoutExercise, getSessionBlocks, BodyMeasurement, OneRMFormula } from '../types';
 import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
 
 /**
@@ -6,12 +7,45 @@ import { MuscleGroup, normalizeMuscle } from '../constants/muscles';
  * Si reps > 12, renvoie null (formule non fiable au-delà de 12 répétitions).
  * Si reps === 1, renvoie directement le poids.
  */
-export function calculateE1RM(weightKg: number, reps: number): number | null {
+export const ONE_RM_FORMULAS_CONFIG: Record<OneRMFormula, { label: string; subtitle: string }> = {
+  epley: { label: 'Epley', subtitle: 'Standard polyvalent : Poids × (1 + Reps / 30)' },
+  brzycki: { label: 'Brzycki', subtitle: 'Force maximale (1–5 reps) : Poids × 36 / (37 − Reps)' },
+  lander: { label: 'Lander', subtitle: 'Mouvements polyarticulaires : (100 × Poids) / (101.3 − 2.67 × Reps)' },
+  wathen: { label: 'Wathen', subtitle: 'Modèle exponentiel : (100 × Poids) / (48.8 + 53.8 × e^(-0.075 × Reps))' },
+};
+
+export function calculateE1RM(
+  weightKg: number,
+  reps: number,
+  formula: OneRMFormula = 'epley',
+  rir?: number
+): number | null {
   if (!weightKg || weightKg <= 0 || !reps || reps <= 0) return null;
   if (reps > 12) return null;
-  if (reps === 1) return Math.round(weightKg * 10) / 10;
-  // Formule d'Epley : 1RM = Poids * (1 + Reps / 30)
-  return Math.round((weightKg * (1 + reps / 30)) * 10) / 10;
+
+  const effectiveRir = rir !== undefined && rir !== null && rir > 0 ? Math.min(rir, 5) : 0;
+  const effectiveReps = reps + effectiveRir;
+  if (effectiveReps === 1) return Math.round(weightKg * 10) / 10;
+
+  let raw = 0;
+  switch (formula) {
+    case 'brzycki':
+      raw = effectiveReps < 37 ? weightKg * (36 / (37 - effectiveReps)) : weightKg * (1 + effectiveReps / 30);
+      break;
+    case 'lander': {
+      const denom = 101.3 - 2.67123 * effectiveReps;
+      raw = denom > 0 ? (100 * weightKg) / denom : weightKg * (1 + effectiveReps / 30);
+      break;
+    }
+    case 'wathen':
+      raw = (100 * weightKg) / (48.8 + 53.8 * Math.exp(-0.075 * effectiveReps));
+      break;
+    case 'epley':
+    default:
+      raw = weightKg * (1 + effectiveReps / 30);
+      break;
+  }
+  return Math.round(raw * 10) / 10;
 }
 
 /**
@@ -31,18 +65,19 @@ export function calculateWorkoutTotalVolume(
   let completedCount = 0;
   let totalCount = 0;
 
-  const processSet = (s: WorkoutSet) => {
+  const processSet = (s: WorkoutSet, exerciseId?: string, exerciseName?: string) => {
     totalCount++;
     if (s.completed) {
       completedCount++;
-      const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+      const bwFactor = s.isBodyweight ? getBodyweightFactor(exerciseId, exerciseName) : 0;
+      const effectiveWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0)) * 100) / 100;
       if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
         volume += effectiveWeight * s.reps;
       }
       // Prise en compte scientifique des Drop Sets (chaque décharge compte dans le tonnage)
       if (s.dropSteps && s.dropSteps.length > 0) {
         s.dropSteps.forEach((step) => {
-          const stepEffectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (step.weightKg || 0);
+          const stepEffectiveWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (step.weightKg || 0)) * 100) / 100;
           if (stepEffectiveWeight > 0 && step.reps) {
             volume += stepEffectiveWeight * step.reps;
           }
@@ -54,7 +89,7 @@ export function calculateWorkoutTotalVolume(
   if (blocks && blocks.length > 0) {
     blocks.forEach((block) => {
       if (block.type === 'single') {
-        (block.exercise.sets || []).forEach(processSet);
+        (block.exercise.sets || []).forEach((s) => processSet(s, block.exercise.exerciseId, block.exercise.exerciseName));
       } else if (block.type === 'circuit') {
         // Pour les blocs circuits
         const rounds = block.rounds || sessionMeta?.completedRoundsCount || sessionMeta?.circuitRounds || 1;
@@ -63,16 +98,18 @@ export function calculateWorkoutTotalVolume(
           const cState = sessionMeta?.circuitStates?.[block.id];
           const completedRounds = cState?.completedRoundsCount ?? rounds;
           completedCount += completedRounds;
-          // Si l'exercice de circuit a une valeur en reps et un poids défini
           if (item.targetType === 'reps' && item.targetValue > 0) {
-            // Le volume est comptabilisé si applicable
+            const effectiveWeight = (cState?.customValues?.[item.id + '_weight']) || 0;
+            if (effectiveWeight > 0) {
+              volume += completedRounds * item.targetValue * effectiveWeight;
+            }
           }
         });
       }
     });
   } else if (exercises) {
     exercises.forEach((ex) => {
-      (ex.sets || []).forEach(processSet);
+      (ex.sets || []).forEach((s) => processSet(s, ex.exerciseId, ex.exerciseName));
     });
   }
 
@@ -116,9 +153,11 @@ export function calculateMaxE1RM(
       if (block.type === 'single') {
         if (block.exercise.exerciseName.trim().toLowerCase() === targetName) {
           (block.exercise.sets || []).forEach((set) => {
-            const effectiveWeight = (set.isBodyweight ? (set.bodyweightUsedKg || 0) : 0) + (set.weightKg || 0);
+            if (set.type === 'warmup') return;
+            const bwFactor = set.isBodyweight ? getBodyweightFactor(block.exercise.exerciseId, block.exercise.exerciseName) : 0;
+            const effectiveWeight = Math.round(Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0)) * 100) / 100;
             if (set.completed && effectiveWeight > 0 && set.reps && set.reps > 0) {
-              const currentE1RM = calculateE1RM(effectiveWeight, set.reps);
+              const currentE1RM = calculateE1RM(effectiveWeight, set.reps, 'epley', set.rir);
               if (currentE1RM !== null && (!bestRecord || currentE1RM > bestRecord.e1RM)) {
                 bestRecord = {
                   exerciseName: block.exercise.exerciseName,
@@ -161,9 +200,11 @@ export function getAvailableExercisesFromHistory(
           const existing = map.get(name) || { count: 0, max1RM: 0 };
           let sessionMaxE1RM = 0;
           (block.exercise.sets || []).forEach((s) => {
-            const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+            if (s.type === 'warmup') return;
+            const bwFactor = s.isBodyweight ? getBodyweightFactor(block.exercise.exerciseId, block.exercise.exerciseName) : 0;
+            const effectiveWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0)) * 100) / 100;
             if (s.completed && effectiveWeight > 0 && s.reps) {
-              const e = calculateE1RM(effectiveWeight, s.reps);
+              const e = calculateE1RM(effectiveWeight, s.reps, 'epley', s.rir);
               if (e !== null && e > sessionMaxE1RM) sessionMaxE1RM = e;
             }
           });
@@ -277,32 +318,82 @@ export function calculateWeeklyMuscleVolume(
     const blocks = getSessionBlocks(session);
     blocks.forEach((block) => {
       if (block.type === 'single') {
-        const rawMuscles = (block.exercise.primaryMuscles && block.exercise.primaryMuscles.length > 0)
-          ? block.exercise.primaryMuscles
-          : (block.exercise.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
-
-        const workingSets = (block.exercise.sets || []).filter(
+        const ex = block.exercise;
+        const workingSets = (ex.sets || []).filter(
           (s) => s.completed && s.type !== 'warmup'
         ).length;
 
-        // Déduplication par groupe musculaire normalisé pour éviter de compter 2 fois la même série
-        const normalizedGroups = Array.from(new Set(rawMuscles.map((m) => normalizeMuscle(m).muscle)));
+        if (workingSets > 0) {
+          if (ex.muscleTargets && ex.muscleTargets.length > 0) {
+            const seenMuscles = new Set<string>();
+            ex.muscleTargets.forEach((target) => {
+              const normalized = normalizeMuscle(target.muscle).muscle;
+              if (!seenMuscles.has(normalized)) {
+                seenMuscles.add(normalized);
+                const fraction = target.fraction !== undefined
+                  ? target.fraction
+                  : (target.role === 'primary' ? 1.0 : 0.5);
+                muscleSetsMap.set(normalized, (muscleSetsMap.get(normalized) || 0) + (workingSets * fraction));
+              }
+            });
+          } else {
+            const rawPrimaries = (ex.primaryMuscles && ex.primaryMuscles.length > 0)
+              ? ex.primaryMuscles
+              : (ex.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
+            const primaryGroups = new Set(rawPrimaries.map((m) => normalizeMuscle(m).muscle));
 
-        normalizedGroups.forEach((muscle) => {
-          muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + workingSets);
-        });
+            primaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + workingSets);
+            });
+
+            const rawSecondaries = ex.targetMuscles || [];
+            const secondaryGroups = new Set(
+              rawSecondaries
+                .map((m) => normalizeMuscle(m).muscle)
+                .filter((m) => !primaryGroups.has(m))
+            );
+
+            secondaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + (workingSets * 0.5));
+            });
+          }
+        }
       } else if (block.type === 'circuit') {
+        const rounds = block.rounds || 1;
         block.exercises.forEach((item) => {
-          const rawMuscles = (item.primaryMuscles && item.primaryMuscles.length > 0)
-            ? item.primaryMuscles
-            : (item.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
+          if (item.muscleTargets && item.muscleTargets.length > 0) {
+            const seenMuscles = new Set<string>();
+            item.muscleTargets.forEach((target) => {
+              const normalized = normalizeMuscle(target.muscle).muscle;
+              if (!seenMuscles.has(normalized)) {
+                seenMuscles.add(normalized);
+                const fraction = target.fraction !== undefined
+                  ? target.fraction
+                  : (target.role === 'primary' ? 1.0 : 0.5);
+                muscleSetsMap.set(normalized, (muscleSetsMap.get(normalized) || 0) + (rounds * fraction));
+              }
+            });
+          } else {
+            const rawPrimaries = (item.primaryMuscles && item.primaryMuscles.length > 0)
+              ? item.primaryMuscles
+              : (item.primaryMuscle || 'Pectoraux').split(',').map((m) => m.trim()).filter(Boolean);
+            const primaryGroups = new Set(rawPrimaries.map((m) => normalizeMuscle(m).muscle));
 
-          const rounds = block.rounds || 1;
-          const normalizedGroups = Array.from(new Set(rawMuscles.map((m) => normalizeMuscle(m).muscle)));
+            primaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + rounds);
+            });
 
-          normalizedGroups.forEach((muscle) => {
-            muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + rounds);
-          });
+            const rawSecondaries = item.targetMuscles || [];
+            const secondaryGroups = new Set(
+              rawSecondaries
+                .map((m) => normalizeMuscle(m).muscle)
+                .filter((m) => !primaryGroups.has(m))
+            );
+
+            secondaryGroups.forEach((muscle) => {
+              muscleSetsMap.set(muscle, (muscleSetsMap.get(muscle) || 0) + (rounds * 0.5));
+            });
+          }
         });
       }
     });
@@ -395,17 +486,17 @@ export function flagPossibleUnderRecovery(
   snapshot: Pick<WeeklyFatigueSnapshot, 'avgRir' | 'avgRir4wRollingAvg' | 'bodyweightKg'>,
   previousWeekBodyweight?: number | null
 ): boolean {
-  if (!snapshot || snapshot.avgRir <= 0 || snapshot.avgRir4wRollingAvg <= 0) {
+  if (!snapshot || snapshot.avgRir < 0 || snapshot.avgRir4wRollingAvg <= 0) {
     return false;
   }
-  const rirElevated = snapshot.avgRir > snapshot.avgRir4wRollingAvg + 1;
+  const rirDropped = snapshot.avgRir < snapshot.avgRir4wRollingAvg - 1;
   const weightStagnantOrDropping =
     snapshot.bodyweightKg === null ||
     previousWeekBodyweight === undefined ||
     previousWeekBodyweight === null ||
     snapshot.bodyweightKg <= previousWeekBodyweight;
 
-  return rirElevated && weightStagnantOrDropping;
+  return rirDropped && weightStagnantOrDropping;
 }
 
 /**
@@ -565,4 +656,76 @@ export function calculateWeeklyFatigueSnapshots(
   }
 
   return snapshots;
+}
+
+export interface ACWRResult {
+  acuteLoadKg: number;
+  chronicWeeklyLoadKg: number;
+  ratio: number;
+  status: 'undertraining' | 'optimal' | 'caution' | 'danger';
+  label: string;
+}
+
+/**
+ * Calcule le ratio de charge aiguë sur chronique (ACWR - Gabbett 2016) pour prévenir les blessures (AJ-13).
+ * - Charge aiguë : tonnage total des 7 derniers jours.
+ * - Charge chronique : moyenne hebdomadaire sur les 28 derniers jours.
+ */
+export function calculateACWR(history: WorkoutSession[]): ACWRResult {
+  const now = Date.now();
+  const ms7d = 7 * 24 * 60 * 60 * 1000;
+  const ms28d = 28 * 24 * 60 * 60 * 1000;
+
+  let acuteLoadKg = 0;
+  let total28dKg = 0;
+
+  (history || []).forEach((s) => {
+    if (s.status !== 'completed' || !s.startTime) return;
+    const t = new Date(s.startTime).getTime();
+    const diff = now - t;
+    if (diff < 0 || diff > ms28d) return;
+
+    const blocks = getSessionBlocks(s);
+    const vol = s.totalVolumeKg || calculateWorkoutTotalVolume(s.exercises, blocks, {
+      isCircuit: s.isCircuit,
+      circuitRounds: s.circuitRounds,
+      completedRoundsCount: s.completedRoundsCount,
+      circuitStates: s.circuitStates,
+    }).volume;
+
+    total28dKg += vol;
+    if (diff <= ms7d) {
+      acuteLoadKg += vol;
+    }
+  });
+
+  const chronicWeeklyLoadKg = Math.round((total28dKg / 4) * 10) / 10;
+  const ratio = chronicWeeklyLoadKg > 0 ? Math.round((acuteLoadKg / chronicWeeklyLoadKg) * 100) / 100 : 1.0;
+
+  let status: ACWRResult['status'] = 'optimal';
+  let label = 'Zone optimale (Sweet Spot)';
+  if (chronicWeeklyLoadKg === 0 && acuteLoadKg === 0) {
+    status = 'optimal';
+    label = 'Données insuffisantes';
+  } else if (ratio < 0.8) {
+    status = 'undertraining';
+    label = 'Sous-charge (< 0.8)';
+  } else if (ratio <= 1.3) {
+    status = 'optimal';
+    label = 'Zone optimale (0.8 – 1.3)';
+  } else if (ratio <= 1.5) {
+    status = 'caution';
+    label = 'Vigilance (1.3 – 1.5)';
+  } else {
+    status = 'danger';
+    label = 'Surcharge / Risque (> 1.5)';
+  }
+
+  return {
+    acuteLoadKg: Math.round(acuteLoadKg),
+    chronicWeeklyLoadKg: Math.round(chronicWeeklyLoadKg),
+    ratio,
+    status,
+    label,
+  };
 }

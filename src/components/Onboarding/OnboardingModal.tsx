@@ -73,8 +73,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
   const handleSkip = () => {
     if (onSkip) {
       onSkip();
+    } else {
+      handleFinish();
     }
-    handleFinish();
   };
 
   if (!visible) return null;
@@ -88,15 +89,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onCom
             Étape {currentSlide + 1} / 3
           </Text>
 
-          {currentSlide < 2 && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleSkip}
-              style={styles.skipBtn}
-            >
-              <Text style={[styles.skipText, { color: theme.textMuted }]}>Passer</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleSkip}
+            style={styles.skipBtn}
+          >
+            <Text style={[styles.skipText, { color: theme.textMuted }]}>Passer</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Zone de Contenu Principale des Diapositives */}

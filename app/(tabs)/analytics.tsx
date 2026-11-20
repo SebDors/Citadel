@@ -1,18 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Switch, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Switch, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkout } from '../../src/context/WorkoutContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 import { WeeklyMuscleVolumeCard } from '../../src/components/Analytics/WeeklyMuscleVolumeCard';
+import { MuscleBalanceRadarCard } from '../../src/components/Analytics/MuscleBalanceRadarCard';
+import { calculateWeeklyMuscleVolume } from '../../src/services/analyticsService';
 import { FatigueMarkersCard } from '../../src/components/Analytics/FatigueMarkersCard';
 import { OneRMChartCard } from '../../src/components/Profile/OneRMChartCard';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { SlidersHorizontal, ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
 
 export default function AnalyticsTab() {
-  const { data } = useWorkout();
+  const { data, restTimer } = useWorkout();
   const { theme } = useTheme();
   const [excludeExceptions, setExcludeExceptions] = useState(false);
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0);
 
   const filteredHistory = useMemo(() => {
     const raw = data?.history || [];
@@ -20,13 +23,41 @@ export default function AnalyticsTab() {
     return raw.filter((s) => !s.isException);
   }, [data?.history, excludeExceptions]);
 
+  const weeklyVolume = useMemo(
+    () => calculateWeeklyMuscleVolume(filteredHistory, selectedWeekOffset),
+    [filteredHistory, selectedWeekOffset]
+  );
+
+  const weekLabel = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() + diffToMon + selectedWeekOffset * 7);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    const fmt = (d: Date) =>
+      d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    const rangeStr = `${fmt(startOfWeek)} - ${fmt(endOfWeek)}`;
+
+    if (selectedWeekOffset === 0) return `Cette semaine · ${rangeStr}`;
+    if (selectedWeekOffset === -1) return `Semaine dernière · ${rangeStr}`;
+    return `Il y a ${Math.abs(selectedWeekOffset)} sem. · ${rangeStr}`;
+  }, [selectedWeekOffset]);
+
   return (
     <TabSwipeWrapper tabIndex={2}>
       <SafeAreaView
         edges={['top', 'left', 'right']}
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            restTimer.active && { paddingBottom: 110 },
+          ]}
+        >
           {/* En-tête de page moderne */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.text }]}>
@@ -58,12 +89,68 @@ export default function AnalyticsTab() {
             />
           </View>
 
+          {/* Sélecteur Global de Semaine pour Volume, Équilibre & Fatigue */}
+          <View style={[styles.weekSelectorCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSelectedWeekOffset((prev) => prev - 1)}
+              style={[styles.weekNavBtn, { backgroundColor: theme.surface }]}
+              accessibilityLabel="Semaine précédente"
+            >
+              <ChevronLeft size={18} color={theme.text} />
+            </TouchableOpacity>
+
+            <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Calendar size={14} color={theme.accent} />
+                <Text style={[styles.weekNavLabel, { color: theme.text }]} numberOfLines={1}>
+                  {weekLabel}
+                </Text>
+              </View>
+              {selectedWeekOffset !== 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedWeekOffset(0)}
+                  style={[styles.todayBtn, { backgroundColor: `${theme.accent}20`, borderColor: theme.accent }]}
+                >
+                  <Text style={[styles.todayBtnText, { color: theme.accent }]}>
+                    Revenir à cette semaine
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSelectedWeekOffset((prev) => Math.min(0, prev + 1))}
+              disabled={selectedWeekOffset >= 0}
+              style={[
+                styles.weekNavBtn,
+                { backgroundColor: theme.surface, opacity: selectedWeekOffset >= 0 ? 0.3 : 1 },
+              ]}
+              accessibilityLabel="Semaine suivante"
+            >
+              <ChevronRight size={18} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+
           {/* 1. Volume musculaire hebdomadaire */}
-          <WeeklyMuscleVolumeCard history={filteredHistory} />
+          <WeeklyMuscleVolumeCard
+            history={filteredHistory}
+            weekOffset={selectedWeekOffset}
+            hideWeekSelector
+          />
+
+          {/* 1B. Graphique Radar d'Équilibre Musculaire (AJ-14) */}
+          <MuscleBalanceRadarCard volumeData={weeklyVolume} />
 
           {/* 2. Marqueurs de fatigue et récupération */}
           {data?.profile?.enableFatigueMarkers !== false && (
-            <FatigueMarkersCard history={filteredHistory} />
+            <FatigueMarkersCard
+              history={filteredHistory}
+              weekOffset={selectedWeekOffset}
+              hideWeekSelector
+            />
           )}
 
           {/* 3. Graphiques / Cartes de Performance 1RM & PRs */}
@@ -115,5 +202,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 2,
     lineHeight: 14,
+  },
+  weekSelectorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  weekNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekNavLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  todayBtn: {
+    marginTop: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  todayBtnText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

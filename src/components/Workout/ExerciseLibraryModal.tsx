@@ -13,10 +13,11 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import { useWorkout } from '../../context/WorkoutContext';
 import { SharedExercise } from '../../constants/exerciseDatabase';
+import ExerciseDetailModal from '../Analytics/ExerciseDetailModal';
 import { normalizeString } from '../../utils/stringUtils';
 import { CreateExerciseModal } from './CreateExerciseModal';
 import { Button } from '../UI/Button';
-import { Search, Plus, Edit2, Trash2, X, BookOpen, AlertTriangle } from 'lucide-react-native';
+import { Search, Plus, Edit2, Trash2, X, BookOpen, AlertTriangle, TrendingUp } from 'lucide-react-native';
 
 const CATEGORY_FILTERS = ['Tous', 'Pectoraux', 'Dos', 'Épaules', 'Bras', 'Jambes', 'Abdos'] as const;
 
@@ -27,7 +28,7 @@ interface ExerciseLibraryModalProps {
 
 export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visible, onClose }) => {
   const { theme } = useTheme();
-  const { allExercises, deleteCustomExercise } = useWorkout();
+  const { allExercises, deleteCustomExercise, data } = useWorkout();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
@@ -38,6 +39,7 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
 
   // État de la modale de confirmation de suppression personnalisée
   const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<SharedExercise | null>(null);
+  const [selectedHistoryExercise, setSelectedHistoryExercise] = useState<SharedExercise | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Normalisation, Filtrage & Tri par ordre alphabétique
@@ -87,7 +89,7 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.content, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
           {/* Header */}
@@ -163,17 +165,30 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
             ) : (
               filteredExercises.map((ex) => (
                 <View key={ex.id} style={[styles.exRow, { borderBottomColor: theme.border }]}>
-                  <View style={{ flex: 1 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={{ flex: 1, paddingRight: 8 }}
+                    onPress={() => setSelectedHistoryExercise(ex)}
+                    accessibilityLabel={`Voir l'historique de ${ex.name}`}
+                  >
                     <View style={styles.titleRow}>
                       <Text style={[styles.exName, { color: theme.text }]}>{ex.name}</Text>
                     </View>
                     <Text style={[styles.exSub, { color: theme.textMuted }]}>
                       {ex.primaryMuscle} • {ex.category}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
 
-                  {/* Actions d'édition/suppression pour tous les exercices */}
+                  {/* Actions statistiques / édition / suppression */}
                   <View style={styles.actionsBox}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setSelectedHistoryExercise(ex)}
+                      style={[styles.iconBtn, { backgroundColor: `${theme.accent}18`, marginRight: 6 }]}
+                      accessibilityLabel={`Historique de ${ex.name}`}
+                    >
+                      <TrendingUp size={16} color={theme.accent} />
+                    </TouchableOpacity>
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => handleEdit(ex)}
@@ -205,6 +220,8 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
 
       {/* Modale de Confirmation de Suppression (Design & DA Applicative) */}
       <Modal
+        statusBarTranslucent
+        navigationBarTranslucent
         visible={!!deleteConfirmExercise}
         transparent
         animationType="fade"
@@ -258,6 +275,14 @@ export const ExerciseLibraryModal: React.FC<ExerciseLibraryModalProps> = ({ visi
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      <ExerciseDetailModal
+        visible={selectedHistoryExercise !== null}
+        onClose={() => setSelectedHistoryExercise(null)}
+        exerciseName={selectedHistoryExercise?.name || ''}
+        primaryMuscle={selectedHistoryExercise?.primaryMuscle}
+        targetMuscles={selectedHistoryExercise?.targetMuscles}
+        history={data?.history || []}
+      />
     </Modal>
   );
 };

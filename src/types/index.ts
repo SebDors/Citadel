@@ -1,4 +1,5 @@
 export type SetType = 'normal' | 'warmup' | 'drop' | 'amrap' | 'failure';
+export type OneRMFormula = 'epley' | 'brzycki' | 'lander' | 'wathen';
 
 export interface SetTypeInfo {
   type: SetType;
@@ -30,6 +31,8 @@ export interface WorkoutSet {
   reps?: number;     // Optionnel (champ vide si non renseigné)
   rir?: number;      // Reps In Reserve (0 à 5+)
   targetRir?: number;// Reps In Reserve Cible
+  targetRepsMin?: number;// Fourchette de reps min cible
+  targetRepsMax?: number;// Fourchette de reps max cible
   dropSteps?: DropStep[]; // Décharges (Drop Sets)
   durationSeconds?: number;
   previous?: string; // Ex: "100kg x 8" ou "45s"
@@ -181,6 +184,8 @@ export interface WorkoutFolder {
   isCollapsed?: boolean;
 }
 
+export type MeasurementMetricKey = 'weight' | 'bodyFat' | 'waist' | 'chest' | 'thigh' | 'biceps';
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -188,9 +193,11 @@ export interface UserProfile {
   currentWeightKg: number;
   totalWorkouts: number;
   availablePlates?: number[];
-  dropSetReductionPercent?: number; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
+  dropSetReductionPercent?: number;
+  oneRmFormula?: OneRMFormula; // Pourcentage de réduction par défaut pour les sous-séries Drop Set (ex: 20 ou 30%)
   enableRir?: boolean; // Suivi du RIR (Reps in Reserve) actif par défaut si indéfini
   enableFatigueMarkers?: boolean; // Actif par défaut si indéfini
+  hiddenMeasurementMetrics?: MeasurementMetricKey[];
 }
 
 export interface CardioSession {
@@ -217,6 +224,7 @@ export interface FitTrackerData {
   hasCompletedOnboarding?: boolean;
   hasCreatedFirstSession?: boolean;
   hasCompletedFirstWorkout?: boolean;
+  weeklySchedule?: Record<number, string | null>;
 }
 
 /**

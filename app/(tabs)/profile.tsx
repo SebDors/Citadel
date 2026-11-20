@@ -12,7 +12,7 @@ import { Palette, Settings } from 'lucide-react-native';
 import { TabSwipeWrapper } from '../../src/components/Navigation/TabSwipeWrapper';
 
 export default function ProfileTab() {
-  const { data, addMeasurement, deleteMeasurement, updateUserProfile } = useWorkout();
+  const { data, addMeasurement, deleteMeasurement, updateUserProfile, restTimer } = useWorkout();
   const { theme } = useTheme();
   const [themeModalVisible, setThemeModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
@@ -22,7 +22,12 @@ export default function ProfileTab() {
   return (
     <TabSwipeWrapper tabIndex={3}>
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          restTimer.active && { paddingBottom: 100 },
+        ]}
+      >
         {/* Page Header avec boutons Thème et Paramètres dans l'angle supérieur droit */}
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>

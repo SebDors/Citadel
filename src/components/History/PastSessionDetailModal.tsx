@@ -502,7 +502,7 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.content, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
           {/* Header de la Modale */}
@@ -1089,7 +1089,15 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
 
                         {/* Liste des séries en lecture seule */}
                         {sets.map((s, sIdx) => {
-                          const weightStr = s.weightKg !== undefined && s.weightKg !== null ? `${formatWeight(s.weightKg)} kg` : '-';
+                          const weightStr = s.isBodyweight
+                            ? s.weightKg && s.weightKg > 0
+                              ? `PDC +${formatWeight(s.weightKg)} kg`
+                              : s.weightKg && s.weightKg < 0
+                              ? `PDC -${formatWeight(Math.abs(s.weightKg))} kg`
+                              : 'PDC'
+                            : s.weightKg !== undefined && s.weightKg !== null
+                            ? `${formatWeight(s.weightKg)} kg`
+                            : '-';
                           const repsStr = s.reps !== undefined && s.reps !== null ? `${s.reps}` : '-';
                           const rirStr = s.rir !== undefined && s.rir !== null ? `${s.rir}` : '-';
 
@@ -1237,7 +1245,7 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
       )}
 
       {/* Modal Sélection d'exercice */}
-      <Modal visible={showExerciseSelector} transparent animationType="slide" onRequestClose={() => setShowExerciseSelector(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showExerciseSelector} transparent animationType="slide" onRequestClose={() => setShowExerciseSelector(false)}>
         <View style={styles.overlay}>
           <TouchableOpacity
             style={styles.backdrop}
@@ -1296,7 +1304,9 @@ const styles = StyleSheet.create({
     height: '88%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 18,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'android' ? 38 : 30,
     borderTopWidth: 1,
   },
   headerRow: {

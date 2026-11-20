@@ -23,7 +23,6 @@
         "backgroundColor": "#273338"
       },
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
@@ -32,7 +31,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-audio"
+      "expo-audio",
+      "expo-sqlite"
     ],
     "scheme": "citadel",
     "extra": {

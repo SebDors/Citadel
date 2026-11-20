@@ -1,3 +1,4 @@
+import { triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -6,11 +7,14 @@ import {
   Pressable,
   StyleSheet,
   Modal,
+  Platform,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { X, Delete, ArrowRight, Check, RotateCcw, ArrowLeft } from 'lucide-react-native';
+import { computeNextNumericValue, NumericFieldType } from '../../utils/numberUtils';
 
-export type NumericFieldType = 'weightKg' | 'reps' | 'rir';
+export type { NumericFieldType };
+export const computeNextValue = computeNextNumericValue;
 
 export interface CustomNumericKeypadProps {
   visible: boolean;
@@ -30,51 +34,6 @@ export interface CustomNumericKeypadProps {
   isBodyweight?: boolean;
   onToggleBodyweight?: (isBodyweight: boolean) => void;
 }
-
-interface KeyButtonProps {
-  value: string;
-  label?: string;
-  icon?: React.ReactNode;
-  onPress: (val: string) => void;
-  disabled?: boolean;
-  style?: any;
-  textStyle?: any;
-}
-
-export const computeNextValue = (
-  prevVal: string,
-  key: string,
-  activeField: NumericFieldType | null
-): string => {
-  if (key === 'backspace') {
-    return prevVal.length > 0 ? prevVal.slice(0, -1) : '';
-  }
-  if (key === '.') {
-    if (activeField === 'reps') return prevVal; // Les reps sont toujours des entiers
-    if (prevVal.includes('.')) return prevVal;
-    return prevVal === '' ? '0.' : prevVal + '.';
-  }
-
-  // Limitation à 2 chiffres après la virgule (ex: 82.25)
-  if (prevVal.includes('.')) {
-    const decimalPart = prevVal.split('.')[1];
-    if (decimalPart && decimalPart.length >= 2) {
-      return prevVal;
-    }
-  }
-
-  // Si premier chiffre après 0 (sans point) : remplacer le 0 par le nouveau chiffre
-  if (prevVal === '0') {
-    return key;
-  }
-
-  // Limitation à 6 caractères au total (ex: 999.99)
-  if (prevVal.length >= 6) {
-    return prevVal;
-  }
-
-  return prevVal + key;
-};
 
 // Grille et options constantes (évite la ré-instanciation de tableaux à chaque frappe)
 const KEYPAD_ROWS = [
@@ -106,6 +65,7 @@ const KeyButton = React.memo<KeyButtonProps>(({
 }) => {
   const handlePressIn = useCallback(() => {
     if (!disabled) {
+      triggerHapticLight();
       onPress(value);
     }
   }, [onPress, value, disabled]);
@@ -173,6 +133,7 @@ const RirButton = React.memo<RirButtonProps>(({
   theme,
 }) => {
   const handlePressIn = useCallback(() => {
+    triggerHapticLight();
     onPress(option);
   }, [onPress, option]);
 
@@ -325,12 +286,14 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
   // Si le champ est vide mais qu'une ghostValue existe, l'incrément prend la ghostValue comme point de départ
   const handleQuickIncrement = useCallback((delta: number) => {
     setLocalValue((prevVal) => {
-      const baseStr = prevVal !== '' ? prevVal : (ghostValue || '');
+      const baseStr = prevVal !== '' && prevVal !== '-' ? prevVal : (ghostValue || '');
       const currentNum = parseFloat(baseStr) || 0;
-      const nextNum = Math.max(0, Math.round((currentNum + delta) * 100) / 100);
+      const rawNext = Math.round((currentNum + delta) * 100) / 100;
+      const allowNegative = activeField === 'weightKg' && localIsBodyweightRef.current;
+      const nextNum = allowNegative ? rawNext : Math.max(0, rawNext);
       return String(nextNum);
     });
-  }, [ghostValue]);
+  }, [ghostValue, activeField]);
 
   // Réinitialisation locale de la valeur saisie (sans commit synchrone bloquant)
   const handleClear = useCallback(() => {
@@ -393,20 +356,22 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
     if (!localValue || localValue === '0') {
       displayHeaderValue = 'PDC';
       displayHeaderUnit = '';
+    } else if (localValue === '-') {
+      displayHeaderValue = 'PDC -';
+      displayHeaderUnit = 'KG';
+    } else if (localValue.startsWith('-')) {
+      displayHeaderValue = `PDC - ${localValue.slice(1)}`;
+      displayHeaderUnit = 'KG';
     } else {
-      const num = parseFloat(localValue);
-      if (!isNaN(num) && num < 0) {
-        displayHeaderValue = `PDC ${localValue}`;
-        displayHeaderUnit = 'KG';
-      } else {
-        displayHeaderValue = `PDC + ${localValue}`;
-        displayHeaderUnit = 'KG';
-      }
+      displayHeaderValue = `PDC + ${localValue}`;
+      displayHeaderUnit = 'KG';
     }
   }
 
   return (
     <Modal
+      navigationBarTranslucent
+      statusBarTranslucent
       visible={visible}
       transparent
       animationType="fade"
@@ -547,6 +512,33 @@ export const CustomNumericKeypad: React.FC<CustomNumericKeypadProps> = ({
               <View style={styles.quickChipsBar}>
                 {activeField === 'weightKg' ? (
                   <>
+                    {localIsBodyweight && (
+                      <Pressable
+                        unstable_pressDelay={0}
+                        onPress={() => {
+                          triggerHapticLight();
+                          handleKeyPress('+/-');
+                        }}
+                        style={({ pressed }) => [
+                          styles.chipBtn,
+                          {
+                            backgroundColor: localValue.startsWith('-')
+                              ? theme.accent
+                              : (pressed ? `${theme.accent}35` : theme.surface),
+                            borderColor: localValue.startsWith('-') || pressed ? theme.accent : theme.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: localValue.startsWith('-') ? '#FFFFFF' : theme.accent },
+                          ]}
+                        >
+                          +/-
+                        </Text>
+                      </Pressable>
+                    )}
                     <Pressable
                       unstable_pressDelay={0}
                       onPress={() => handleQuickIncrement(-2.5)}
@@ -784,7 +776,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1.5,
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,

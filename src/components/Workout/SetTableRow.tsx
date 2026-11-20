@@ -1,8 +1,9 @@
+import { triggerHapticSuccess, triggerHapticLight } from '../../utils/haptics';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
 import { WorkoutSet, DropStep, SET_TYPES_CONFIG } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { useWorkout } from '../../context/WorkoutContext';
+import { useUserPreferencesStore } from '../../stores/useUserPreferencesStore';
 import { Check, Trash2, X, Plus, CornerDownRight } from 'lucide-react-native';
 import { CustomNumericKeypad, NumericFieldType } from '../UI/CustomNumericKeypad';
 import { parseFloatFrench } from '../../utils/numberUtils';
@@ -33,15 +34,17 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   onDelete,
 }) => {
   const { theme } = useTheme();
-  const { data } = useWorkout();
-  const isRirEnabled = enableRirProp !== undefined ? enableRirProp : (data?.profile?.enableRir !== false);
+  const storeEnableRir = useUserPreferencesStore((s) => s.enableRir);
+  const dropReductionPercent = useUserPreferencesStore((s) => s.dropSetReductionPercent);
+  const userWeight = useUserPreferencesStore((s) => s.userWeightKg);
+  const isRirEnabled = enableRirProp !== undefined ? enableRirProp : storeEnableRir;
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<KeypadTarget>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
   const currentTypeConfig = SET_TYPES_CONFIG[set.type] || SET_TYPES_CONFIG.normal;
-  const dropReductionPercent = data?.profile?.dropSetReductionPercent ?? 20;
-  const userWeight = (data?.profile as any)?.weightKg ?? data?.profile?.currentWeightKg;
+
 
   const isBodyweightRef = useRef(set.isBodyweight);
   useEffect(() => {
@@ -131,7 +134,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
       const field = target.field;
       if (field === 'weightKg') {
-        if (effectiveIsBw && (valStr === '' || valStr === undefined || valStr === null)) {
+        if (effectiveIsBw && (valStr === '' || valStr === '-' || valStr === undefined || valStr === null)) {
           onUpdate('weightKg', 0);
         } else {
           const num = parseFloatFrench(valStr);
@@ -247,6 +250,11 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
     onUpdate('dropSteps', next);
   };
 
+  const handleDeletePress = useCallback(() => {
+    triggerHapticLight();
+    setShowDeleteConfirmModal(true);
+  }, []);
+
   const handleRemoveDropStep = (stepId: string) => {
     const current = set.dropSteps || [];
     const next = current.filter((s) => s.id !== stepId);
@@ -257,9 +265,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const previousMatch = useMemo(() => {
     if (!set.previous) return null;
     if (set.isBodyweight) {
-      const mBw = set.previous.match(/(?:PDC|\+([0-9.]+)\s*kg)\s*[×x*]\s*([0-9]+)/i);
+      const mBw = set.previous.match(/(?:PDC|([+-][0-9.]+)\s*kg)\s*[×x*]\s*([0-9]+)/i);
       if (mBw) {
-        return { weight: mBw[1] || '0', reps: mBw[2] };
+        const rawW = mBw[1] ? mBw[1].replace(/^\+/, '') : '0';
+        return { weight: rawW, reps: mBw[2] };
       }
       const mReps = set.previous.match(/([0-9]+)\s*reps/i);
       if (mReps) {
@@ -398,15 +407,16 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                     ? theme.accent
                     : (set.reps !== undefined && set.reps !== null ? theme.text : theme.textMuted),
                   fontWeight: isRepsActive || (isNextToFill && isRepsEmpty) ? '900' : '700',
+                  fontStyle: (set.reps === undefined || set.reps === null) && (set.targetRepsMin !== undefined || set.targetRepsMax !== undefined) ? 'italic' : 'normal',
                 },
               ]}
             >
-              {set.reps !== undefined && set.reps !== null ? String(set.reps) : '-'}
+              {set.reps !== undefined && set.reps !== null ? String(set.reps) : (set.targetRepsMin !== undefined || set.targetRepsMax !== undefined ? (set.targetRepsMin && set.targetRepsMax && set.targetRepsMin !== set.targetRepsMax ? `${set.targetRepsMin}-${set.targetRepsMax}` : String(set.targetRepsMin ?? set.targetRepsMax)) : '-')}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Saisie RIR : Affichée UNIQUEMENT si isRirEnabled et si la série est de type "normal" */}
+        {/* Colonne RIR : Saisie sur série normale, indicateur clair 0 / — pour séries spéciales (AM-08) */}
         {isRirEnabled && (
           <View style={styles.colInput}>
             {set.type === 'normal' ? (
@@ -442,14 +452,36 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                     : '-'}
                 </Text>
               </TouchableOpacity>
-            ) : null}
+            ) : (
+              <View
+                style={[
+                  styles.cellBtn,
+                  {
+                    borderColor: theme.border,
+                    backgroundColor: 'transparent',
+                    opacity: set.type === 'failure' || set.type === 'amrap' ? 0.75 : 0.45,
+                  },
+                ]}
+              >
+                <Text style={[styles.cellText, { color: theme.textMuted, fontWeight: '700' }]}>
+                  {set.type === 'failure' || set.type === 'amrap' ? '0' : '—'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
         {/* Checkbox de complétion */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={onToggleComplete}
+          onPress={() => {
+            if (!set.completed) {
+              triggerHapticSuccess();
+            } else {
+              triggerHapticLight();
+            }
+            onToggleComplete();
+          }}
           style={[
             styles.checkButton,
             {
@@ -461,8 +493,14 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
           {set.completed && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
         </TouchableOpacity>
 
-        {/* Suppression de la série */}
-        <TouchableOpacity activeOpacity={0.7} onPress={onDelete} style={styles.deleteButton}>
+        {/* Suppression de la série avec confirmation et hitSlop 44pt */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handleDeletePress}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}
+          style={styles.deleteButton}
+          accessibilityLabel={`Supprimer la série ${set.setNumber}`}
+        >
           <Trash2 size={16} color={theme.danger} />
         </TouchableOpacity>
       </View>
@@ -573,7 +611,9 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => handleRemoveDropStep(step.id)}
-                  style={{ padding: 4, marginLeft: 4 }}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}
+                  style={{ padding: 4, marginLeft: 4, minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityLabel="Supprimer cette décharge"
                 >
                   <Trash2 size={14} color={theme.danger} />
                 </TouchableOpacity>
@@ -635,7 +675,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
       )}
 
       {/* Modal de sélection du type de série */}
-      <Modal visible={showTypeModal} transparent animationType="slide" onRequestClose={() => setShowTypeModal(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showTypeModal} transparent animationType="slide" onRequestClose={() => setShowTypeModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowTypeModal(false)}>
           <View style={[styles.modalSheet, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
@@ -685,6 +725,56 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
               </TouchableOpacity>
             ))}
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modale de confirmation de suppression dans la DA de l'application */}
+      <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
+        visible={showDeleteConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirmModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.confirmOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDeleteConfirmModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.confirmCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}
+          >
+            <View style={[styles.confirmIconCircle, { backgroundColor: `${theme.danger}18` }]}>
+              <Trash2 size={22} color={theme.danger} />
+            </View>
+            <Text style={[styles.confirmTitle, { color: theme.text }]}>
+              Supprimer la série {set.setNumber} ?
+            </Text>
+            <Text style={[styles.confirmDesc, { color: theme.textMuted }]}>
+              Les données enregistrées sur cette série seront définitivement effacées.
+            </Text>
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowDeleteConfirmModal(false)}
+                style={[styles.confirmBtn, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}
+              >
+                <Text style={[styles.confirmBtnText, { color: theme.text }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowDeleteConfirmModal(false);
+                  onDelete();
+                }}
+                style={[styles.confirmBtn, { backgroundColor: theme.danger }]}
+              >
+                <Text style={[styles.confirmBtnText, { color: '#FFFFFF' }]}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -761,11 +851,63 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   deleteButton: {
-    width: 24,
+    minWidth: 28,
+    minHeight: 34,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
     marginLeft: 4,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+    alignItems: 'center',
+  },
+  confirmIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  confirmDesc: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  confirmBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
@@ -775,7 +917,9 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 18,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'android' ? 42 : 34,
     borderTopWidth: 1,
   },
   modalHeader: {

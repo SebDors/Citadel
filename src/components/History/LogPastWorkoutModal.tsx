@@ -80,7 +80,6 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
 
   // Keypad state
-  const [keypadVisible, setKeypadVisible] = useState(false);
   const [keypadTarget, setKeypadTarget] = useState<{ blockId: string; setId: string; field: NumericFieldType; setNumber: number; value: string } | null>(null);
 
   // Exercise Selector state
@@ -112,7 +111,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
       setPrefillSourceText(null);
       setMode('detailed');
       setBlocks([]);
-      setKeypadVisible(false);
+      setKeypadTarget(null);
       setShowTemplateSelector(false);
       setTemplateSearchQuery('');
     }
@@ -676,7 +675,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
   }, [allExercises, searchQuery]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <TouchableOpacity
           style={styles.backdrop}
@@ -1182,6 +1181,8 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
 
       {/* Template Selector Modal (Dropdown Pop-up) */}
       <Modal
+        navigationBarTranslucent
+        statusBarTranslucent
         visible={showTemplateSelector}
         transparent
         animationType="slide"
@@ -1336,7 +1337,7 @@ export const LogPastWorkoutModal: React.FC<LogPastWorkoutModalProps> = ({ visibl
       </Modal>
 
       {/* Exercise Selector Modal for Detailed Mode */}
-      <Modal visible={showExerciseSelector} transparent animationType="slide" onRequestClose={() => setShowExerciseSelector(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showExerciseSelector} transparent animationType="slide" onRequestClose={() => setShowExerciseSelector(false)}>
         <View style={styles.overlay}>
           <TouchableOpacity
             style={styles.backdrop}

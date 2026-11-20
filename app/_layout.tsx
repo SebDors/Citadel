@@ -4,6 +4,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { WorkoutProvider } from '../src/context/WorkoutContext';
+import { GlobalErrorBoundary, RootErrorBoundary } from '../src/components/UI/GlobalErrorBoundary';
+
+/**
+ * Gestionnaire d'erreur natif Expo Router (AJ-04)
+ */
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <RootErrorBoundary error={error} retry={retry} />;
+}
 
 function RootLayoutNav() {
   const { theme, isReady } = useTheme();
@@ -27,12 +35,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <WorkoutProvider>
-        <RootLayoutNav />
-      </WorkoutProvider>
-    </ThemeProvider>
+    <GlobalErrorBoundary>
+      <ThemeProvider>
+        <WorkoutProvider>
+          <RootLayoutNav />
+        </WorkoutProvider>
+      </ThemeProvider>
+    </GlobalErrorBoundary>
   );
 }
-
-

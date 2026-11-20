@@ -22,9 +22,14 @@ import {
   getSessionBlocks,
 } from '../types';
 import { StorageService } from '../services/storage';
+import { BackupService } from '../services/backupService';
+import { useUserPreferencesStore } from '../stores/useUserPreferencesStore';
+import { useWorkoutDataStore } from '../stores/useWorkoutDataStore';
+import { useActiveWorkoutStore } from '../stores/useActiveWorkoutStore';
 import { NotificationService } from '../services/notificationService';
 import { calculateWorkoutTotalVolume } from '../services/analyticsService';
 import { normalizeString } from '../utils/stringUtils';
+import { formatWeight } from '../utils/numberUtils';
 
 export interface NextSetPreview {
   exerciseName: string;
@@ -49,6 +54,7 @@ export interface WorkoutContextType {
   updateSet: (exerciseId: string, setId: string, field: keyof WorkoutSet, value: any) => void;
   toggleSetComplete: (exerciseId: string, setId: string) => void;
   addSet: (exerciseId: string) => void;
+  prependWarmupSets: (exerciseId: string, warmups: Array<{ weightKg: number; reps: number }>) => void;
   removeSet: (exerciseId: string, setId: string) => void;
   addExerciseToActiveWorkout: (exerciseName: string, primaryMuscle: string, targetMuscles: string[], restSeconds?: number, exerciseId?: string, isBodyweight?: boolean) => void;
   addBatchExercisesToActiveWorkout: (items: Array<{ exerciseId?: string; exerciseName: string; primaryMuscle: string; targetMuscles: string[]; restSeconds?: number; isBodyweight?: boolean }>) => void;
@@ -97,6 +103,7 @@ export interface WorkoutContextType {
   skipOnboarding: () => Promise<void>;
   markFirstSessionCreated: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
+  updateWeeklySchedule: (schedule: Record<number, string | null>) => Promise<void>;
   // Base d'exercices personnalisés
   customExercises: SharedExercise[];
   allExercises: SharedExercise[];
@@ -126,7 +133,12 @@ const WorkoutContext = createContext<WorkoutContextType>({} as WorkoutContextTyp
 
 function formatSetPerf(set: WorkoutSet): string {
   if (set.isBodyweight) {
-    const weightPrefix = set.weightKg && set.weightKg > 0 ? `+${set.weightKg}kg` : 'PDC';
+    const weightPrefix =
+      set.weightKg && set.weightKg > 0
+        ? `+${formatWeight(set.weightKg)}kg`
+        : set.weightKg && set.weightKg < 0
+        ? `-${formatWeight(Math.abs(set.weightKg))}kg`
+        : 'PDC';
     if (set.reps !== undefined && set.reps > 0) {
       return `${weightPrefix} × ${set.reps}`;
     }
@@ -332,6 +344,36 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     timerType: 'rest',
   });
 
+  // Synchronisation atomique avec les stores Zustand (MO-03)
+  useEffect(() => {
+    useWorkoutDataStore.getState().setData(data);
+    if (data) {
+      BackupService.ensureDailyLocalBackup(data).catch(() => {});
+    }
+    useUserPreferencesStore.getState().syncFromProfile(data?.profile);
+    if (data) {
+      StorageService.getExerciseRecords()
+        .then((recs) => useWorkoutDataStore.getState().setExerciseRecords(recs))
+        .catch(() => {});
+    }
+  }, [data]);
+
+  useEffect(() => {
+    useWorkoutDataStore.getState().setIsLoading(loading);
+  }, [loading]);
+
+  useEffect(() => {
+    useActiveWorkoutStore.getState().setActiveSession(activeSession);
+  }, [activeSession]);
+
+  useEffect(() => {
+    useActiveWorkoutStore.getState().setRestTimerState(
+      restTimer.secondsRemaining,
+      90,
+      restTimer.active
+    );
+  }, [restTimer.secondsRemaining, restTimer.active]);
+
   const hasPlayedEndSoundRef = React.useRef(false);
 
   const handleTimerExpired = () => {
@@ -438,6 +480,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const markFirstSessionCreated = async () => {
     const updated = await StorageService.markFirstSessionCreated();
     setData(updated);
+  };
+
+  const updateWeeklySchedule = async (schedule: Record<number, string | null>) => {
+    if (!data) return;
+    const updatedData: FitTrackerData = {
+      ...data,
+      weeklySchedule: schedule,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
   };
 
   const resetOnboarding = async () => {
@@ -903,6 +955,65 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           ...block,
           exercise: { ...block.exercise, sets: [...block.exercise.sets, newSet] },
+        };
+      }
+      return block;
+    });
+
+    const updatedExercises: WorkoutExercise[] = [];
+    updatedBlocks.forEach((b) => {
+      if (b.type === 'single') {
+        updatedExercises.push(b.exercise);
+      }
+    });
+
+    const { volume, completedCount, totalCount } = calculateVolumeAndCompletedCount(
+      updatedExercises,
+      updatedBlocks
+    );
+
+    const updatedSession: WorkoutSession = {
+      ...activeSession,
+      blocks: updatedBlocks,
+      exercises: updatedExercises,
+      totalVolumeKg: volume,
+      completedSetsCount: completedCount,
+      totalSetsCount: totalCount,
+    };
+
+    setActiveSession(updatedSession);
+    StorageService.saveCurrentWorkout(updatedSession);
+  };
+
+  const prependWarmupSets = (
+    exerciseId: string,
+    warmups: Array<{ weightKg: number; reps: number }>
+  ) => {
+    if (!activeSession || !warmups || warmups.length === 0) return;
+
+    const currentBlocks = getSessionBlocks(activeSession);
+    const baseTs = Date.now();
+    const updatedBlocks = currentBlocks.map((block) => {
+      if (block.type === 'single' && block.exercise.id === exerciseId) {
+        const warmupSets: WorkoutSet[] = warmups.map((w, idx) => ({
+          id: `set_w_${baseTs}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+          setNumber: idx + 1,
+          type: 'warmup',
+          weightKg: w.weightKg,
+          reps: w.reps,
+          rir: undefined,
+          completed: false,
+          isBodyweight: false,
+        }));
+
+        const combinedSets = [...warmupSets, ...block.exercise.sets].map((st, idx) => ({
+          ...st,
+          setNumber: idx + 1,
+        }));
+
+        return {
+          ...block,
+          exercise: { ...block.exercise, sets: combinedSets },
         };
       }
       return block;
@@ -1650,16 +1761,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       circuitStates: states,
     };
     setActiveSession(updatedSession);
-    if (data) {
-      const updatedData: FitTrackerData = {
-        ...data,
-        currentWorkout: updatedSession,
-      };
-      setData(updatedData);
-      StorageService.saveData(updatedData);
-    } else {
-      StorageService.saveCurrentWorkout(updatedSession);
-    }
+    StorageService.saveCurrentWorkout(updatedSession);
   };
 
   const addBatchExercisesToCircuit = (
@@ -2093,6 +2195,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateSet,
       toggleSetComplete,
       addSet,
+      prependWarmupSets,
       removeSet,
       addExerciseToActiveWorkout,
       addBatchExercisesToActiveWorkout,
@@ -2141,6 +2244,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       skipOnboarding,
       markFirstSessionCreated,
       resetOnboarding,
+      updateWeeklySchedule,
       customExercises,
       allExercises,
       addCustomExercise,
