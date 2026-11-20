@@ -29,6 +29,7 @@ import { useActiveWorkoutStore } from '../stores/useActiveWorkoutStore';
 import { NotificationService } from '../services/notificationService';
 import { calculateWorkoutTotalVolume } from '../services/analyticsService';
 import { normalizeString } from '../utils/stringUtils';
+import { formatWeight } from '../utils/numberUtils';
 
 export interface NextSetPreview {
   exerciseName: string;
@@ -132,7 +133,12 @@ const WorkoutContext = createContext<WorkoutContextType>({} as WorkoutContextTyp
 
 function formatSetPerf(set: WorkoutSet): string {
   if (set.isBodyweight) {
-    const weightPrefix = set.weightKg && set.weightKg > 0 ? `+${set.weightKg}kg` : 'PDC';
+    const weightPrefix =
+      set.weightKg && set.weightKg > 0
+        ? `+${formatWeight(set.weightKg)}kg`
+        : set.weightKg && set.weightKg < 0
+        ? `-${formatWeight(Math.abs(set.weightKg))}kg`
+        : 'PDC';
     if (set.reps !== undefined && set.reps > 0) {
       return `${weightPrefix} × ${set.reps}`;
     }

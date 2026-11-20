@@ -360,7 +360,7 @@ export function updateIncrementalRecordsForSession(
 
     (ex.sets || []).forEach((s) => {
       if (!s.completed || s.type === 'warmup') return;
-      const effWeight = Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0));
+      const effWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0)) * 100) / 100;
       const reps = s.reps || 0;
       if (effWeight > sessionMaxWeight) sessionMaxWeight = effWeight;
       if (reps > sessionMaxReps) sessionMaxReps = reps;

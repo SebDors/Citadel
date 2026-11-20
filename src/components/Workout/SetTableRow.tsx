@@ -134,7 +134,7 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
 
       const field = target.field;
       if (field === 'weightKg') {
-        if (effectiveIsBw && (valStr === '' || valStr === undefined || valStr === null)) {
+        if (effectiveIsBw && (valStr === '' || valStr === '-' || valStr === undefined || valStr === null)) {
           onUpdate('weightKg', 0);
         } else {
           const num = parseFloatFrench(valStr);
@@ -251,14 +251,9 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   };
 
   const handleDeletePress = useCallback(() => {
-    const hasData = set.completed || (set.weightKg !== undefined && set.weightKg > 0) || (set.reps !== undefined && set.reps > 0);
-    if (hasData) {
-      triggerHapticLight();
-      setShowDeleteConfirmModal(true);
-    } else {
-      onDelete();
-    }
-  }, [set.completed, set.weightKg, set.reps, onDelete]);
+    triggerHapticLight();
+    setShowDeleteConfirmModal(true);
+  }, []);
 
   const handleRemoveDropStep = (stepId: string) => {
     const current = set.dropSteps || [];
@@ -270,9 +265,10 @@ const SetTableRowComponent: React.FC<SetTableRowProps> = ({
   const previousMatch = useMemo(() => {
     if (!set.previous) return null;
     if (set.isBodyweight) {
-      const mBw = set.previous.match(/(?:PDC|\+([0-9.]+)\s*kg)\s*[×x*]\s*([0-9]+)/i);
+      const mBw = set.previous.match(/(?:PDC|([+-][0-9.]+)\s*kg)\s*[×x*]\s*([0-9]+)/i);
       if (mBw) {
-        return { weight: mBw[1] || '0', reps: mBw[2] };
+        const rawW = mBw[1] ? mBw[1].replace(/^\+/, '') : '0';
+        return { weight: rawW, reps: mBw[2] };
       }
       const mReps = set.previous.match(/([0-9]+)\s*reps/i);
       if (mReps) {

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FitTrackerData, WorkoutSession, BodyMeasurement, WorkoutFolder, CardioSession, getSessionBlocks } from '../types';
 import { INITIAL_MOCK_DATA } from './mockData';
-import { SharedExercise } from '../constants/exerciseDatabase';
+import { SharedExercise, getBodyweightFactor } from '../constants/exerciseDatabase';
 import {
   getDatabase,
   initDatabaseSchema,
@@ -20,6 +20,16 @@ const LEGACY_COLLAPSED_CARDS_KEY = '@warriorfit_collapsed_cards_v1';
 const CURRENT_WORKOUT_KEY = '@citadel_current_workout_v1';
 
 let sqliteInitialized = false;
+
+function getEffectiveSetWeight(
+  s: { isBodyweight?: boolean; bodyweightUsedKg?: number; weightKg?: number },
+  exerciseId?: string,
+  exerciseName?: string
+): number {
+  const bwFactor = s.isBodyweight ? getBodyweightFactor(exerciseId, exerciseName) : 0;
+  const raw = (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0);
+  return Math.round(Math.max(0, raw) * 100) / 100;
+}
 
 /**
  * Migration transparente d'un exercice individuel :
@@ -728,7 +738,7 @@ export const StorageService = {
           totalSetsCount++;
           if (s.completed) {
             completedSetsCount++;
-            const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+            const effectiveWeight = getEffectiveSetWeight(s, b.exercise.exerciseId, b.exercise.exerciseName);
             if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
               totalVolume += effectiveWeight * s.reps;
             }
@@ -805,7 +815,7 @@ export const StorageService = {
               totalCount++;
               if (s.completed) {
                 completedCount++;
-                const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+                const effectiveWeight = getEffectiveSetWeight(s, block.exercise.exerciseId, block.exercise.exerciseName);
                 if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
                   volume += effectiveWeight * s.reps;
                 }
@@ -819,7 +829,7 @@ export const StorageService = {
             totalCount++;
             if (s.completed) {
               completedCount++;
-              const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+              const effectiveWeight = getEffectiveSetWeight(s, ex.exerciseId, ex.exerciseName);
               if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
                 volume += effectiveWeight * s.reps;
               }
@@ -832,7 +842,7 @@ export const StorageService = {
         ...session,
         blocks: updatedBlocks,
         exercises: updatedExercises,
-        totalVolumeKg: volume,
+        totalVolumeKg: Math.round(volume * 10) / 10,
         completedSetsCount: completedCount,
         totalSetsCount: totalCount,
       };
@@ -887,7 +897,7 @@ export const StorageService = {
               totalCount++;
               if (s.completed) {
                 completedCount++;
-                const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+                const effectiveWeight = getEffectiveSetWeight(s, block.exercise.exerciseId, block.exercise.exerciseName);
                 if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
                   volume += effectiveWeight * s.reps;
                 }
@@ -901,7 +911,7 @@ export const StorageService = {
             totalCount++;
             if (s.completed) {
               completedCount++;
-              const effectiveWeight = (s.isBodyweight ? (s.bodyweightUsedKg || 0) : 0) + (s.weightKg || 0);
+              const effectiveWeight = getEffectiveSetWeight(s, ex.exerciseId, ex.exerciseName);
               if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
                 volume += effectiveWeight * s.reps;
               }
@@ -914,7 +924,7 @@ export const StorageService = {
         ...session,
         blocks: updatedBlocks,
         exercises: updatedExercises,
-        totalVolumeKg: volume,
+        totalVolumeKg: Math.round(volume * 10) / 10,
         completedSetsCount: completedCount,
         totalSetsCount: totalCount,
       };

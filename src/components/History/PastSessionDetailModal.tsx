@@ -1089,7 +1089,15 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
 
                         {/* Liste des séries en lecture seule */}
                         {sets.map((s, sIdx) => {
-                          const weightStr = s.weightKg !== undefined && s.weightKg !== null ? `${formatWeight(s.weightKg)} kg` : '-';
+                          const weightStr = s.isBodyweight
+                            ? s.weightKg && s.weightKg > 0
+                              ? `PDC +${formatWeight(s.weightKg)} kg`
+                              : s.weightKg && s.weightKg < 0
+                              ? `PDC -${formatWeight(Math.abs(s.weightKg))} kg`
+                              : 'PDC'
+                            : s.weightKg !== undefined && s.weightKg !== null
+                            ? `${formatWeight(s.weightKg)} kg`
+                            : '-';
                           const repsStr = s.reps !== undefined && s.reps !== null ? `${s.reps}` : '-';
                           const rirStr = s.rir !== undefined && s.rir !== null ? `${s.rir}` : '-';
 

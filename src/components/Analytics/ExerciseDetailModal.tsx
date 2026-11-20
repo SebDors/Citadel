@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Trophy, Activity, Calendar, Dumbbell, AlertTriangle, TrendingUp } from 'lucide-react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
@@ -8,11 +8,40 @@ import { WorkoutSession, getSessionBlocks, SessionNote, NOTE_TYPES_CONFIG, Sessi
 import { useTheme } from '../../context/ThemeContext';
 import { calculateE1RM } from '../../services/analyticsService';
 import { getBodyweightFactor } from '../../constants/exerciseDatabase';
+import { formatWeight } from '../../utils/numberUtils';
+import { buildSmoothBezierPath, findNearestChartPointIndex } from '../../utils/svgChartUtils';
 import {
   hasExercisePainAlert,
   getExercisePainSeverity,
   formatExceptionReason,
 } from '../../utils/sessionNoteUtils';
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+interface HistorySetEntry {
+  weightKg: number;
+  reps: number;
+  rir?: number;
+  isPr?: boolean;
+  isBodyweight?: boolean;
+  bodyweightUsedKg?: number;
+  addedWeightKg?: number;
+}
+
+function formatSetWeightLabel(set: HistorySetEntry): string {
+  if (set.isBodyweight) {
+    const added = round2(set.addedWeightKg || 0);
+    const totalSuffix = set.weightKg > 0 ? ` (${formatWeight(set.weightKg)} kg)` : '';
+    if (added > 0) {
+      return `PDC + ${formatWeight(added)} kg${totalSuffix}`;
+    }
+    if (added < 0) {
+      return `PDC - ${formatWeight(Math.abs(added))} kg${totalSuffix}`;
+    }
+    return set.weightKg > 0 ? `PDC (${formatWeight(set.weightKg)} kg)` : 'PDC';
+  }
+  return set.weightKg > 0 ? `${formatWeight(set.weightKg)} kg` : 'PDC';
+}
 
 interface ExerciseDetailModalProps {
   visible: boolean;
@@ -35,6 +64,11 @@ export default function ExerciseDetailModal({
   const oneRmFormula = useUserPreferencesStore((s) => s.oneRmFormula);
   const [chartMetric, setChartMetric] = useState<'e1rm' | 'maxWeight'>('e1rm');
   const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
+  const [chartWidth, setChartWidth] = useState(290);
+
+  useEffect(() => {
+    setSelectedPointIdx(null);
+  }, [visible, exerciseName, chartMetric]);
 
   // Extract history and PRs for this specific exercise
   const { exerciseHistory, prs } = useMemo(() => {
@@ -45,7 +79,7 @@ export default function ExerciseDetailModal({
     const historyItems: {
       date: string;
       dateFormatted: string;
-      sets: { weightKg: number; reps: number; rir?: number; isPr?: boolean }[];
+      sets: HistorySetEntry[];
       isException?: boolean;
       exceptionReason?: SessionExceptionReason;
       sessionNotes?: SessionNote[];
@@ -59,7 +93,7 @@ export default function ExerciseDetailModal({
     );
 
     sortedHistory.forEach(session => {
-      const foundSets: { weightKg: number; reps: number; rir?: number; isPr?: boolean }[] = [];
+      const foundSets: HistorySetEntry[] = [];
       const sessionDate = new Date(session.startTime);
       const timeFormatted = sessionDate.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
@@ -88,7 +122,7 @@ export default function ExerciseDetailModal({
             const bwFactor = getBodyweightFactor(block.exercise.exerciseId, block.exercise.exerciseName);
             block.exercise.sets.forEach(set => {
               if (set.completed && set.type !== 'warmup') {
-                const w = Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0));
+                const w = round2(Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0)));
                 const r = set.reps || 0;
                 if (w > bestWeight || (w === bestWeight && r > bestReps)) {
                   bestWeight = w;
@@ -96,7 +130,14 @@ export default function ExerciseDetailModal({
                   bestRir = set.rir;
                   prDate = dateFormatted;
                 }
-                foundSets.push({ weightKg: w, reps: r, rir: set.rir });
+                foundSets.push({
+                  weightKg: w,
+                  reps: r,
+                  rir: set.rir,
+                  isBodyweight: Boolean(set.isBodyweight),
+                  bodyweightUsedKg: set.bodyweightUsedKg || 0,
+                  addedWeightKg: set.weightKg || 0,
+                });
               }
             });
           }
@@ -143,22 +184,79 @@ export default function ExerciseDetailModal({
     return asc
       .map((item) => {
         let maxW = 0;
+        let maxWSet: HistorySetEntry | null = null;
         let maxE1rm = 0;
-        item.sets.forEach((s) => {
-          if (s.weightKg > maxW) maxW = s.weightKg;
+        let maxE1rmSet: HistorySetEntry | null = null;
+        for (const s of item.sets) {
+          if (s.weightKg > maxW) {
+            maxW = s.weightKg;
+            maxWSet = s;
+          }
           const est = calculateE1RM(s.weightKg, s.reps, oneRmFormula, s.rir);
-          if (est && est > maxE1rm) maxE1rm = est;
-        });
+          if (est && est > maxE1rm) {
+            maxE1rm = est;
+            maxE1rmSet = s;
+          }
+        }
         const d = new Date(item.date);
         const shortDate = `${d.getDate()}/${d.getMonth() + 1}`;
+        const bestSet = chartMetric === 'e1rm' ? (maxE1rmSet || maxWSet) : maxWSet;
+        const bestSetLabel = bestSet ? `${formatSetWeightLabel(bestSet)} × ${bestSet.reps} reps` : '';
         return {
           date: shortDate,
           fullDate: item.dateFormatted,
-          value: chartMetric === 'e1rm' ? (maxE1rm || maxW) : maxW,
+          value: round2(chartMetric === 'e1rm' ? (maxE1rm || maxW) : maxW),
+          bestSetLabel,
         };
       })
       .filter((pt) => pt.value > 0);
   }, [exerciseHistory, chartMetric, oneRmFormula]);
+
+  const chartGeometry = useMemo(() => {
+    const chartH = 135;
+    const padX = 24;
+    const padY = 18;
+    if (chartPoints.length === 0) {
+      return { chartH, padX, padY, coords: [] as { x: number; y: number; val: number; date: string }[], dPath: '' };
+    }
+    const vals = chartPoints.map((p) => p.value);
+    let minV = Math.min(...vals);
+    let maxV = Math.max(...vals);
+    if (minV === maxV) {
+      minV = Math.max(0, minV - 5);
+      maxV += 5;
+    }
+    const range = maxV - minV || 1;
+    const denom = Math.max(1, chartPoints.length - 1);
+    const coords = chartPoints.map((p, idx) => ({
+      x: chartPoints.length === 1 ? chartWidth / 2 : padX + (idx / denom) * (chartWidth - padX * 2),
+      y: padY + (chartH - padY * 2) - ((p.value - minV) / range) * (chartH - padY * 2),
+      val: p.value,
+      date: p.date,
+    }));
+    const dPath = buildSmoothBezierPath(coords);
+    return { chartH, padX, padY, coords, dPath };
+  }, [chartPoints, chartWidth]);
+
+  const coordsRef = useRef(chartGeometry.coords);
+  coordsRef.current = chartGeometry.coords;
+
+  const chartPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > Math.abs(gs.dy),
+        onPanResponderGrant: (evt) => {
+          const nearest = findNearestChartPointIndex(evt.nativeEvent.locationX, coordsRef.current);
+          if (nearest !== null) setSelectedPointIdx(nearest);
+        },
+        onPanResponderMove: (evt) => {
+          const nearest = findNearestChartPointIndex(evt.nativeEvent.locationX, coordsRef.current);
+          if (nearest !== null) setSelectedPointIdx(nearest);
+        },
+      }),
+    []
+  );
 
   return (
     <Modal
@@ -200,13 +298,13 @@ export default function ExerciseDetailModal({
                 <View style={[styles.prItem, { backgroundColor: theme.surface }]}>
                   <Text style={[styles.prLabel, { color: theme.textMuted }]}>Est. 1RM</Text>
                   <Text style={[styles.prValue, { color: theme.text }]}>
-                    {prs.e1RM ? `${prs.e1RM} kg` : (prs.bestReps > 12 ? 'Non fiable (>12 reps)' : '—')}
+                    {prs.e1RM ? `${formatWeight(prs.e1RM)} kg` : (prs.bestReps > 12 ? 'Non fiable (>12 reps)' : '—')}
                   </Text>
                 </View>
                 <View style={[styles.prItem, { backgroundColor: theme.surface }]}>
                   <Text style={[styles.prLabel, { color: theme.textMuted }]}>Max Charge</Text>
                   <Text style={[styles.prValue, { color: theme.text }]}>
-                    {prs.bestWeight > 0 ? `${prs.bestWeight} kg × ${prs.bestReps}` : '-'}
+                    {prs.bestWeight > 0 ? `${formatWeight(prs.bestWeight)} kg × ${prs.bestReps}` : '-'}
                   </Text>
                 </View>
                 <View style={[styles.prItem, { backgroundColor: theme.surface }]}>
@@ -220,7 +318,15 @@ export default function ExerciseDetailModal({
 
             {/* Progression Chart Section (AJ-09) */}
             {chartPoints.length >= 2 && (
-              <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border, marginTop: 16 }]}>
+              <View
+                onLayout={(e) => {
+                  const w = Math.floor(e.nativeEvent.layout.width - 24);
+                  if (w >= 200 && w !== chartWidth) {
+                    setChartWidth(w);
+                  }
+                }}
+                style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border, marginTop: 16 }]}
+              >
                 <View style={[styles.cardHeader, { justifyContent: 'space-between' }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TrendingUp size={20} color={theme.accent} />
@@ -256,58 +362,120 @@ export default function ExerciseDetailModal({
                   </View>
                 </View>
 
-                {selectedPointIdx !== null && chartPoints[selectedPointIdx] && (
-                  <View style={{ backgroundColor: theme.surface, padding: 8, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ color: theme.textMuted, fontSize: 12 }}>{chartPoints[selectedPointIdx].fullDate}</Text>
-                    <Text style={{ color: theme.accent, fontSize: 13, fontWeight: '800' }}>{chartPoints[selectedPointIdx].value} kg</Text>
-                  </View>
-                )}
-
-                {(() => {
-                  const chartW = 290;
-                  const chartH = 120;
-                  const padX = 24;
-                  const padY = 16;
-                  const vals = chartPoints.map((p) => p.value);
-                  let minV = Math.min(...vals);
-                  let maxV = Math.max(...vals);
-                  if (minV === maxV) { minV = Math.max(0, minV - 5); maxV += 5; }
-                  const range = maxV - minV || 1;
-                  const coords = chartPoints.map((p, idx) => ({
-                    x: padX + (idx / (chartPoints.length - 1)) * (chartW - padX * 2),
-                    y: padY + (chartH - padY * 2) - ((p.value - minV) / range) * (chartH - padY * 2),
-                    val: p.value,
-                    date: p.date,
-                  }));
-                  const dPath = coords.reduce((acc, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`), '');
-                  return (
-                    <View style={{ alignItems: 'center' }}>
-                      <Svg width={chartW} height={chartH}>
-                        <Line x1={padX} y1={padY} x2={chartW - padX} y2={padY} stroke={theme.border} strokeDasharray="4,4" strokeWidth={1} />
-                        <Line x1={padX} y1={chartH - padY} x2={chartW - padX} y2={chartH - padY} stroke={theme.border} strokeDasharray="4,4" strokeWidth={1} />
-                        <Path d={dPath} fill="none" stroke={theme.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-                        {coords.map((pt, i) => (
-                          <Circle
-                            key={i}
-                            cx={pt.x}
-                            cy={pt.y}
-                            r={selectedPointIdx === i ? 6 : 4}
-                            fill={selectedPointIdx === i ? theme.accent : theme.cardBg}
-                            stroke={theme.accent}
-                            strokeWidth={2}
-                            onPress={() => setSelectedPointIdx(i)}
-                          />
-                        ))}
-                      </Svg>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: chartW, paddingHorizontal: 10 }}>
-                        <Text style={{ fontSize: 10, color: theme.textMuted }}>{chartPoints[0].date} ({chartPoints[0].value} kg)</Text>
-                        <Text style={{ fontSize: 10, color: theme.accent, fontWeight: '700' }}>
-                          {chartPoints[chartPoints.length - 1].date} ({chartPoints[chartPoints.length - 1].value} kg)
+                <View style={{ paddingHorizontal: 12, paddingBottom: 14 }}>
+                  {selectedPointIdx !== null && chartPoints[selectedPointIdx] ? (
+                    <View
+                      style={{
+                        backgroundColor: theme.surface,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: `${theme.accent}45`,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>
+                          {chartPoints[selectedPointIdx].fullDate}
+                        </Text>
+                        {!!chartPoints[selectedPointIdx].bestSetLabel && (
+                          <Text style={{ color: theme.text, fontSize: 12, fontWeight: '700', marginTop: 2 }} numberOfLines={1}>
+                            {chartPoints[selectedPointIdx].bestSetLabel}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: theme.textMuted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>
+                          {chartMetric === 'e1rm' ? '1RM Est.' : 'Charge Max'}
+                        </Text>
+                        <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '800' }}>
+                          {formatWeight(chartPoints[selectedPointIdx].value)} kg
                         </Text>
                       </View>
                     </View>
-                  );
-                })()}
+                  ) : (
+                    <View style={{ paddingVertical: 4, marginBottom: 4, alignItems: 'center' }}>
+                      <Text style={{ color: theme.textMuted, fontSize: 11, fontStyle: 'italic' }}>
+                        Touchez ou glissez sur la courbe pour voir le détail d'une séance
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={{ alignItems: 'center' }}>
+                    <View {...chartPanResponder.panHandlers}>
+                      <Svg width={chartWidth} height={chartGeometry.chartH}>
+                        <Line
+                          x1={chartGeometry.padX}
+                          y1={chartGeometry.padY}
+                          x2={chartWidth - chartGeometry.padX}
+                          y2={chartGeometry.padY}
+                          stroke={theme.border}
+                          strokeDasharray="4,4"
+                          strokeWidth={1}
+                        />
+                        <Line
+                          x1={chartGeometry.padX}
+                          y1={chartGeometry.chartH - chartGeometry.padY}
+                          x2={chartWidth - chartGeometry.padX}
+                          y2={chartGeometry.chartH - chartGeometry.padY}
+                          stroke={theme.border}
+                          strokeDasharray="4,4"
+                          strokeWidth={1}
+                        />
+                        {selectedPointIdx !== null && chartGeometry.coords[selectedPointIdx] && (
+                          <Line
+                            x1={chartGeometry.coords[selectedPointIdx].x}
+                            y1={chartGeometry.padY - 4}
+                            x2={chartGeometry.coords[selectedPointIdx].x}
+                            y2={chartGeometry.chartH - chartGeometry.padY + 4}
+                            stroke={theme.accent}
+                            strokeDasharray="3,3"
+                            strokeWidth={1.5}
+                          />
+                        )}
+                        <Path
+                          d={chartGeometry.dPath}
+                          fill="none"
+                          stroke={theme.accent}
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        {chartGeometry.coords.map((pt, i) => (
+                          <React.Fragment key={i}>
+                            <Circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={selectedPointIdx === i ? 6 : 4}
+                              fill={selectedPointIdx === i ? theme.accent : theme.cardBg}
+                              stroke={theme.accent}
+                              strokeWidth={2}
+                            />
+                            <Circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={16}
+                              fill="transparent"
+                              onPress={() => setSelectedPointIdx(i)}
+                            />
+                          </React.Fragment>
+                        ))}
+                      </Svg>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: chartWidth, paddingHorizontal: 10 }}>
+                      <Text style={{ fontSize: 10, color: theme.textMuted }}>
+                        {chartPoints[0].date} ({formatWeight(chartPoints[0].value)} kg)
+                      </Text>
+                      <Text style={{ fontSize: 10, color: theme.accent, fontWeight: '700' }}>
+                        {chartPoints[chartPoints.length - 1].date} ({formatWeight(chartPoints[chartPoints.length - 1].value)} kg)
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </View>
             )}
 
@@ -349,8 +517,13 @@ export default function ExerciseDetailModal({
                       {item.sets.map((set, sIdx) => (
                         <View key={sIdx} style={[styles.setRow, set.isPr && { backgroundColor: theme.surface }]}>
                           <Text style={[styles.setText, { color: theme.text }]}>
-                            {set.weightKg > 0 ? `${set.weightKg} kg` : 'PDC'} × {set.reps} reps
+                            {formatSetWeightLabel(set)} × {set.reps} reps
                           </Text>
+                          {set.rir !== undefined && (
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textMuted, marginLeft: 8 }}>
+                              RIR {set.rir}
+                            </Text>
+                          )}
                           {set.isPr && (
                             <Trophy size={14} color={theme.accent} style={{ marginLeft: 8 }} />
                           )}

@@ -70,14 +70,14 @@ export function calculateWorkoutTotalVolume(
     if (s.completed) {
       completedCount++;
       const bwFactor = s.isBodyweight ? getBodyweightFactor(exerciseId, exerciseName) : 0;
-      const effectiveWeight = Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0));
+      const effectiveWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0)) * 100) / 100;
       if (s.type !== 'warmup' && effectiveWeight > 0 && s.reps) {
         volume += effectiveWeight * s.reps;
       }
       // Prise en compte scientifique des Drop Sets (chaque décharge compte dans le tonnage)
       if (s.dropSteps && s.dropSteps.length > 0) {
         s.dropSteps.forEach((step) => {
-          const stepEffectiveWeight = Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (step.weightKg || 0));
+          const stepEffectiveWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (step.weightKg || 0)) * 100) / 100;
           if (stepEffectiveWeight > 0 && step.reps) {
             volume += stepEffectiveWeight * step.reps;
           }
@@ -155,7 +155,7 @@ export function calculateMaxE1RM(
           (block.exercise.sets || []).forEach((set) => {
             if (set.type === 'warmup') return;
             const bwFactor = set.isBodyweight ? getBodyweightFactor(block.exercise.exerciseId, block.exercise.exerciseName) : 0;
-            const effectiveWeight = Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0));
+            const effectiveWeight = Math.round(Math.max(0, (set.isBodyweight ? (set.bodyweightUsedKg || 0) * bwFactor : 0) + (set.weightKg || 0)) * 100) / 100;
             if (set.completed && effectiveWeight > 0 && set.reps && set.reps > 0) {
               const currentE1RM = calculateE1RM(effectiveWeight, set.reps, 'epley', set.rir);
               if (currentE1RM !== null && (!bestRecord || currentE1RM > bestRecord.e1RM)) {
@@ -202,7 +202,7 @@ export function getAvailableExercisesFromHistory(
           (block.exercise.sets || []).forEach((s) => {
             if (s.type === 'warmup') return;
             const bwFactor = s.isBodyweight ? getBodyweightFactor(block.exercise.exerciseId, block.exercise.exerciseName) : 0;
-            const effectiveWeight = Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0));
+            const effectiveWeight = Math.round(Math.max(0, (s.isBodyweight ? (s.bodyweightUsedKg || 0) * bwFactor : 0) + (s.weightKg || 0)) * 100) / 100;
             if (s.completed && effectiveWeight > 0 && s.reps) {
               const e = calculateE1RM(effectiveWeight, s.reps, 'epley', s.rir);
               if (e !== null && e > sessionMaxE1RM) sessionMaxE1RM = e;

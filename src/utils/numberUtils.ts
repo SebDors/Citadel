@@ -29,3 +29,57 @@ export function formatWeightWithUnit(val?: number | null, unit: string = 'kg'): 
   if (val === undefined || val === null || isNaN(val)) return `-- ${unit}`;
   return `${formatWeight(val)} ${unit}`;
 }
+
+export type NumericFieldType = 'weightKg' | 'reps' | 'rir';
+
+/**
+ * Calcule la valeur suivante du clavier numérique en gérant les décimales,
+ * la suppression et le basculement du signe +/- pour les charges PDC assistées.
+ */
+export function computeNextNumericValue(
+  prevVal: string,
+  key: string,
+  activeField: NumericFieldType | null
+): string {
+  if (key === '+/-') {
+    if (activeField !== 'weightKg') return prevVal;
+    if (prevVal === '' || prevVal === '0') return '-';
+    if (prevVal === '-') return '';
+    if (prevVal.startsWith('-')) return prevVal.slice(1);
+    return '-' + prevVal;
+  }
+  if (key === 'backspace') {
+    return prevVal.length > 0 ? prevVal.slice(0, -1) : '';
+  }
+  if (key === '.') {
+    if (activeField === 'reps') return prevVal;
+    if (prevVal.includes('.')) return prevVal;
+    if (prevVal === '') return '0.';
+    if (prevVal === '-') return '-0.';
+    return prevVal + '.';
+  }
+
+  // Limitation à 2 chiffres après la virgule (ex: 82.25)
+  if (prevVal.includes('.')) {
+    const decimalPart = prevVal.split('.')[1];
+    if (decimalPart && decimalPart.length >= 2) {
+      return prevVal;
+    }
+  }
+
+  // Si premier chiffre après 0 ou -0 (sans point)
+  if (prevVal === '0') {
+    return key;
+  }
+  if (prevVal === '-0') {
+    return '-' + key;
+  }
+
+  // Limitation à 6 caractères (7 si signe négatif)
+  const maxLen = prevVal.startsWith('-') ? 7 : 6;
+  if (prevVal.length >= maxLen) {
+    return prevVal;
+  }
+
+  return prevVal + key;
+}

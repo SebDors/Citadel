@@ -84,7 +84,7 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
             const isBw = Boolean(set.isBodyweight);
             const addedWeight = set.weightKg || 0;
             const bwUsed = set.bodyweightUsedKg || fallbackBw;
-            const effectiveWeight = Math.max(0, (isBw ? bwUsed * bwFactor : 0) + addedWeight);
+            const effectiveWeight = Math.round(Math.max(0, (isBw ? bwUsed * bwFactor : 0) + addedWeight) * 100) / 100;
 
             const currentE1RM = effectiveWeight > 0
               ? calculateE1RM(effectiveWeight, set.reps, oneRmFormula, set.rir)
@@ -226,9 +226,9 @@ export const OneRMChartCard: React.FC<OneRMChartCardProps> = ({
                       <Text style={[styles.prValue, { color: theme.accent }]}>
                         {item.isBodyweight
                           ? item.addedWeightKg > 0
-                            ? `PDC +${formatWeight(item.addedWeightKg)} kg`
+                            ? `PDC + ${formatWeight(item.addedWeightKg)} kg`
                             : item.addedWeightKg < 0
-                            ? `PDC ${formatWeight(item.addedWeightKg)} kg`
+                            ? `PDC - ${formatWeight(Math.abs(item.addedWeightKg))} kg`
                             : 'PDC'
                           : `${formatWeight(item.weightKg)} kg`}
                       </Text>

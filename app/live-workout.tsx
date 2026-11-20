@@ -1248,10 +1248,7 @@ export default function LiveWorkoutScreen() {
       <ScrollView
         ref={scrollViewRef}
         stickyHeaderIndices={[0]}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: restTimer.active ? 190 : 110 },
-        ]}
+        contentContainerStyle={styles.scrollContent}
         onScroll={(e) => {
           scrollYRef.current = e.nativeEvent.contentOffset.y;
         }}

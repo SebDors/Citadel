@@ -1,4 +1,4 @@
-import { parseFloatFrench, formatWeight, formatWeightWithUnit } from '../numberUtils';
+import { parseFloatFrench, formatWeight, formatWeightWithUnit, computeNextNumericValue } from '../numberUtils';
 
 describe('numberUtils', () => {
   describe('parseFloatFrench', () => {
@@ -41,6 +41,26 @@ describe('numberUtils', () => {
     it('formats value with unit', () => {
       expect(formatWeightWithUnit(80, 'kg')).toBe('80 kg');
       expect(formatWeightWithUnit(undefined, 'cm')).toBe('-- cm');
+    });
+  });
+
+  describe('computeNextNumericValue', () => {
+    it('toggles +/- sign only when activeField is weightKg (AJ-16)', () => {
+      expect(computeNextNumericValue('', '+/-', 'weightKg')).toBe('-');
+      expect(computeNextNumericValue('0', '+/-', 'weightKg')).toBe('-');
+      expect(computeNextNumericValue('-', '+/-', 'weightKg')).toBe('');
+      expect(computeNextNumericValue('15', '+/-', 'weightKg')).toBe('-15');
+      expect(computeNextNumericValue('-15', '+/-', 'weightKg')).toBe('15');
+      expect(computeNextNumericValue('10', '+/-', 'reps')).toBe('10');
+      expect(computeNextNumericValue('2', '+/-', 'rir')).toBe('2');
+    });
+
+    it('formats negative decimals and digits cleanly without dropping sign', () => {
+      expect(computeNextNumericValue('-', '.', 'weightKg')).toBe('-0.');
+      expect(computeNextNumericValue('-0', '5', 'weightKg')).toBe('-5');
+      expect(computeNextNumericValue('-12.5', '5', 'weightKg')).toBe('-12.55');
+      expect(computeNextNumericValue('-12.55', '9', 'weightKg')).toBe('-12.55');
+      expect(computeNextNumericValue('-125.75', '9', 'weightKg')).toBe('-125.75');
     });
   });
 });

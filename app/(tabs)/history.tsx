@@ -7,6 +7,8 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   TouchableOpacity,
+  TextInput,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWorkout } from "../../src/context/WorkoutContext";
@@ -14,12 +16,13 @@ import { useTheme } from "../../src/context/ThemeContext";
 import { CalendarView } from "../../src/components/History/CalendarView";
 import { ActivitySummaryCard } from "../../src/components/History/ActivitySummaryCard";
 import { CardioSessionCard } from "../../src/components/History/CardioSessionCard";
-import { Calendar, Plus, ChevronDown, ChevronUp, Flame } from "lucide-react-native";
+import { Calendar, Plus, ChevronDown, ChevronUp, Flame, Search, X } from "lucide-react-native";
 import { TabSwipeWrapper } from "../../src/components/Navigation/TabSwipeWrapper";
 import { LogPastWorkoutModal } from "../../src/components/History/LogPastWorkoutModal";
 import { LogCardioModal } from "../../src/components/History/LogCardioModal";
 import { StorageService } from "../../src/services/storage";
-import { WorkoutSession, CardioSession } from "../../src/types";
+import { WorkoutSession, CardioSession, getSessionBlocks } from "../../src/types";
+import { normalizeString } from "../../src/utils/stringUtils";
 
 type CombinedHistoryItem =
   | { type: 'workout'; id: string; date: Date; session: WorkoutSession }
@@ -33,6 +36,7 @@ export default function HistoryTab() {
   const [editingCardioSession, setEditingCardioSession] = React.useState<CardioSession | null>(null);
   const [isLastSessionsCollapsed, setIsLastSessionsCollapsed] = React.useState(false);
   const [filterType, setFilterType] = React.useState<'all' | 'workout' | 'cardio'>('all');
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   React.useEffect(() => {
     StorageService.loadCollapsedCards().then((saved) => {
@@ -68,15 +72,69 @@ export default function HistoryTab() {
     return [...workouts, ...cardios].sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [historyList, cardioList]);
 
+  const uniqueExerciseNames = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    historyList.forEach((session) => {
+      getSessionBlocks(session).forEach((block) => {
+        if (block.type === 'single' && block.exercise.exerciseName) {
+          const name = block.exercise.exerciseName.trim();
+          counts.set(name, (counts.get(name) || 0) + 1);
+        } else if (block.type === 'circuit') {
+          block.exercises.forEach((item) => {
+            if (item.exerciseName) {
+              const name = item.exerciseName.trim();
+              counts.set(name, (counts.get(name) || 0) + 1);
+            }
+          });
+        }
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name);
+  }, [historyList]);
+
+  const exerciseSuggestions = React.useMemo(() => {
+    const q = normalizeString(searchQuery);
+    if (!q) return [];
+    return uniqueExerciseNames
+      .filter((name) => {
+        const norm = normalizeString(name);
+        return norm.includes(q) && norm !== q;
+      })
+      .slice(0, 6);
+  }, [uniqueExerciseNames, searchQuery]);
+
   const displayList = React.useMemo(() => {
+    let list = combinedList;
     if (filterType === 'workout') {
-      return combinedList.filter((item) => item.type === 'workout');
+      list = list.filter((item) => item.type === 'workout');
+    } else if (filterType === 'cardio') {
+      list = list.filter((item) => item.type === 'cardio');
     }
-    if (filterType === 'cardio') {
-      return combinedList.filter((item) => item.type === 'cardio');
-    }
-    return combinedList;
-  }, [combinedList, filterType]);
+
+    const q = normalizeString(searchQuery);
+    if (!q) return list;
+
+    return list.filter((item) => {
+      if (item.type === 'workout') {
+        if (normalizeString(item.session.title).includes(q)) return true;
+        return getSessionBlocks(item.session).some((block) => {
+          if (block.type === 'single') {
+            return normalizeString(block.exercise.exerciseName).includes(q);
+          }
+          if (block.type === 'circuit') {
+            return block.exercises.some((ex) => normalizeString(ex.exerciseName).includes(q));
+          }
+          return false;
+        });
+      }
+      return (
+        normalizeString(item.session.activity).includes(q) ||
+        normalizeString(item.session.notes || '').includes(q)
+      );
+    });
+  }, [combinedList, filterType, searchQuery]);
 
   const renderItem = React.useCallback(
     ({ item }: { item: CombinedHistoryItem }) => {
@@ -186,69 +244,111 @@ export default function HistoryTab() {
         </View>
       </View>
 
-      {/* Filtres Type de Séance (Tous, Muscu, Cardio) */}
+      {/* Filtres Type de Séance (Tous, Muscu, Cardio) & Barre de recherche */}
       {!isLastSessionsCollapsed && (
-        <View style={styles.filterBar}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.filterChip,
-              filterType === 'all'
-                ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                : { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
-            onPress={() => setFilterType('all')}
-          >
-            <Text
+        <>
+          <View style={styles.filterBar}>
+            <TouchableOpacity
+              activeOpacity={0.7}
               style={[
-                styles.filterChipText,
-                { color: filterType === 'all' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'all' ? '800' : '600' },
+                styles.filterChip,
+                filterType === 'all'
+                  ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                  : { backgroundColor: theme.surface, borderColor: theme.border },
               ]}
+              onPress={() => setFilterType('all')}
             >
-              Tous ({combinedList.length})
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  { color: filterType === 'all' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'all' ? '800' : '600' },
+                ]}
+              >
+                Tous ({combinedList.length})
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.filterChip,
-              filterType === 'workout'
-                ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                : { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
-            onPress={() => setFilterType('workout')}
-          >
-            <Text
+            <TouchableOpacity
+              activeOpacity={0.7}
               style={[
-                styles.filterChipText,
-                { color: filterType === 'workout' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'workout' ? '800' : '600' },
+                styles.filterChip,
+                filterType === 'workout'
+                  ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                  : { backgroundColor: theme.surface, borderColor: theme.border },
               ]}
+              onPress={() => setFilterType('workout')}
             >
-              Muscu ({historyList.length})
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  { color: filterType === 'workout' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'workout' ? '800' : '600' },
+                ]}
+              >
+                Muscu ({historyList.length})
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.filterChip,
-              filterType === 'cardio'
-                ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                : { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
-            onPress={() => setFilterType('cardio')}
-          >
-            <Text
+            <TouchableOpacity
+              activeOpacity={0.7}
               style={[
-                styles.filterChipText,
-                { color: filterType === 'cardio' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'cardio' ? '800' : '600' },
+                styles.filterChip,
+                filterType === 'cardio'
+                  ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                  : { backgroundColor: theme.surface, borderColor: theme.border },
               ]}
+              onPress={() => setFilterType('cardio')}
             >
-              Cardio ({cardioList.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  { color: filterType === 'cardio' ? '#FFFFFF' : theme.textMuted, fontWeight: filterType === 'cardio' ? '800' : '600' },
+                ]}
+              >
+                Cardio ({cardioList.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchSection}>
+            <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Search size={15} color={theme.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Rechercher une séance ou un exercice..."
+                placeholderTextColor={theme.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={15} color={theme.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {exerciseSuggestions.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.suggestionsRow}
+              >
+                {exerciseSuggestions.map((name) => (
+                  <TouchableOpacity
+                    key={name}
+                    activeOpacity={0.75}
+                    onPress={() => setSearchQuery(name)}
+                    style={[styles.suggestionChip, { backgroundColor: `${theme.accent}15`, borderColor: `${theme.accent}40` }]}
+                  >
+                    <Text style={[styles.suggestionChipText, { color: theme.accent }]}>{name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </>
       )}
     </>
   );
@@ -264,10 +364,13 @@ export default function HistoryTab() {
           keyExtractor={(item: CombinedHistoryItem) => `${item.type}_${item.id}`}
           renderItem={renderItem}
           ListHeaderComponent={listHeader}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             !isLastSessionsCollapsed ? (
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                {filterType === 'cardio'
+                {searchQuery.trim()
+                  ? `Aucune séance trouvée pour « ${searchQuery.trim()} ».`
+                  : filterType === 'cardio'
                   ? 'Aucune séance cardio enregistrée.'
                   : filterType === 'workout'
                   ? 'Aucune séance de musculation enregistrée.'

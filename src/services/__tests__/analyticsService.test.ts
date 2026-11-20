@@ -147,6 +147,114 @@ describe('analyticsService', () => {
       const result = calculateWorkoutTotalVolume(undefined, blocks);
       expect(result.volume).toBe(720);
     });
+
+    it('subtracts negative assisted weight from bodyweight and clamps at 0', () => {
+      const assistedBlocks: WorkoutBlock[] = [
+        {
+          id: 'b1',
+          type: 'single',
+          exercise: {
+            id: 'ex1',
+            exerciseId: 'pullups',
+            exerciseName: 'Tractions Prise Pronation',
+            primaryMuscle: 'Grand Dorsal',
+            targetMuscles: [],
+            restSeconds: 90,
+            sets: [
+              {
+                id: 's1',
+                setNumber: 1,
+                type: 'normal',
+                isBodyweight: true,
+                bodyweightUsedKg: 80,
+                weightKg: -15,
+                reps: 8,
+                completed: true,
+              },
+              {
+                id: 's2',
+                setNumber: 2,
+                type: 'normal',
+                isBodyweight: true,
+                bodyweightUsedKg: 80,
+                weightKg: -100,
+                reps: 8,
+                completed: true,
+              },
+            ],
+          },
+        },
+      ];
+
+      // (80 - 15) * 8 + max(0, 80 - 100) * 8 = 520 kg
+      const result = calculateWorkoutTotalVolume(undefined, assistedBlocks);
+      expect(result.volume).toBe(520);
+
+      const history: WorkoutSession[] = [
+        {
+          id: 'sess_assisted',
+          title: 'Pull Assisted',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          status: 'completed',
+          durationSeconds: 1200,
+          completedSetsCount: 1,
+          totalSetsCount: 1,
+          totalVolumeKg: 520,
+          blocks: [assistedBlocks[0]],
+        },
+      ];
+
+      const pr = calculateMaxE1RM(history, 'Tractions Prise Pronation');
+      expect(pr).not.toBeNull();
+      expect(pr?.weightKg).toBe(65);
+    });
+
+    it('avoids floating-point noise when multiplying bodyweightFactor (e.g. 74.9 * 0.9 + 10 = 77.41)', () => {
+      const history: WorkoutSession[] = [
+        {
+          id: 'sess_dips',
+          title: 'Push',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          status: 'completed',
+          durationSeconds: 1200,
+          completedSetsCount: 1,
+          totalSetsCount: 1,
+          totalVolumeKg: 774.1,
+          blocks: [
+            {
+              id: 'b1',
+              type: 'single',
+              exercise: {
+                id: 'ex_dips',
+                exerciseId: 'dips',
+                exerciseName: 'Dips',
+                primaryMuscle: 'Pectoraux',
+                targetMuscles: [],
+                restSeconds: 90,
+                sets: [
+                  {
+                    id: 's1',
+                    setNumber: 1,
+                    type: 'normal',
+                    isBodyweight: true,
+                    bodyweightUsedKg: 74.9,
+                    weightKg: 10,
+                    reps: 10,
+                    completed: true,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ];
+
+      const pr = calculateMaxE1RM(history, 'Dips');
+      expect(pr).not.toBeNull();
+      expect(pr?.weightKg).toBe(77.41);
+    });
   });
 
   describe('flagPossibleUnderRecovery - Fatigue RIR Logic (MO-04)', () => {
