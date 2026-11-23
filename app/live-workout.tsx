@@ -126,7 +126,7 @@ interface WorkoutDurationWidgetProps {
   theme: any;
 }
 
-const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo(({
+const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo(function WorkoutDurationWidget({
   startTime,
   hasStarted,
   isPaused,
@@ -134,7 +134,7 @@ const WorkoutDurationWidget: React.FC<WorkoutDurationWidgetProps> = React.memo((
   durationSeconds,
   onPress,
   theme,
-}) => {
+}) {
   const [elapsed, setElapsed] = useState<number>(() => {
     if (!hasStarted || !startTime) return 0;
     if (isPaused) return durationSeconds || 0;

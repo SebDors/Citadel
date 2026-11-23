@@ -109,146 +109,6 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
     }
   }, [session, visible]);
 
-  if (!currentSession) return null;
-
-  const formattedDate = new Date(currentSession.startTime).toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const formattedTime = new Date(currentSession.startTime).toLocaleTimeString('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  const blocks = getSessionBlocks(currentSession);
-
-  const handleConvertToTemplate = () => {
-    onClose();
-    router.push({ pathname: '/template-editor', params: { fromSessionId: currentSession.id } });
-  };
-
-  const handleStartEdit = () => {
-    setEditTitle(currentSession.title || 'Séance');
-    const d = new Date(currentSession.startTime);
-    const day = d.getDate().toString().padStart(2, '0');
-    const month = (d.getMonth() + 1).toString().padStart(2, '0');
-    const year = d.getFullYear();
-    setEditDate(`${day}/${month}/${year}`);
-    const hours = d.getHours().toString().padStart(2, '0');
-    const minutes = d.getMinutes().toString().padStart(2, '0');
-    setEditTime(`${hours}:${minutes}`);
-    setEditDurationMin(String(Math.max(1, Math.round((currentSession.durationSeconds || 2700) / 60))));
-    setEditBlocks(JSON.parse(JSON.stringify(getSessionBlocks(currentSession))));
-    setEditIsException(Boolean(currentSession.isException));
-    setEditExceptionReason(currentSession.exceptionReason || 'contrainte_materiel');
-    setEditExceptionNote(currentSession.exceptionNote || '');
-    setIsEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setKeypadTarget(null);
-    setShowExerciseSelector(false);
-  };
-
-  const handleDeleteSession = () => {
-    Alert.alert(
-      'Supprimer cette séance',
-      'Êtes-vous sûr de vouloir supprimer définitivement cette séance de votre historique ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteWorkoutSession(currentSession.id);
-            onClose();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleAddSet = (blockId: string) => {
-    setEditBlocks((prev) =>
-      prev.map((b) => {
-        if (b.id === blockId && b.type === 'single') {
-          const lastSet = b.exercise.sets[b.exercise.sets.length - 1];
-          const newSet: WorkoutSet = {
-            id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-            setNumber: b.exercise.sets.length + 1,
-            type: lastSet ? lastSet.type : 'normal',
-            completed: true,
-            weightKg: lastSet?.weightKg,
-            reps: lastSet?.reps,
-            rir: lastSet?.rir,
-          };
-          return {
-            ...b,
-            exercise: {
-              ...b.exercise,
-              sets: [...b.exercise.sets, newSet],
-            },
-          };
-        }
-        return b;
-      })
-    );
-  };
-
-  const handleRemoveSet = (blockId: string, setId: string) => {
-    setEditBlocks((prev) =>
-      prev.map((b) => {
-        if (b.id === blockId && b.type === 'single') {
-          return {
-            ...b,
-            exercise: {
-              ...b.exercise,
-              sets: b.exercise.sets
-                .filter((s) => s.id !== setId)
-                .map((s, idx) => ({ ...s, setNumber: idx + 1 })),
-            },
-          };
-        }
-        return b;
-      })
-    );
-  };
-
-  const handleRemoveBlock = (blockId: string) => {
-    setEditBlocks((prev) => prev.filter((b) => b.id !== blockId));
-  };
-
-  const handleAddExercise = (ex: SharedExercise) => {
-    const newBlock: SingleExerciseBlock = {
-      id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      type: 'single',
-      exercise: {
-        id: `ex_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        primaryMuscle: ex.primaryMuscle,
-        targetMuscles: ex.targetMuscles || [],
-        restSeconds: 90,
-        sets: [
-          {
-            id: `set_${Date.now()}_1`,
-            setNumber: 1,
-            type: 'normal',
-            completed: true,
-            weightKg: undefined,
-            reps: 10,
-          },
-        ],
-      },
-    };
-    setEditBlocks((prev) => [...prev, newBlock]);
-    setShowExerciseSelector(false);
-  };
-
   const handleCommitSetField = useCallback(
     (blockId: string, setId: string, field: NumericFieldType, rawVal: string) => {
       const num = parseFloat(rawVal);
@@ -455,6 +315,146 @@ export const PastSessionDetailModal: React.FC<PastSessionDetailModalProps> = ({
     },
     [keypadTarget, handleCommitSetField]
   );
+
+  if (!currentSession) return null;
+
+  const formattedDate = new Date(currentSession.startTime).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const formattedTime = new Date(currentSession.startTime).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const blocks = getSessionBlocks(currentSession);
+
+  const handleConvertToTemplate = () => {
+    onClose();
+    router.push({ pathname: '/template-editor', params: { fromSessionId: currentSession.id } });
+  };
+
+  const handleStartEdit = () => {
+    setEditTitle(currentSession.title || 'Séance');
+    const d = new Date(currentSession.startTime);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    setEditDate(`${day}/${month}/${year}`);
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    setEditTime(`${hours}:${minutes}`);
+    setEditDurationMin(String(Math.max(1, Math.round((currentSession.durationSeconds || 2700) / 60))));
+    setEditBlocks(JSON.parse(JSON.stringify(getSessionBlocks(currentSession))));
+    setEditIsException(Boolean(currentSession.isException));
+    setEditExceptionReason(currentSession.exceptionReason || 'contrainte_materiel');
+    setEditExceptionNote(currentSession.exceptionNote || '');
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setKeypadTarget(null);
+    setShowExerciseSelector(false);
+  };
+
+  const handleDeleteSession = () => {
+    Alert.alert(
+      'Supprimer cette séance',
+      'Êtes-vous sûr de vouloir supprimer définitivement cette séance de votre historique ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteWorkoutSession(currentSession.id);
+            onClose();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAddSet = (blockId: string) => {
+    setEditBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          const lastSet = b.exercise.sets[b.exercise.sets.length - 1];
+          const newSet: WorkoutSet = {
+            id: `set_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            setNumber: b.exercise.sets.length + 1,
+            type: lastSet ? lastSet.type : 'normal',
+            completed: true,
+            weightKg: lastSet?.weightKg,
+            reps: lastSet?.reps,
+            rir: lastSet?.rir,
+          };
+          return {
+            ...b,
+            exercise: {
+              ...b.exercise,
+              sets: [...b.exercise.sets, newSet],
+            },
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleRemoveSet = (blockId: string, setId: string) => {
+    setEditBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id === blockId && b.type === 'single') {
+          return {
+            ...b,
+            exercise: {
+              ...b.exercise,
+              sets: b.exercise.sets
+                .filter((s) => s.id !== setId)
+                .map((s, idx) => ({ ...s, setNumber: idx + 1 })),
+            },
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleRemoveBlock = (blockId: string) => {
+    setEditBlocks((prev) => prev.filter((b) => b.id !== blockId));
+  };
+
+  const handleAddExercise = (ex: SharedExercise) => {
+    const newBlock: SingleExerciseBlock = {
+      id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      type: 'single',
+      exercise: {
+        id: `ex_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        exerciseId: ex.id,
+        exerciseName: ex.name,
+        primaryMuscle: ex.primaryMuscle,
+        targetMuscles: ex.targetMuscles || [],
+        restSeconds: 90,
+        sets: [
+          {
+            id: `set_${Date.now()}_1`,
+            setNumber: 1,
+            type: 'normal',
+            completed: true,
+            weightKg: undefined,
+            reps: 10,
+          },
+        ],
+      },
+    };
+    setEditBlocks((prev) => [...prev, newBlock]);
+    setShowExerciseSelector(false);
+  };
 
   const handleSaveEdit = async () => {
     const cleanDate = editDate.trim().replace(/-/g, '/');

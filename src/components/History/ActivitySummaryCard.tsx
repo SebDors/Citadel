@@ -37,6 +37,7 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
   const { theme } = useTheme();
   const { data, deleteWorkoutSession } = useWorkout();
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
   const router = useRouter();
 
   const handleDelete = (sessionId: string) => {
@@ -89,8 +90,6 @@ export const ActivitySummaryCard: React.FC<ActivitySummaryCardProps> = ({
 
     const exercisesStr = blockSummaries.join(' · ');
     const targetMusclesList = Array.from(targetMusclesSet);
-
-    const [showDetail, setShowDetail] = useState(false);
 
     return (
       <Card style={styles.cardMargin}>
