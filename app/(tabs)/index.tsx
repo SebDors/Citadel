@@ -43,12 +43,10 @@ import {
   Share2,
   ArrowUpCircle,
   Clock,
-  SlidersHorizontal,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { LogCardioModal } from "../../src/components/History/LogCardioModal";
 import { CardioTemplateModal } from "../../src/components/Home/CardioTemplateModal";
-import { CardioActivitiesModal } from "../../src/components/Home/CardioActivitiesModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
 import { WeeklySplitSchedulerCard } from "../../src/components/Home/WeeklySplitSchedulerCard";
 import { UpdateModal } from "../../src/components/Profile/UpdateModal";
@@ -151,7 +149,6 @@ export default function WorkoutTab() {
   const [showTemplateMenuModal, setShowTemplateMenuModal] = useState(false);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [showCardioTemplateModal, setShowCardioTemplateModal] = useState(false);
-  const [showCardioActivitiesModal, setShowCardioActivitiesModal] = useState(false);
   const [editingCardioTemplate, setEditingCardioTemplate] = useState<CardioTemplate | null>(null);
   const [logCardioPreset, setLogCardioPreset] = useState<{
     activity: string;
@@ -948,35 +945,21 @@ export default function WorkoutTab() {
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
               MES SÉANCES CARDIO
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <TouchableOpacity
-                style={[
-                  styles.newFolderBtn,
-                  { borderColor: theme.border, backgroundColor: theme.surface },
-                ]}
-                onPress={() => setShowCardioActivitiesModal(true)}
-              >
-                <SlidersHorizontal size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
-                <Text style={[styles.newFolderText, { color: theme.textMuted }]}>
-                  Activités
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.newFolderBtn,
-                  { borderColor: '#F9731650', backgroundColor: theme.surface },
-                ]}
-                onPress={() => {
-                  setEditingCardioTemplate(null);
-                  setShowCardioTemplateModal(true);
-                }}
-              >
-                <Plus size={13} color="#F97316" style={{ marginRight: 4 }} />
-                <Text style={[styles.newFolderText, { color: '#F97316' }]}>
-                  Cardio
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.newFolderBtn,
+                { borderColor: '#F9731650', backgroundColor: theme.surface },
+              ]}
+              onPress={() => {
+                setEditingCardioTemplate(null);
+                setShowCardioTemplateModal(true);
+              }}
+            >
+              <Plus size={13} color="#F97316" style={{ marginRight: 4 }} />
+              <Text style={[styles.newFolderText, { color: '#F97316' }]}>
+                Cardio
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {(data?.cardioTemplates || []).length === 0 ? (
@@ -1173,12 +1156,6 @@ export default function WorkoutTab() {
             setEditingCardioTemplate(null);
           }}
           onSave={saveCardioTemplate}
-        />
-
-        {/* Modale CRUD des Activités Cardio */}
-        <CardioActivitiesModal
-          visible={showCardioActivitiesModal}
-          onClose={() => setShowCardioActivitiesModal(false)}
         />
 
         {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}
