@@ -41,7 +41,7 @@ export const UpdateService = {
    * Récupère la version actuelle de l'application depuis la configuration Expo
    */
   getCurrentVersion(): string {
-    return Constants.expoConfig?.version || '1.5.1';
+    return Constants.expoConfig?.version || '1.8.0';
   },
 
   /**

@@ -1,3 +1,37 @@
+🎉 Nouveautés de la version 1.8.0 :
+
+⚡ Architecture, Performances & Fiabilité
+- Migration complète vers une base de données locale SQLite relationnelle indexée (sauvegardes instantanées, table incrémentale des records PR et historique virtualisé sans troncature).
+- Découpage modulaire de l'état (Zustand), écran de récupération en cas d'erreur (`ErrorBoundary`) et retrait de la permission Android inutile `RECORD_AUDIO`.
+
+🧭 Navigation & Ergonomie
+- Swipe natif fluide entre les onglets principaux avec indicateur visuel de l'onglet actif.
+- Minuteur de repos persistant accessible depuis tous les onglets et retours haptiques natifs sur les séries, minuteurs et circuits.
+- Réorganisation tactile par glisser-déposer (Drag & Drop) des exercices et blocs.
+- Menu de séance simplifié, confirmation systématique lors de la suppression d'une série et réorganisation claire des Paramètres.
+
+🗓️ Planification & Cardio
+- Planificateur hebdomadaire (*Weekly Split Scheduler*) intégrant les séances de musculation et les modèles cardio.
+- Création, modification et suppression de modèles de séances cardio ainsi que gestion complète (CRUD) des activités cardio personnalisées.
+
+🏋️ Entraînement, Charges & Poids de Corps
+- Fourchettes de répétitions (*Rep Ranges*) configurables dans les modèles et en séance live.
+- Générateur automatique d'échauffement progressif.
+- Amélioration du pavé numérique PDC (`+/-`), coefficients biomécaniques de poids de corps pour le tonnage réel et affichage détaillé dans l'historique (`PDC + X kg (total)`).
+- Ajout des exercices Planche Latérale et Planche Latérale Dynamique.
+
+📊 Analyses, Graphiques & Mensurations
+- Jauge anti-blessure **ACWR** (Ratio Charge Aiguë / Chronique) avec infobulle explicative et graphique Radar d'équilibre musculaire (repliable) intégrant les muscles secondaires (0.5) et les circuits.
+- Fiche détail d'exercice repensée : courbes lissées (Charge Max & 1RM Estimé ajusté au RIR) interactives au toucher et records au Poids de Corps.
+- Choix de la formule de calcul du 1RM dans les paramètres (Epley par défaut, Brzycki, Lander, Wathen).
+- Suivi du taux de masse grasse (%), indicateurs de défilement sur les graphiques de mensurations et recherche/filtres dans l'historique (`Tous`, `Muscu`, `Cardio`).
+
+💾 Sauvegarde & Importation
+- Import universel CSV depuis **Strong**, **Hevy** et **Citadel**.
+- Sauvegarde locale quotidienne rotative et séparation claire Sauvegarde / Exportation dans les réglages.
+
+---
+
 🎉 Nouveautés de la version 1.7.4 :
 
 📏 Mensurations — Tour de Taille & Suivi Graphique
