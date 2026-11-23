@@ -603,6 +603,12 @@ export function saveFullDataToDb(
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('cardio_templates', ?)",
       [JSON.stringify(data.cardioTemplates || [])]
     );
+    if (data.cardioActivities !== undefined) {
+      db.runSync(
+        "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('cardio_activities', ?)",
+        [JSON.stringify(data.cardioActivities)]
+      );
+    }
   });
 }
 
@@ -669,7 +675,7 @@ export function loadFullDataFromDb(db: SQLite.SQLiteDatabase): FitTrackerData | 
     : null;
 
   const metaRows = db.getAllSync<{ key: string; value: string }>(
-    "SELECT key, value FROM app_meta WHERE key IN ('has_completed_onboarding', 'has_created_first_session', 'has_completed_first_workout', 'weekly_schedule', 'cardio_templates')"
+    "SELECT key, value FROM app_meta WHERE key IN ('has_completed_onboarding', 'has_created_first_session', 'has_completed_first_workout', 'weekly_schedule', 'cardio_templates', 'cardio_activities')"
   );
   const metaMap: Record<string, string> = {};
   metaRows.forEach((r) => { metaMap[r.key] = r.value; });
@@ -682,6 +688,7 @@ export function loadFullDataFromDb(db: SQLite.SQLiteDatabase): FitTrackerData | 
     measurements,
     cardioSessions,
     cardioTemplates: metaMap['cardio_templates'] ? JSON.parse(metaMap['cardio_templates']) : [],
+    cardioActivities: metaMap['cardio_activities'] ? JSON.parse(metaMap['cardio_activities']) : undefined,
     customExercises,
     currentWorkout,
     hasCompletedOnboarding: metaMap['has_completed_onboarding'] === 'true',

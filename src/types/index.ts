@@ -209,6 +209,16 @@ export interface CardioSession {
   notes?: string;
 }
 
+export const DEFAULT_CARDIO_ACTIVITIES: string[] = [
+  'Course',
+  'Boxe',
+  'Vélo',
+  'Natation',
+  'Corde à sauter',
+  'HIIT',
+  'Rameur',
+];
+
 export interface CardioTemplate {
   id: string;
   title: string;
@@ -226,6 +236,7 @@ export interface FitTrackerData {
   history: WorkoutSession[];
   cardioSessions?: CardioSession[];
   cardioTemplates?: CardioTemplate[];
+  cardioActivities?: string[];
   measurements: BodyMeasurement[];
   folders?: WorkoutFolder[];
   customExercises?: SharedExercise[];

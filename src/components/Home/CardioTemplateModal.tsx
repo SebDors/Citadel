@@ -10,10 +10,12 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import { X, Flame, Plus, Minus, Clock, Zap, Check } from 'lucide-react-native';
+import { X, Flame, Plus, Minus, Clock, Zap, Check, SlidersHorizontal } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { useWorkout } from '../../context/WorkoutContext';
 import { CardioTemplate } from '../../types';
 import { Button } from '../UI/Button';
+import { CardioActivitiesModal } from './CardioActivitiesModal';
 
 interface CardioTemplateModalProps {
   visible: boolean;
@@ -21,16 +23,6 @@ interface CardioTemplateModalProps {
   onClose: () => void;
   onSave: (template: CardioTemplate) => Promise<void> | void;
 }
-
-const PRESET_ACTIVITIES = [
-  'Course',
-  'Boxe',
-  'Vélo',
-  'Natation',
-  'Corde à sauter',
-  'HIIT',
-  'Rameur',
-];
 
 const PRESET_DURATIONS = [15, 30, 45, 60];
 
@@ -41,19 +33,21 @@ export const CardioTemplateModal: React.FC<CardioTemplateModalProps> = ({
   onSave,
 }) => {
   const { theme } = useTheme();
+  const { cardioActivities } = useWorkout();
   const [title, setTitle] = useState('');
-  const [activity, setActivity] = useState('Course');
+  const [activity, setActivity] = useState(cardioActivities[0] || 'Course');
   const [isCustomActivity, setIsCustomActivity] = useState(false);
   const [customActivityText, setCustomActivityText] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [rpe, setRpe] = useState(6);
   const [notes, setNotes] = useState('');
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     if (templateToEdit) {
       setTitle(templateToEdit.title || '');
-      const matched = PRESET_ACTIVITIES.find(
+      const matched = cardioActivities.find(
         (p) => p.toLowerCase() === (templateToEdit.activity || '').trim().toLowerCase()
       );
       if (matched) {
@@ -70,7 +64,7 @@ export const CardioTemplateModal: React.FC<CardioTemplateModalProps> = ({
       setNotes(templateToEdit.notes || '');
     } else {
       setTitle('');
-      setActivity('Course');
+      setActivity(cardioActivities[0] || 'Course');
       setIsCustomActivity(false);
       setCustomActivityText('');
       setDurationMinutes(30);
@@ -152,9 +146,19 @@ export const CardioTemplateModal: React.FC<CardioTemplateModalProps> = ({
               />
 
               {/* Type d'activité */}
-              <Text style={[styles.label, { color: theme.textMuted }]}>ACTIVITÉ</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 }}>
+                <Text style={[styles.label, { color: theme.textMuted, marginTop: 0, marginBottom: 0 }]}>ACTIVITÉ</Text>
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => setShowActivitiesModal(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}
+                >
+                  <SlidersHorizontal size={12} color="#F97316" />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#F97316' }}>Gérer</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.chipsWrap}>
-                {PRESET_ACTIVITIES.map((item) => {
+                {cardioActivities.map((item) => {
                   const selected = !isCustomActivity && activity === item;
                   return (
                     <TouchableOpacity
@@ -348,6 +352,11 @@ export const CardioTemplateModal: React.FC<CardioTemplateModalProps> = ({
           </View>
         </KeyboardAvoidingView>
       </TouchableOpacity>
+
+      <CardioActivitiesModal
+        visible={showActivitiesModal}
+        onClose={() => setShowActivitiesModal(false)}
+      />
     </Modal>
   );
 };

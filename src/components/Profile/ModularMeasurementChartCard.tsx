@@ -11,7 +11,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Text as SvgText, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { BodyMeasurement, MeasurementMetricKey } from '../../types';
 import { useWorkout } from '../../context/WorkoutContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -218,7 +218,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
         </TouchableOpacity>
       </View>
 
-      {/* Pilules horizontales aérées avec indicateurs directionnels de défilement */}
+      {/* Pilules horizontales aérées avec indicateurs directionnels fondus sans bordure */}
       <View style={[styles.buttonsWrapper, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <ScrollView
           ref={metricsScrollRef}
@@ -228,11 +228,7 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
           onScroll={handleMetricsScroll}
           onLayout={(e) => setMetricsContainerWidth(e.nativeEvent.layout.width)}
           onContentSizeChange={(w) => setMetricsContentWidth(w)}
-          contentContainerStyle={[
-            styles.buttonsScrollContent,
-            canScrollRight && { paddingRight: 28 },
-            canScrollLeft && { paddingLeft: 28 },
-          ]}
+          contentContainerStyle={styles.buttonsScrollContent}
         >
           {visibleConfigs.map((config) => {
             const isActive = config.key === activeConfig.key;
@@ -269,13 +265,19 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
             activeOpacity={0.8}
             onPress={() => nudgeMetricsScroll(-120)}
             accessibilityLabel="Défiler les mesures vers la gauche"
-            style={[
-              styles.scrollHintArrow,
-              styles.scrollHintLeft,
-              { backgroundColor: theme.surface, borderRightColor: theme.border },
-            ]}
+            style={[styles.scrollHintArrow, styles.scrollHintLeft]}
           >
-            <ChevronLeft size={16} color={theme.accent} />
+            <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Defs>
+                <LinearGradient id="fadeLeft" x1="0" y1="0" x2="1" y2="0">
+                  <Stop offset="0%" stopColor={theme.surface} stopOpacity="0.96" />
+                  <Stop offset="55%" stopColor={theme.surface} stopOpacity="0.72" />
+                  <Stop offset="100%" stopColor={theme.surface} stopOpacity="0" />
+                </LinearGradient>
+              </Defs>
+              <Rect x="0" y="0" width="100%" height="100%" fill="url(#fadeLeft)" />
+            </Svg>
+            <ChevronLeft size={16} color={theme.accent} style={styles.scrollHintIconLeft} />
           </TouchableOpacity>
         )}
 
@@ -284,13 +286,19 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
             activeOpacity={0.8}
             onPress={() => nudgeMetricsScroll(120)}
             accessibilityLabel="Défiler les mesures vers la droite"
-            style={[
-              styles.scrollHintArrow,
-              styles.scrollHintRight,
-              { backgroundColor: theme.surface, borderLeftColor: theme.border },
-            ]}
+            style={[styles.scrollHintArrow, styles.scrollHintRight]}
           >
-            <ChevronRight size={16} color={theme.accent} />
+            <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Defs>
+                <LinearGradient id="fadeRight" x1="0" y1="0" x2="1" y2="0">
+                  <Stop offset="0%" stopColor={theme.surface} stopOpacity="0" />
+                  <Stop offset="45%" stopColor={theme.surface} stopOpacity="0.72" />
+                  <Stop offset="100%" stopColor={theme.surface} stopOpacity="0.96" />
+                </LinearGradient>
+              </Defs>
+              <Rect x="0" y="0" width="100%" height="100%" fill="url(#fadeRight)" />
+            </Svg>
+            <ChevronRight size={16} color={theme.accent} style={styles.scrollHintIconRight} />
           </TouchableOpacity>
         )}
       </View>
@@ -587,17 +595,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: 28,
-    alignItems: 'center',
+    width: 38,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
   },
   scrollHintLeft: {
     left: 0,
-    borderRightWidth: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 6,
   },
   scrollHintRight: {
     right: 0,
-    borderLeftWidth: 1,
+    alignItems: 'flex-end',
+    paddingRight: 6,
+  },
+  scrollHintIconLeft: {
+    zIndex: 2,
+  },
+  scrollHintIconRight: {
+    zIndex: 2,
   },
   metricBtn: {
     paddingHorizontal: 14,

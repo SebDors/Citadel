@@ -17,6 +17,7 @@ import {
   CircuitExerciseItem,
   CardioSession,
   CardioTemplate,
+  DEFAULT_CARDIO_ACTIVITIES,
   SessionNote,
   SessionExceptionReason,
   getTemplateBlocks,
@@ -107,6 +108,11 @@ export interface WorkoutContextType {
   updateWeeklySchedule: (schedule: Record<number, string | null>) => Promise<void>;
   saveCardioTemplate: (tpl: CardioTemplate) => Promise<void>;
   deleteCardioTemplate: (id: string) => Promise<void>;
+  cardioActivities: string[];
+  addCardioActivity: (name: string) => Promise<void>;
+  renameCardioActivity: (oldName: string, newName: string) => Promise<void>;
+  deleteCardioActivity: (name: string) => Promise<void>;
+  resetCardioActivities: () => Promise<void>;
   // Base d'exercices personnalisés
   customExercises: SharedExercise[];
   allExercises: SharedExercise[];
@@ -525,6 +531,83 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...data,
       cardioTemplates: nextCardioTemplates,
       weeklySchedule: nextSchedule,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
+  };
+
+  const cardioActivities = useMemo(
+    () => data?.cardioActivities ?? [...DEFAULT_CARDIO_ACTIVITIES],
+    [data?.cardioActivities]
+  );
+
+  const addCardioActivity = async (name: string) => {
+    if (!data) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const current = data.cardioActivities ?? [...DEFAULT_CARDIO_ACTIVITIES];
+    if (current.some((a) => a.toLowerCase() === trimmed.toLowerCase())) return;
+    const updatedData: FitTrackerData = {
+      ...data,
+      cardioActivities: [...current, trimmed],
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
+  };
+
+  const renameCardioActivity = async (oldName: string, newName: string) => {
+    if (!data) return;
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const current = data.cardioActivities ?? [...DEFAULT_CARDIO_ACTIVITIES];
+    if (
+      trimmed.toLowerCase() !== oldName.toLowerCase() &&
+      current.some((a) => a.toLowerCase() === trimmed.toLowerCase())
+    ) {
+      return;
+    }
+    const nextActivities = current.map((a) =>
+      a.toLowerCase() === oldName.toLowerCase() ? trimmed : a
+    );
+    const nextTemplates = (data.cardioTemplates || []).map((t) =>
+      t.activity.toLowerCase() === oldName.toLowerCase() ? { ...t, activity: trimmed } : t
+    );
+    const nextSchedule = { ...(data.weeklySchedule || {}) };
+    const oldPrefix = `cardio:${oldName.toLowerCase()}`;
+    Object.keys(nextSchedule).forEach((k) => {
+      const dayIdx = Number(k);
+      const val = nextSchedule[dayIdx];
+      if (typeof val === 'string' && val.toLowerCase() === oldPrefix) {
+        nextSchedule[dayIdx] = `cardio:${trimmed}`;
+      }
+    });
+    const updatedData: FitTrackerData = {
+      ...data,
+      cardioActivities: nextActivities,
+      cardioTemplates: nextTemplates,
+      weeklySchedule: nextSchedule,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
+  };
+
+  const deleteCardioActivity = async (name: string) => {
+    if (!data) return;
+    const current = data.cardioActivities ?? [...DEFAULT_CARDIO_ACTIVITIES];
+    const nextActivities = current.filter((a) => a.toLowerCase() !== name.toLowerCase());
+    const updatedData: FitTrackerData = {
+      ...data,
+      cardioActivities: nextActivities,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
+  };
+
+  const resetCardioActivities = async () => {
+    if (!data) return;
+    const updatedData: FitTrackerData = {
+      ...data,
+      cardioActivities: [...DEFAULT_CARDIO_ACTIVITIES],
     };
     setData(updatedData);
     await StorageService.saveData(updatedData);
@@ -2285,6 +2368,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateWeeklySchedule,
       saveCardioTemplate,
       deleteCardioTemplate,
+      cardioActivities,
+      addCardioActivity,
+      renameCardioActivity,
+      deleteCardioActivity,
+      resetCardioActivities,
       customExercises,
       allExercises,
       addCustomExercise,
@@ -2299,6 +2387,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       data,
       loading,
       activeSession,
+      cardioActivities,
       customExercises,
       allExercises,
       restTimer,

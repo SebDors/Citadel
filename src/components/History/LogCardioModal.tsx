@@ -26,8 +26,10 @@ import {
   FileText,
   Check,
   Zap,
+  SlidersHorizontal,
 } from 'lucide-react-native';
 import { CardioSession } from '../../types';
+import { CardioActivitiesModal } from '../Home/CardioActivitiesModal';
 
 interface LogCardioModalProps {
   visible: boolean;
@@ -40,14 +42,6 @@ interface LogCardioModalProps {
   initialNotes?: string;
   sessionToEdit?: CardioSession | null;
 }
-
-const PRESET_ACTIVITIES = [
-  { label: 'Boxe' },
-  { label: 'Course' },
-  { label: 'Corde à sauter' },
-  { label: 'Natation' },
-  { label: 'Vélo' },
-];
 
 const PRESET_DURATIONS = [15, 30, 45, 60];
 
@@ -76,7 +70,8 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
   sessionToEdit,
 }) => {
   const { theme } = useTheme();
-  const { logCardioSession } = useWorkout();
+  const { logCardioSession, cardioActivities } = useWorkout();
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
 
   const formatISOToFrench = (isoStr?: string): string => {
     if (!isoStr) {
@@ -144,10 +139,11 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
           setTimeStr('12:00');
         }
 
-        const isPreset = PRESET_ACTIVITIES.some((p) => p.label.toLowerCase() === sessionToEdit.activity.toLowerCase());
-        if (isPreset) {
-          const matched = PRESET_ACTIVITIES.find((p) => p.label.toLowerCase() === sessionToEdit.activity.toLowerCase());
-          setActivity(matched?.label || sessionToEdit.activity);
+        const matched = cardioActivities.find(
+          (p) => p.toLowerCase() === sessionToEdit.activity.toLowerCase()
+        );
+        if (matched) {
+          setActivity(matched);
           setIsCustomActivity(false);
           setCustomActivityText('');
         } else {
@@ -162,11 +158,11 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
       } else {
         setDateStr(formatISOToFrench(initialDate) || todayFrenchStr);
         if (initialActivity && initialActivity.toLowerCase() !== 'cardio') {
-          const matchedPreset = PRESET_ACTIVITIES.find(
-            (p) => p.label.toLowerCase() === initialActivity.trim().toLowerCase()
+          const matchedPreset = cardioActivities.find(
+            (p) => p.toLowerCase() === initialActivity.trim().toLowerCase()
           );
           if (matchedPreset) {
-            setActivity(matchedPreset.label);
+            setActivity(matchedPreset);
             setIsCustomActivity(false);
             setCustomActivityText('');
           } else {
@@ -175,8 +171,8 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
             setCustomActivityText(initialActivity.trim());
           }
         } else {
-          setActivity('Boxe');
-          setIsCustomActivity(false);
+          setActivity(cardioActivities[0] || 'Cardio');
+          setIsCustomActivity(cardioActivities.length === 0);
           setCustomActivityText('');
         }
         setDurationMinutes(initialDurationMinutes && initialDurationMinutes > 0 ? initialDurationMinutes : 45);
@@ -346,19 +342,29 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
           >
             {/* 1. Sélection de l'Activité */}
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: `${theme.accent}15` }]}>
-                  <Flame size={14} color={theme.accent} />
+              <View style={[styles.sectionHeader, { justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={[styles.sectionIconBadge, { backgroundColor: `${theme.accent}15` }]}>
+                    <Flame size={14} color={theme.accent} />
+                  </View>
+                  <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>ACTIVITÉ</Text>
                 </View>
-                <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>ACTIVITÉ</Text>
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => setShowActivitiesModal(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border }}
+                >
+                  <SlidersHorizontal size={12} color={theme.accent} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: theme.accent }}>Gérer</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.chipsRow}>
-                {PRESET_ACTIVITIES.map((act) => {
-                  const isSelected = !isCustomActivity && activity === act.label;
+                {cardioActivities.map((act) => {
+                  const isSelected = !isCustomActivity && activity === act;
                   return (
                     <TouchableOpacity
-                      key={act.label}
+                      key={act}
                       activeOpacity={0.7}
                       style={[
                         styles.chip,
@@ -367,7 +373,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
                           borderColor: isSelected ? theme.accent : theme.border,
                         },
                       ]}
-                      onPress={() => handleSelectPresetActivity(act.label)}
+                      onPress={() => handleSelectPresetActivity(act)}
                     >
                       <Text
                         style={[
@@ -375,7 +381,7 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
                           { color: isSelected ? '#FFFFFF' : theme.text, fontWeight: isSelected ? '800' : '600' },
                         ]}
                       >
-                        {act.label}
+                        {act}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -624,6 +630,11 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
           </ScrollView>
         </Animated.View>
       </View>
+
+      <CardioActivitiesModal
+        visible={showActivitiesModal}
+        onClose={() => setShowActivitiesModal(false)}
+      />
     </Modal>
   );
 };

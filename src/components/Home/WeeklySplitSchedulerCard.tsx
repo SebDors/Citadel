@@ -12,12 +12,12 @@ import {
 } from 'react-native';
 import { CalendarDays, Play, X, Check, Coffee, Flame, Dumbbell } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { WorkoutTemplate, CardioTemplate } from '../../types';
+import { useWorkout } from '../../context/WorkoutContext';
+import { WorkoutTemplate, CardioTemplate, DEFAULT_CARDIO_ACTIVITIES } from '../../types';
 import { Card } from '../UI/Card';
 
 export const CARDIO_SCHEDULE_PREFIX = 'cardio:';
 export const CARDIO_TEMPLATE_PREFIX = 'cardio_tpl:';
-const CARDIO_SCHEDULE_PRESETS = ['Cardio', 'Course', 'Boxe', 'Vélo', 'Natation', 'Corde à sauter'];
 
 export function isCardioScheduleValue(val?: string | null): boolean {
   return (
@@ -64,8 +64,14 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
   onStartCardio,
 }) => {
   const { theme } = useTheme();
+  const { cardioActivities } = useWorkout();
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
   const [customCardioName, setCustomCardioName] = useState('');
+
+  const cardioSchedulePresets = React.useMemo(() => {
+    const list = cardioActivities && cardioActivities.length > 0 ? cardioActivities : DEFAULT_CARDIO_ACTIVITIES;
+    return ['Cardio', ...list.filter((a) => a.toLowerCase() !== 'cardio')];
+  }, [cardioActivities]);
 
   const resolveScheduledItem = (val?: string | null) => {
     const cardioTplId = getCardioTemplateIdFromSchedule(val);
@@ -108,7 +114,7 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
   const selectedCustomCardio =
     selectedDayValue &&
     selectedDayValue.startsWith(CARDIO_SCHEDULE_PREFIX) &&
-    !CARDIO_SCHEDULE_PRESETS.some(
+    !cardioSchedulePresets.some(
       (p) => `${CARDIO_SCHEDULE_PREFIX}${p}`.toLowerCase() === selectedDayValue.toLowerCase()
     )
       ? getCardioActivityFromSchedule(selectedDayValue)
@@ -351,7 +357,7 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
                   );
                 })}
 
-                {CARDIO_SCHEDULE_PRESETS.map((preset) => {
+                {cardioSchedulePresets.map((preset) => {
                   const valueKey = `${CARDIO_SCHEDULE_PREFIX}${preset}`;
                   const isSelected =
                     selectedDayIdx !== null &&
