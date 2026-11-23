@@ -1,5 +1,16 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, PanResponder, ScrollView, Modal, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  PanResponder,
+  ScrollView,
+  Modal,
+  Platform,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { BodyMeasurement, MeasurementMetricKey } from '../../types';
 import { useWorkout } from '../../context/WorkoutContext';
@@ -7,7 +18,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { formatWeight } from '../../utils/numberUtils';
 import { buildSmoothBezierPath, findNearestChartPointIndex } from '../../utils/svgChartUtils';
 import { Card } from '../UI/Card';
-import { TrendingUp, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { TrendingUp, SlidersHorizontal, X, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { calculateExponentialMovingAverage } from '../../services/analyticsService';
 
 interface ModularMeasurementChartCardProps {
@@ -43,6 +54,31 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
   const [activeMetricKey, setActiveMetricKey] = useState<MeasurementMetricKey>(visibleConfigs[0].key);
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  const metricsScrollRef = useRef<ScrollView>(null);
+  const [metricsScrollX, setMetricsScrollX] = useState(0);
+  const [metricsContainerWidth, setMetricsContainerWidth] = useState(0);
+  const [metricsContentWidth, setMetricsContentWidth] = useState(0);
+
+  const canScrollLeft = metricsScrollX > 6;
+  const canScrollRight =
+    metricsContentWidth > metricsContainerWidth + 6 &&
+    metricsScrollX < metricsContentWidth - metricsContainerWidth - 6;
+
+  const handleMetricsScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setMetricsScrollX(e.nativeEvent.contentOffset.x);
+  };
+
+  const nudgeMetricsScroll = (delta: number) => {
+    const maxOffset = Math.max(0, metricsContentWidth - metricsContainerWidth);
+    const targetX = Math.max(0, Math.min(maxOffset, metricsScrollX + delta));
+    metricsScrollRef.current?.scrollTo({ x: targetX, animated: true });
+  };
+
+  useEffect(() => {
+    setMetricsScrollX(0);
+    metricsScrollRef.current?.scrollTo({ x: 0, animated: false });
+  }, [visibleConfigs.length]);
 
   useEffect(() => {
     if (!visibleConfigs.some((c) => c.key === activeMetricKey)) {
@@ -182,12 +218,21 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
         </TouchableOpacity>
       </View>
 
-      {/* Pilules horizontales aérées sans retour à la ligne */}
+      {/* Pilules horizontales aérées avec indicateurs directionnels de défilement */}
       <View style={[styles.buttonsWrapper, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <ScrollView
+          ref={metricsScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.buttonsScrollContent}
+          scrollEventThrottle={16}
+          onScroll={handleMetricsScroll}
+          onLayout={(e) => setMetricsContainerWidth(e.nativeEvent.layout.width)}
+          onContentSizeChange={(w) => setMetricsContentWidth(w)}
+          contentContainerStyle={[
+            styles.buttonsScrollContent,
+            canScrollRight && { paddingRight: 28 },
+            canScrollLeft && { paddingLeft: 28 },
+          ]}
         >
           {visibleConfigs.map((config) => {
             const isActive = config.key === activeConfig.key;
@@ -218,6 +263,36 @@ export const ModularMeasurementChartCard: React.FC<ModularMeasurementChartCardPr
             );
           })}
         </ScrollView>
+
+        {canScrollLeft && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => nudgeMetricsScroll(-120)}
+            accessibilityLabel="Défiler les mesures vers la gauche"
+            style={[
+              styles.scrollHintArrow,
+              styles.scrollHintLeft,
+              { backgroundColor: theme.surface, borderRightColor: theme.border },
+            ]}
+          >
+            <ChevronLeft size={16} color={theme.accent} />
+          </TouchableOpacity>
+        )}
+
+        {canScrollRight && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => nudgeMetricsScroll(120)}
+            accessibilityLabel="Défiler les mesures vers la droite"
+            style={[
+              styles.scrollHintArrow,
+              styles.scrollHintRight,
+              { backgroundColor: theme.surface, borderLeftColor: theme.border },
+            ]}
+          >
+            <ChevronRight size={16} color={theme.accent} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Current Metric Value Callout */}
@@ -500,11 +575,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 4,
     marginBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
   },
   buttonsScrollContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  scrollHintArrow: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollHintLeft: {
+    left: 0,
+    borderRightWidth: 1,
+  },
+  scrollHintRight: {
+    right: 0,
+    borderLeftWidth: 1,
   },
   metricBtn: {
     paddingHorizontal: 14,

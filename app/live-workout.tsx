@@ -2465,7 +2465,7 @@ export default function LiveWorkoutScreen() {
               <TouchableOpacity
                 style={[
                   styles.sessionMenuItem,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  { backgroundColor: theme.surface },
                 ]}
                 activeOpacity={0.7}
                 onPress={() => {
@@ -2525,7 +2525,7 @@ export default function LiveWorkoutScreen() {
               <TouchableOpacity
                 style={[
                   styles.sessionMenuItem,
-                  { backgroundColor: theme.surface, borderColor: `${theme.danger}40` },
+                  { backgroundColor: theme.surface },
                 ]}
                 activeOpacity={0.7}
                 onPress={() => {
@@ -3398,7 +3398,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 12,
     borderRadius: 14,
-    borderWidth: 1,
   },
   sessionMenuIconBox: {
     width: 40,

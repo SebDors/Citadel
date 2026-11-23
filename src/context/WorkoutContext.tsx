@@ -16,6 +16,7 @@ import {
   CircuitBlock,
   CircuitExerciseItem,
   CardioSession,
+  CardioTemplate,
   SessionNote,
   SessionExceptionReason,
   getTemplateBlocks,
@@ -104,6 +105,8 @@ export interface WorkoutContextType {
   markFirstSessionCreated: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
   updateWeeklySchedule: (schedule: Record<number, string | null>) => Promise<void>;
+  saveCardioTemplate: (tpl: CardioTemplate) => Promise<void>;
+  deleteCardioTemplate: (id: string) => Promise<void>;
   // Base d'exercices personnalisés
   customExercises: SharedExercise[];
   allExercises: SharedExercise[];
@@ -487,6 +490,41 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updatedData: FitTrackerData = {
       ...data,
       weeklySchedule: schedule,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
+  };
+
+  const saveCardioTemplate = async (tpl: CardioTemplate) => {
+    if (!data) return;
+    const existing = data.cardioTemplates || [];
+    const exists = existing.some((c) => c.id === tpl.id);
+    const nextCardioTemplates = exists
+      ? existing.map((c) => (c.id === tpl.id ? tpl : c))
+      : [...existing, tpl];
+    const updatedData: FitTrackerData = {
+      ...data,
+      cardioTemplates: nextCardioTemplates,
+    };
+    setData(updatedData);
+    await StorageService.saveData(updatedData);
+  };
+
+  const deleteCardioTemplate = async (id: string) => {
+    if (!data) return;
+    const nextCardioTemplates = (data.cardioTemplates || []).filter((c) => c.id !== id);
+    const nextSchedule = { ...(data.weeklySchedule || {}) };
+    const prefixKey = `cardio_tpl:${id}`;
+    Object.keys(nextSchedule).forEach((k) => {
+      const dayKey = Number(k);
+      if (nextSchedule[dayKey] === prefixKey) {
+        nextSchedule[dayKey] = null;
+      }
+    });
+    const updatedData: FitTrackerData = {
+      ...data,
+      cardioTemplates: nextCardioTemplates,
+      weeklySchedule: nextSchedule,
     };
     setData(updatedData);
     await StorageService.saveData(updatedData);
@@ -2245,6 +2283,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       markFirstSessionCreated,
       resetOnboarding,
       updateWeeklySchedule,
+      saveCardioTemplate,
+      deleteCardioTemplate,
       customExercises,
       allExercises,
       addCustomExercise,

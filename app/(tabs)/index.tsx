@@ -42,9 +42,11 @@ import {
   Sparkles,
   Share2,
   ArrowUpCircle,
+  Clock,
 } from "lucide-react-native";
 import { ExerciseLibraryModal } from "../../src/components/Workout/ExerciseLibraryModal";
 import { LogCardioModal } from "../../src/components/History/LogCardioModal";
+import { CardioTemplateModal } from "../../src/components/Home/CardioTemplateModal";
 import { OnboardingModal } from "../../src/components/Onboarding/OnboardingModal";
 import { WeeklySplitSchedulerCard } from "../../src/components/Home/WeeklySplitSchedulerCard";
 import { UpdateModal } from "../../src/components/Profile/UpdateModal";
@@ -52,6 +54,7 @@ import { UpdateService, UpdateInfo } from "../../src/services/updateService";
 import {
   WorkoutSession,
   WorkoutTemplate,
+  CardioTemplate,
   WorkoutFolder,
   CircuitBlock,
   getRealLastWorkoutDate,
@@ -134,6 +137,8 @@ export default function WorkoutTab() {
     updateWeeklySchedule,
     allExercises,
     restTimer,
+    saveCardioTemplate,
+    deleteCardioTemplate,
   } = useWorkout();
   const { theme } = useTheme();
   const router = useRouter();
@@ -143,7 +148,14 @@ export default function WorkoutTab() {
     useState<WorkoutTemplate | null>(null);
   const [showTemplateMenuModal, setShowTemplateMenuModal] = useState(false);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
-  const [scheduledCardioActivity, setScheduledCardioActivity] = useState<string | null>(null);
+  const [showCardioTemplateModal, setShowCardioTemplateModal] = useState(false);
+  const [editingCardioTemplate, setEditingCardioTemplate] = useState<CardioTemplate | null>(null);
+  const [logCardioPreset, setLogCardioPreset] = useState<{
+    activity: string;
+    durationMinutes?: number;
+    rpe?: number;
+    notes?: string;
+  } | null>(null);
   const [showMoveFolderModal, setShowMoveFolderModal] = useState(false);
 
   const [showRenameTemplateModal, setShowRenameTemplateModal] = useState(false);
@@ -744,10 +756,18 @@ export default function WorkoutTab() {
           {data?.hasCompletedOnboarding && (
             <WeeklySplitSchedulerCard
               templates={data?.templates || []}
+              cardioTemplates={data?.cardioTemplates || []}
               weeklySchedule={data?.weeklySchedule || {}}
               onUpdateSchedule={updateWeeklySchedule}
               onStartTemplate={(tpl) => handleStartTemplate(tpl.id)}
-              onStartCardio={(activity) => setScheduledCardioActivity(activity)}
+              onStartCardio={(activity, tpl) =>
+                setLogCardioPreset({
+                  activity: tpl?.activity || activity,
+                  durationMinutes: tpl?.defaultDurationMinutes,
+                  rpe: tpl?.defaultRpe,
+                  notes: tpl?.notes,
+                })
+              }
             />
           )}
 
@@ -920,6 +940,146 @@ export default function WorkoutTab() {
             </View>
           )}
 
+          {/* Section Mes Séances Cardio */}
+          <View style={[styles.sectionHeader, { marginTop: 10 }]}>
+            <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+              MES SÉANCES CARDIO
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.newFolderBtn,
+                { borderColor: '#F9731650', backgroundColor: theme.surface },
+              ]}
+              onPress={() => {
+                setEditingCardioTemplate(null);
+                setShowCardioTemplateModal(true);
+              }}
+            >
+              <Plus size={13} color="#F97316" style={{ marginRight: 4 }} />
+              <Text style={[styles.newFolderText, { color: '#F97316' }]}>
+                Cardio
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {(data?.cardioTemplates || []).length === 0 ? (
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => {
+                setEditingCardioTemplate(null);
+                setShowCardioTemplateModal(true);
+              }}
+              style={[
+                styles.cardioEmptyCard,
+                { backgroundColor: theme.cardBg, borderColor: theme.border },
+              ]}
+            >
+              <View style={[styles.cardioIconBox, { backgroundColor: '#F9731618' }]}>
+                <Flame size={18} color="#F97316" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardioEmptyTitle, { color: theme.text }]}>
+                  Créer une séance cardio
+                </Text>
+                <Text style={[styles.cardioEmptySub, { color: theme.textMuted }]}>
+                  Footing, boxe, vélo ou circuit HIIT réutilisable
+                </Text>
+              </View>
+              <Plus size={18} color="#F97316" />
+            </TouchableOpacity>
+          ) : (
+            (data?.cardioTemplates || []).map((cTpl) => (
+              <Card key={cTpl.id} style={styles.cardioTemplateCard}>
+                <View style={styles.cardioTemplateRow}>
+                  <View style={[styles.cardioIconBox, { backgroundColor: '#F9731618' }]}>
+                    <Flame size={18} color="#F97316" />
+                  </View>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={[styles.cardioTemplateTitle, { color: theme.text }]} numberOfLines={1}>
+                      {cTpl.title}
+                    </Text>
+                    <View style={styles.cardioMetaRow}>
+                      <Text style={[styles.cardioMetaText, { color: '#F97316' }]}>
+                        {cTpl.activity}
+                      </Text>
+                      <Text style={[styles.cardioMetaText, { color: theme.textMuted }]}>·</Text>
+                      <Clock size={11} color={theme.textMuted} />
+                      <Text style={[styles.cardioMetaText, { color: theme.textMuted }]}>
+                        {cTpl.defaultDurationMinutes} min
+                      </Text>
+                      {cTpl.defaultRpe !== undefined && (
+                        <>
+                          <Text style={[styles.cardioMetaText, { color: theme.textMuted }]}>·</Text>
+                          <Text style={[styles.cardioMetaText, { color: theme.textMuted }]}>
+                            RPE {cTpl.defaultRpe}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                    {!!cTpl.notes && (
+                      <Text style={[styles.cardioNotesText, { color: theme.textMuted }]} numberOfLines={1}>
+                        {cTpl.notes}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.cardioActionsRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        setLogCardioPreset({
+                          activity: cTpl.activity,
+                          durationMinutes: cTpl.defaultDurationMinutes,
+                          rpe: cTpl.defaultRpe,
+                          notes: cTpl.notes,
+                        })
+                      }
+                      style={[styles.cardioLogBtn, { backgroundColor: '#F97316' }]}
+                      accessibilityLabel={`Enregistrer ${cTpl.title}`}
+                    >
+                      <Play size={12} color="#FFFFFF" fill="#FFFFFF" />
+                      <Text style={styles.cardioLogBtnText}>Noter</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setEditingCardioTemplate(cTpl);
+                        setShowCardioTemplateModal(true);
+                      }}
+                      style={[styles.cardioIconAction, { backgroundColor: theme.surface }]}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                      accessibilityLabel={`Modifier ${cTpl.title}`}
+                    >
+                      <Edit2 size={14} color={theme.textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        Alert.alert(
+                          'Supprimer la séance cardio',
+                          `Voulez-vous supprimer "${cTpl.title}" ?`,
+                          [
+                            { text: 'Annuler', style: 'cancel' },
+                            {
+                              text: 'Supprimer',
+                              style: 'destructive',
+                              onPress: () => deleteCardioTemplate(cTpl.id),
+                            },
+                          ]
+                        );
+                      }}
+                      style={[styles.cardioIconAction, { backgroundColor: theme.surface }]}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                      accessibilityLabel={`Supprimer ${cTpl.title}`}
+                    >
+                      <Trash2 size={14} color={theme.danger} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Card>
+            ))
+          )}
+
           {/* Carte Accès Bibliothèque d'Exercices */}
           <TouchableOpacity
             activeOpacity={0.7}
@@ -977,11 +1137,25 @@ export default function WorkoutTab() {
           onClose={() => setShowLibraryModal(false)}
         />
 
-        {/* Modale Enregistrement Cardio depuis le Planning */}
+        {/* Modale Enregistrement Cardio depuis le Planning / Carte Cardio */}
         <LogCardioModal
-          visible={scheduledCardioActivity !== null}
-          initialActivity={scheduledCardioActivity || undefined}
-          onClose={() => setScheduledCardioActivity(null)}
+          visible={logCardioPreset !== null}
+          initialActivity={logCardioPreset?.activity}
+          initialDurationMinutes={logCardioPreset?.durationMinutes}
+          initialRpe={logCardioPreset?.rpe}
+          initialNotes={logCardioPreset?.notes}
+          onClose={() => setLogCardioPreset(null)}
+        />
+
+        {/* Modale Création / Édition de Modèle Cardio */}
+        <CardioTemplateModal
+          visible={showCardioTemplateModal}
+          templateToEdit={editingCardioTemplate}
+          onClose={() => {
+            setShowCardioTemplateModal(false);
+            setEditingCardioTemplate(null);
+          }}
+          onSave={saveCardioTemplate}
         />
 
         {/* ---------------- MODALE MENU ... DE SÉANCE ---------------- */}
@@ -1918,5 +2092,81 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 17,
+  },
+  cardioEmptyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
+    gap: 12,
+  },
+  cardioIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardioEmptyTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  cardioEmptySub: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  cardioTemplateCard: {
+    padding: 12,
+    marginBottom: 8,
+  },
+  cardioTemplateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  cardioTemplateTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  cardioMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  cardioMetaText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  cardioNotesText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  cardioActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  cardioLogBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  cardioLogBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  cardioIconAction: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

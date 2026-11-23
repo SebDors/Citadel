@@ -209,6 +209,15 @@ export interface CardioSession {
   notes?: string;
 }
 
+export interface CardioTemplate {
+  id: string;
+  title: string;
+  activity: string;
+  defaultDurationMinutes: number;
+  defaultRpe?: number;
+  notes?: string;
+}
+
 import { SharedExercise } from '../constants/exerciseDatabase';
 
 export interface FitTrackerData {
@@ -216,6 +225,7 @@ export interface FitTrackerData {
   templates: WorkoutTemplate[];
   history: WorkoutSession[];
   cardioSessions?: CardioSession[];
+  cardioTemplates?: CardioTemplate[];
   measurements: BodyMeasurement[];
   folders?: WorkoutFolder[];
   customExercises?: SharedExercise[];

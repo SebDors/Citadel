@@ -12,27 +12,37 @@ import {
 } from 'react-native';
 import { CalendarDays, Play, X, Check, Coffee, Flame, Dumbbell } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { WorkoutTemplate } from '../../types';
+import { WorkoutTemplate, CardioTemplate } from '../../types';
 import { Card } from '../UI/Card';
 
 export const CARDIO_SCHEDULE_PREFIX = 'cardio:';
+export const CARDIO_TEMPLATE_PREFIX = 'cardio_tpl:';
 const CARDIO_SCHEDULE_PRESETS = ['Cardio', 'Course', 'Boxe', 'Vélo', 'Natation', 'Corde à sauter'];
 
 export function isCardioScheduleValue(val?: string | null): boolean {
-  return typeof val === 'string' && val.startsWith(CARDIO_SCHEDULE_PREFIX);
+  return (
+    typeof val === 'string' &&
+    (val.startsWith(CARDIO_SCHEDULE_PREFIX) || val.startsWith(CARDIO_TEMPLATE_PREFIX))
+  );
 }
 
 export function getCardioActivityFromSchedule(val?: string | null): string | null {
-  if (!isCardioScheduleValue(val)) return null;
-  return val!.slice(CARDIO_SCHEDULE_PREFIX.length).trim() || 'Cardio';
+  if (typeof val !== 'string' || !val.startsWith(CARDIO_SCHEDULE_PREFIX)) return null;
+  return val.slice(CARDIO_SCHEDULE_PREFIX.length).trim() || 'Cardio';
+}
+
+export function getCardioTemplateIdFromSchedule(val?: string | null): string | null {
+  if (typeof val !== 'string' || !val.startsWith(CARDIO_TEMPLATE_PREFIX)) return null;
+  return val.slice(CARDIO_TEMPLATE_PREFIX.length).trim() || null;
 }
 
 interface WeeklySplitSchedulerCardProps {
   templates: WorkoutTemplate[];
+  cardioTemplates?: CardioTemplate[];
   weeklySchedule: Record<number, string | null>;
   onUpdateSchedule: (nextSchedule: Record<number, string | null>) => void;
   onStartTemplate: (template: WorkoutTemplate) => void;
-  onStartCardio?: (activityName: string) => void;
+  onStartCardio?: (activityName: string, template?: CardioTemplate) => void;
 }
 
 const DAYS_ORDER = [
@@ -47,6 +57,7 @@ const DAYS_ORDER = [
 
 export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> = ({
   templates,
+  cardioTemplates = [],
   weeklySchedule,
   onUpdateSchedule,
   onStartTemplate,
@@ -56,16 +67,47 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
   const [customCardioName, setCustomCardioName] = useState('');
 
+  const resolveScheduledItem = (val?: string | null) => {
+    const cardioTplId = getCardioTemplateIdFromSchedule(val);
+    if (cardioTplId) {
+      const tpl = cardioTemplates.find((c) => c.id === cardioTplId);
+      if (tpl) {
+        return {
+          kind: 'cardio' as const,
+          label: tpl.title,
+          activity: tpl.activity,
+          cardioTemplate: tpl,
+        };
+      }
+    }
+    const rawCardio = getCardioActivityFromSchedule(val);
+    if (rawCardio) {
+      return {
+        kind: 'cardio' as const,
+        label: rawCardio,
+        activity: rawCardio,
+        cardioTemplate: undefined,
+      };
+    }
+    const tpl = val ? templates.find((t) => t.id === val) : undefined;
+    if (tpl) {
+      return {
+        kind: 'workout' as const,
+        label: tpl.title,
+        workoutTemplate: tpl,
+      };
+    }
+    return null;
+  };
+
   const todayDayIdx = new Date().getDay();
-  const todayValue = weeklySchedule?.[todayDayIdx];
-  const todayCardio = getCardioActivityFromSchedule(todayValue);
-  const todayTemplate = !todayCardio ? templates.find((t) => t.id === todayValue) : undefined;
+  const todayItem = resolveScheduledItem(weeklySchedule?.[todayDayIdx]);
   const selectedDayInfo = DAYS_ORDER.find((d) => d.dayIndex === selectedDayIdx);
 
   const selectedDayValue = selectedDayIdx !== null ? weeklySchedule?.[selectedDayIdx] : null;
   const selectedCustomCardio =
     selectedDayValue &&
-    isCardioScheduleValue(selectedDayValue) &&
+    selectedDayValue.startsWith(CARDIO_SCHEDULE_PREFIX) &&
     !CARDIO_SCHEDULE_PRESETS.some(
       (p) => `${CARDIO_SCHEDULE_PREFIX}${p}`.toLowerCase() === selectedDayValue.toLowerCase()
     )
@@ -99,26 +141,26 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
           <CalendarDays size={18} color={theme.accent} />
           <Text style={[styles.title, { color: theme.text }]}>Planning Hebdomadaire</Text>
         </View>
-        {todayTemplate ? (
+        {todayItem?.kind === 'workout' ? (
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => onStartTemplate(todayTemplate)}
+            onPress={() => onStartTemplate(todayItem.workoutTemplate)}
             style={[styles.quickStartPill, { backgroundColor: theme.accent }]}
           >
             <Play size={11} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 4 }} />
             <Text style={styles.quickStartText} numberOfLines={1}>
-              {todayTemplate.title}
+              {todayItem.label}
             </Text>
           </TouchableOpacity>
-        ) : todayCardio ? (
+        ) : todayItem?.kind === 'cardio' ? (
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => onStartCardio?.(todayCardio)}
+            onPress={() => onStartCardio?.(todayItem.activity, todayItem.cardioTemplate)}
             style={[styles.quickStartPill, { backgroundColor: '#F97316' }]}
           >
             <Flame size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
             <Text style={styles.quickStartText} numberOfLines={1}>
-              {todayCardio}
+              {todayItem.label}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -127,10 +169,7 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
       <View style={styles.daysRow}>
         {DAYS_ORDER.map((day) => {
           const isToday = day.dayIndex === todayDayIdx;
-          const assignedId = weeklySchedule?.[day.dayIndex];
-          const assignedCardio = getCardioActivityFromSchedule(assignedId);
-          const assignedTemplate = !assignedCardio ? templates.find((t) => t.id === assignedId) : undefined;
-          const hasActivity = Boolean(assignedCardio || assignedTemplate);
+          const scheduled = resolveScheduledItem(weeklySchedule?.[day.dayIndex]);
 
           return (
             <TouchableOpacity
@@ -161,26 +200,23 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
                 style={[
                   styles.dayDot,
                   {
-                    backgroundColor: assignedCardio
-                      ? '#F97316'
-                      : assignedTemplate
-                      ? theme.accent
-                      : theme.border,
+                    backgroundColor:
+                      scheduled?.kind === 'cardio'
+                        ? '#F97316'
+                        : scheduled?.kind === 'workout'
+                        ? theme.accent
+                        : theme.border,
                   },
                 ]}
               />
               <Text
                 style={[
                   styles.dayLabel,
-                  { color: hasActivity ? theme.text : theme.textMuted },
+                  { color: scheduled ? theme.text : theme.textMuted },
                 ]}
                 numberOfLines={1}
               >
-                {assignedCardio
-                  ? assignedCardio.slice(0, 5)
-                  : assignedTemplate
-                  ? assignedTemplate.title.slice(0, 5)
-                  : 'Repos'}
+                {scheduled ? scheduled.label.slice(0, 5) : 'Repos'}
               </Text>
             </TouchableOpacity>
           );
@@ -281,6 +317,39 @@ export const WeeklySplitSchedulerCard: React.FC<WeeklySplitSchedulerCardProps> =
                 <Text style={[styles.modalSectionLabel, { color: '#F97316' }]}>
                   CARDIO
                 </Text>
+
+                {cardioTemplates.map((ctpl) => {
+                  const valueKey = `${CARDIO_TEMPLATE_PREFIX}${ctpl.id}`;
+                  const isSelected = selectedDayIdx !== null && selectedDayValue === valueKey;
+                  return (
+                    <TouchableOpacity
+                      key={ctpl.id}
+                      activeOpacity={0.7}
+                      onPress={() => handleAssignTemplate(valueKey)}
+                      style={[
+                        styles.optionRow,
+                        { borderBottomColor: theme.border },
+                        isSelected && { backgroundColor: '#F9731618' },
+                      ]}
+                    >
+                      <Flame size={16} color="#F97316" style={{ marginRight: 10 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            { color: isSelected ? '#F97316' : theme.text },
+                          ]}
+                        >
+                          {ctpl.title}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                          {ctpl.activity} · {ctpl.defaultDurationMinutes} min
+                        </Text>
+                      </View>
+                      {isSelected && <Check size={18} color="#F97316" />}
+                    </TouchableOpacity>
+                  );
+                })}
 
                 {CARDIO_SCHEDULE_PRESETS.map((preset) => {
                   const valueKey = `${CARDIO_SCHEDULE_PREFIX}${preset}`;

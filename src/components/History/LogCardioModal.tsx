@@ -35,6 +35,9 @@ interface LogCardioModalProps {
   onSave?: (session: CardioSession) => void;
   initialDate?: string;
   initialActivity?: string;
+  initialDurationMinutes?: number;
+  initialRpe?: number;
+  initialNotes?: string;
   sessionToEdit?: CardioSession | null;
 }
 
@@ -67,6 +70,9 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
   onSave,
   initialDate,
   initialActivity,
+  initialDurationMinutes,
+  initialRpe,
+  initialNotes,
   sessionToEdit,
 }) => {
   const { theme } = useTheme();
@@ -173,14 +179,14 @@ export const LogCardioModal: React.FC<LogCardioModalProps> = ({
           setIsCustomActivity(false);
           setCustomActivityText('');
         }
-        setDurationMinutes(45);
-        setRpe(7);
+        setDurationMinutes(initialDurationMinutes && initialDurationMinutes > 0 ? initialDurationMinutes : 45);
+        setRpe(initialRpe && initialRpe >= 1 && initialRpe <= 10 ? initialRpe : 7);
         const d = new Date();
         setTimeStr(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
-        setNotes('');
+        setNotes(initialNotes || '');
       }
     }
-  }, [visible, initialDate, initialActivity, sessionToEdit, translateY]);
+  }, [visible, initialDate, initialActivity, initialDurationMinutes, initialRpe, initialNotes, sessionToEdit, translateY]);
 
   const panResponder = useMemo(
     () =>

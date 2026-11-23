@@ -351,7 +351,20 @@ export const FatigueMarkersCard: React.FC<FatigueMarkersCardProps> = ({
           {/* Jauge ACWR Anti-Blessure (AJ-13) */}
           <View style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: theme.surface, borderColor: theme.border }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text }}>Ratio ACWR (Aiguë / Chronique)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text }}>Ratio ACWR (Aiguë / Chronique)</Text>
+                <TermInfoTooltip
+                  customTitle="Ratio ACWR (Charge Aiguë / Chronique)"
+                  customExplanation={
+                    "Compare votre volume d'entraînement des 7 derniers jours (charge aiguë) à votre moyenne hebdomadaire sur les 28 derniers jours (charge chronique).\n\n" +
+                    "• < 0.80 (Sous-charge) : Volume inférieur à votre habitude (récupération ou deload).\n" +
+                    "• 0.80 – 1.30 (Zone optimale) : Progression maîtrisée, risque de blessure minimal.\n" +
+                    "• 1.30 – 1.50 (Vigilance) : Hausse rapide du volume, surveillez votre fatigue.\n" +
+                    "• > 1.50 (Surcharge / Risque) : Pic trop brutal, risque accru de blessure ou surmenage."
+                  }
+                  size={14}
+                />
+              </View>
               <Text
                 style={{
                   fontSize: 13,

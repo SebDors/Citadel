@@ -149,7 +149,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   const handleResetOnboarding = async () => {
     Alert.alert(
       'Relancer le tutoriel ?',
-      'Le guidage de bienvenue sera réactivé lors de vos prochaines visites dans les onglets de l\'application.',
+      'Le tutoriel indicatif de bienvenue sera réaffiché dans les onglets. Aucune de vos séances, mesures ou préférences ne sera supprimée.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -255,7 +255,12 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
           )}
 
           {/* SECTION 1 : ENTRAÎNEMENT & CALCULATEUR */}
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.textMuted, marginTop: updateInfo?.hasUpdate ? 4 : 0 },
+            ]}
+          >
             ENTRAÎNEMENT & CALCULATEUR
           </Text>
 
@@ -416,43 +421,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
             </View>
           </View>
 
-          {/* SECTION 2 : DONNÉES & SAUVEGARDE */}
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-            DONNÉES & SAUVEGARDE
-          </Text>
-
-          <View
-            style={[
-              styles.cardSection,
-              { backgroundColor: theme.cardBg, borderColor: theme.border },
-            ]}
-          >
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowExportModal(true)}
-              style={styles.actionRow}
-            >
-              <View
-                style={[
-                  styles.actionIconBox,
-                  { backgroundColor: `${theme.primary || theme.accent}15` },
-                ]}
-              >
-                <Download size={20} color={theme.primary || theme.accent} />
-              </View>
-              <View style={styles.actionTextBox}>
-                <Text style={[styles.actionTitle, { color: theme.text }]}>
-                  Sauvegarde & Exportation des données
-                </Text>
-                <Text style={[styles.actionSubtitle, { color: theme.textMuted }]}>
-                  Télécharger vos séances en CSV, sauvegarder ou restaurer un backup JSON
-                </Text>
-              </View>
-              <ChevronRight size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* SECTION 2B : FORMULE DE CALCUL 1RM (AJ-08) */}
+          {/* SECTION 2 : FORMULE DE CALCUL 1RM (AJ-08) */}
           <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
             CALCUL DU 1RM ESTIMÉ
           </Text>
@@ -524,9 +493,112 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
             })}
           </View>
 
-          {/* SECTION 3 : APPLICATION & MISES À JOUR */}
+          {/* SECTION 3 : DONNÉES & SAUVEGARDE */}
           <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-            APPLICATION & VERSION
+            DONNÉES & SAUVEGARDE
+          </Text>
+
+          <View
+            style={[
+              styles.cardSection,
+              { backgroundColor: theme.cardBg, borderColor: theme.border },
+            ]}
+          >
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowExportModal(true)}
+              style={styles.actionRow}
+            >
+              <View
+                style={[
+                  styles.actionIconBox,
+                  { backgroundColor: `${theme.primary || theme.accent}15` },
+                ]}
+              >
+                <Download size={20} color={theme.primary || theme.accent} />
+              </View>
+              <View style={styles.actionTextBox}>
+                <Text style={[styles.actionTitle, { color: theme.text }]}>
+                  Sauvegarde & Exportation des données
+                </Text>
+                <Text style={[styles.actionSubtitle, { color: theme.textMuted }]}>
+                  Télécharger vos séances en CSV, sauvegarder ou restaurer un backup JSON
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* SECTION 4 : ZONE DE DANGER & RÉINITIALISATION */}
+          <Text style={[styles.sectionTitle, { color: theme.danger || '#EF4444' }]}>
+            ZONE DE DANGER
+          </Text>
+
+          <View
+            style={[
+              styles.cardSection,
+              {
+                backgroundColor: theme.cardBg,
+                borderColor: `${theme.danger || '#EF4444'}30`,
+              },
+            ]}
+          >
+            {/* Relancer l'onboarding */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleResetOnboarding}
+              style={styles.actionRow}
+            >
+              <View
+                style={[
+                  styles.actionIconBox,
+                  { backgroundColor: `${theme.accent}15` },
+                ]}
+              >
+                <Sparkles size={20} color={theme.accent} />
+              </View>
+              <View style={styles.actionTextBox}>
+                <Text style={[styles.actionTitle, { color: theme.text }]}>
+                  Relancer le tutoriel de bienvenue
+                </Text>
+                <Text style={[styles.actionSubtitle, { color: theme.textMuted }]}>
+                  Réaffiche le tutoriel indicatif de découverte. Aucune donnée n'est supprimée.
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+
+            <View style={[styles.cardDivider, { backgroundColor: theme.border }]} />
+
+            {/* Réinitialiser toutes les données */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleResetAllData}
+              style={styles.actionRow}
+            >
+              <View
+                style={[
+                  styles.actionIconBox,
+                  { backgroundColor: `${theme.danger || '#EF4444'}15` },
+                ]}
+              >
+                <RotateCcw size={20} color={theme.danger || '#EF4444'} />
+              </View>
+              <View style={styles.actionTextBox}>
+                <Text style={[styles.actionTitle, { color: theme.danger || '#EF4444' }]}>
+                  Réinitialiser toutes les données
+                </Text>
+                <Text style={[styles.actionSubtitle, { color: theme.textMuted }]}>
+                  Supprime définitivement tout l'historique, les modèles et les mensurations
+                </Text>
+              </View>
+              <ShieldAlert size={18} color={theme.danger || '#EF4444'} />
+            </TouchableOpacity>
+          </View>
+
+          {/* SECTION 5 : VERSION */}
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+            VERSION
           </Text>
 
           <View
@@ -577,73 +649,6 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-
-          {/* SECTION 4 : ZONE DE DANGER & RÉINITIALISATION */}
-          <Text style={[styles.sectionTitle, { color: theme.danger || '#EF4444' }]}>
-            ZONE DE DANGER
-          </Text>
-
-          <View
-            style={[
-              styles.cardSection,
-              {
-                backgroundColor: theme.cardBg,
-                borderColor: `${theme.danger || '#EF4444'}30`,
-              },
-            ]}
-          >
-            {/* Relancer l'onboarding */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleResetOnboarding}
-              style={styles.actionRow}
-            >
-              <View
-                style={[
-                  styles.actionIconBox,
-                  { backgroundColor: `${theme.accent}15` },
-                ]}
-              >
-                <Sparkles size={20} color={theme.accent} />
-              </View>
-              <View style={styles.actionTextBox}>
-                <Text style={[styles.actionTitle, { color: theme.text }]}>
-                  Relancer le tutoriel de bienvenue
-                </Text>
-                <Text style={[styles.actionSubtitle, { color: theme.textMuted }]}>
-                  Réaffiche les bannières d'explications et conseils pour redécouvrir l'application
-                </Text>
-              </View>
-              <ChevronRight size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-
-            <View style={[styles.cardDivider, { backgroundColor: theme.border }]} />
-
-            {/* Réinitialiser toutes les données */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleResetAllData}
-              style={styles.actionRow}
-            >
-              <View
-                style={[
-                  styles.actionIconBox,
-                  { backgroundColor: `${theme.danger || '#EF4444'}15` },
-                ]}
-              >
-                <RotateCcw size={20} color={theme.danger || '#EF4444'} />
-              </View>
-              <View style={styles.actionTextBox}>
-                <Text style={[styles.actionTitle, { color: theme.danger || '#EF4444' }]}>
-                  Réinitialiser toutes les données
-                </Text>
-                <Text style={[styles.actionSubtitle, { color: theme.textMuted }]}>
-                  Supprime définitivement tout l'historique, les modèles et les mensurations
-                </Text>
-              </View>
-              <ShieldAlert size={18} color={theme.danger || '#EF4444'} />
-            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -707,7 +712,8 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 40,
   },
   updateBanner: {
